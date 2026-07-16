@@ -1,0 +1,73 @@
+Améliore l’application ClimbTrack sans supprimer ni casser les fonctionnalités actuelles.
+
+1. Progression intelligente
+
+* Après deux réussites complètes consécutives sur un exercice, proposer automatiquement une progression adaptée :
+    * augmentation de charge ;
+    * augmentation du nombre de répétitions ;
+    * augmentation du temps ;
+    * réduction de l’assistance ;
+    * réglette plus petite lorsque c’est pertinent.
+* La proposition ne doit jamais être appliquée automatiquement.
+* Toujours demander confirmation à l’utilisateur.
+* L’utilisateur doit pouvoir modifier manuellement les valeurs avant d’accepter.
+* L’utilisateur doit aussi pouvoir ignorer la proposition et entrer librement ses propres valeurs à tout moment.
+* Conserver un historique clair des anciennes valeurs et des progressions acceptées.
+
+2. Records uniquement liés directement à l’escalade
+    Créer une section Records dédiée uniquement aux performances vraiment spécifiques à l’escalade.
+    Inclure notamment :
+
+* suspensions sur réglette, séparées par taille de réglette ;
+* records assistés et non assistés séparés ;
+* traction maximale, avec charge ajoutée ;
+* pince maximale ;
+* temps maximal de suspension ;
+* éventuellement meilleur niveau d’assistance atteint.
+
+Ne pas inclure les records trop généraux comme le gainage, le squat ou les exercices qui ne sont pas directement liés à l’escalade.
+
+3. Calendrier avec flammes et série de jours
+
+* Garder le calendrier existant.
+* Ajouter une flamme sur chaque jour où une séance d’escalade ou d’entraînement escalade a été réalisée.
+* Ajouter un compteur de série actuelle, dans un style proche de Duolingo.
+* Afficher aussi la meilleure série historique.
+* Une journée de repos ne doit pas casser automatiquement la série si elle correspond à une règle de récupération raisonnable.
+* Les séances de prévention seules ne doivent pas forcément compter comme une vraie journée d’entraînement escalade.
+* Le design doit rester sobre, en noir, blanc et gris, avec une flamme élégante.
+
+4. Sauvegarde simple et fiable
+
+* Ajouter un bouton clair “Sauvegarder mes données”.
+* Exporter facilement toutes les données de l’application en un fichier JSON.
+* Ajouter un bouton “Importer une sauvegarde”.
+* Vérifier le fichier avant importation et afficher un avertissement avant de remplacer les données actuelles.
+* Ajouter un rappel discret de sauvegarde, par exemple une fois par semaine ou après plusieurs nouvelles séances.
+* Tout doit rester stocké localement sur l’appareil.
+
+5. Mode séance amélioré
+    Pendant une séance :
+
+* afficher un grand bouton pour valider chaque série ;
+* afficher clairement l’exercice actuel et le prochain exercice ;
+* lancer automatiquement le chronomètre de repos après validation ;
+* faire vibrer le téléphone à la fin du repos si le navigateur l’autorise ;
+* empêcher l’écran de s’éteindre pendant la séance si l’appareil et le navigateur le permettent ;
+* sauvegarder automatiquement la séance en cours ;
+* reprendre exactement où l’utilisateur s’était arrêté après fermeture ou rechargement ;
+* afficher les temps, charges, répétitions et assistances en grands caractères faciles à lire ;
+* permettre de modifier toutes les valeurs pendant la séance ;
+* ne jamais bloquer l’utilisateur si le temps de repos conseillé n’est pas terminé ;
+* garder l’interface très simple et rapide à utiliser sur iPhone.
+
+6. Contraintes générales
+
+* Ne pas ajouter de RPE, de score de fatigue ou de questionnaire de récupération.
+* Ne pas ajouter de fonctionnalités sociales.
+* Ne pas rendre l’application publique ou dépendante d’un compte utilisateur.
+* Garder toutes les données dans localStorage ou IndexedDB.
+* Conserver la compatibilité GitHub Pages et le fonctionnement hors ligne.
+* Garder le style actuel minimaliste noir, blanc et gris.
+* Vérifier que toutes les nouvelles fonctions fonctionnent sur iPhone et en PWA.
+* Une fois les modifications terminées, tester l’application puis pousser les changements sur GitHub

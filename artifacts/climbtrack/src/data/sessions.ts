@@ -11,6 +11,8 @@ export interface ExerciseDef {
   defaultValues: ExerciseDefaults;
   assistanceOptions?: string[];
   isHangboard?: boolean;
+  /** For custom exercises: which sessions they appear in. */
+  sessionIds?: string[];
 }
 
 export interface SessionDef {
