@@ -5,8 +5,9 @@ import { defineConfig } from 'vite';
 import { VitePWA } from 'vite-plugin-pwa';
 
 // GitHub Pages build config — no Replit-specific plugins, no PORT/BASE_PATH env vars required.
-// The app is deployed under https://<user>.github.io/ClimbTrack/
-const BASE = '/ClimbTrack/';
+// The app is deployed under https://<user>.github.io/Climbtrack/
+// IMPORTANT: base must match the exact GitHub repo name case (Climbtrack, not ClimbTrack).
+const BASE = '/Climbtrack/';
 
 export default defineConfig({
   base: BASE,
