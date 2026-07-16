@@ -1,0 +1,1035 @@
+Je veux créer une application web mobile personnelle appelée provisoirement « ClimbTrack ». Elle doit être optimisée principalement pour iPhone et pouvoir être ajoutée à l’écran d’accueil comme une application.
+
+L’application est uniquement destinée à mon usage personnel. Je ne veux pas de réseau social, de profil public, de partage entre utilisateurs, de classement, de publicité, d’abonnement ou de contenu communautaire.
+
+DESIGN GÉNÉRAL
+
+Créer une interface moderne, très propre, minimaliste et sportive.
+
+Palette de couleurs :
+
+* fond noir ;
+* cartes gris très foncé ;
+* séparations gris moyen ;
+* textes principaux blancs ;
+* textes secondaires gris clair ;
+* boutons principaux blancs avec texte noir ;
+* vert discret uniquement pour signaler un exercice terminé ;
+* rouge discret uniquement pour les avertissements ou suppressions.
+
+Ne pas utiliser de couleurs vives pour l’interface normale.
+
+L’application doit être :
+
+* parfaitement lisible sur iPhone ;
+* utilisable facilement avec une seule main ;
+* rapide ;
+* fluide ;
+* moderne ;
+* entièrement en français ;
+* compatible avec le mode portrait ;
+* installable comme PWA sur l’écran d’accueil ;
+* capable de fonctionner hors ligne après le premier chargement.
+
+Les données doivent rester personnelles et être sauvegardées localement sur mon appareil. Prévoir également un bouton pour exporter toutes les données en fichier JSON et un bouton pour les réimporter.
+
+NAVIGATION PRINCIPALE
+
+Créer cinq onglets en bas de l’écran :
+
+1. Séances
+2. Historique
+3. Progression
+4. Corps
+5. Réglages
+
+1. ONGLET SÉANCES
+
+Afficher les séances disponibles sous forme de grandes cartes.
+
+Séances :
+
+1. Force doigts / puissance
+2. Résistance musculaire
+3. Dos / épaules / force
+4. Gainage complet
+5. Souplesse complète
+6. Jambes
+7. Prévention blessures
+
+Lorsqu’une séance est ouverte, afficher tous ses exercices.
+
+Pour chaque exercice, afficher :
+
+* une case à cocher ;
+* le nom ;
+* une courte explication ;
+* le nombre de séries prévu ;
+* les répétitions ou le temps prévu ;
+* le repos recommandé ;
+* la charge prévue si nécessaire ;
+* la dernière performance enregistrée ;
+* le record personnel s’il existe.
+
+Toutes les valeurs doivent être préremplies par défaut.
+
+Quand je coche un exercice sans rien modifier, l’application doit enregistrer automatiquement que j’ai réalisé exactement les séries, répétitions, temps et charges prévus.
+
+Je dois pouvoir modifier rapidement :
+
+* le nombre de séries réellement réalisées ;
+* les répétitions ;
+* le temps ;
+* la charge ;
+* l’assistance ;
+* la valeur utilisée pour le graphique de progression.
+
+Ajouter un bouton « Terminer la séance ».
+
+À la fin, enregistrer :
+
+* la date ;
+* la séance ;
+* les exercices cochés ;
+* les valeurs réalisées ;
+* une note courte facultative.
+
+Ne pas demander de difficulté ressentie sur 10.
+
+REPOS ENTRE LES SÉRIES
+
+Pour chaque exercice avec repos, intégrer un chronomètre facultatif.
+
+Je ne veux pas un minuteur qui m’empêche de repartir.
+
+Créer un chronomètre de repos qui compte vers le haut :
+
+* 0:00 ;
+* 0:01 ;
+* 0:02 ;
+* etc.
+
+Afficher clairement le repos recommandé.
+
+Exemple :
+« Repos recommandé : 3 min »
+
+Avant que le temps soit atteint :
+« Récupération en cours »
+
+Lorsque le temps recommandé est atteint :
+« Repos conseillé atteint. Tu peux repartir quand tu te sens prêt. »
+
+Ajouter :
+
+* Démarrer ;
+* Réinitialiser ;
+* Série suivante.
+
+SUSPENSIONS ET ASSISTANCE DES PIEDS
+
+Pour toutes les suspensions sur réglette de 25 mm ou moins, prévoir un champ « Assistance ».
+
+Choix :
+
+* deux pieds au sol, appui fort ;
+* deux pieds au sol, appui moyen ;
+* deux pieds au sol, appui léger ;
+* un pied au sol ;
+* pointes des pieds ;
+* sans assistance ;
+* lesté.
+
+Pour le moment, la valeur par défaut doit être « deux pieds au sol, appui moyen ».
+
+Pour les suspensions de 25 mm, je peux parfois tenir brièvement avec très peu d’assistance. Je dois pouvoir enregistrer séparément un test sans aide, même s’il ne dure que quelques secondes.
+
+Les graphiques doivent distinguer :
+
+* temps avec assistance ;
+* niveau d’assistance ;
+* temps sans assistance ;
+* charge ajoutée éventuelle.
+
+Ne jamais comparer directement une suspension assistée avec une suspension sans aide comme s’il s’agissait de la même performance.
+
+2. ONGLET HISTORIQUE
+
+Créer un calendrier ou une liste chronologique.
+
+Si aucune séance n’est enregistrée un jour donné, le jour est automatiquement affiché comme :
+« Repos »
+
+Je dois pouvoir ajouter une séance oubliée à une date passée avec un bouton :
+« Ajouter une séance passée »
+
+Je choisis :
+
+* la date ;
+* la séance ;
+* les exercices réalisés ;
+* les valeurs.
+
+Le jour qui était marqué repos devient alors automatiquement un jour d’entraînement.
+
+Je dois pouvoir :
+
+* ouvrir une séance passée ;
+* la modifier ;
+* la supprimer ;
+* ajouter plusieurs séances le même jour ;
+* marquer manuellement un jour comme repos.
+
+Afficher des statistiques simples :
+
+* séances cette semaine ;
+* jours de repos cette semaine ;
+* dernière séance doigts ;
+* dernière séance jambes ;
+* nombre de jours depuis la dernière séance.
+
+3. ONGLET PROGRESSION
+
+Créer un graphique d’évolution distinct pour chaque exercice mesurable.
+
+Je dois choisir l’exercice dans une liste déroulante.
+
+Afficher :
+
+* toutes les performances avec leur date ;
+* dernière performance ;
+* record ;
+* évolution ;
+* nombre de fois où l’exercice a été effectué.
+
+Catégories à suivre séparément :
+
+Suspensions
+
+* suspension 25 mm ;
+* suspension 20 mm ;
+* suspension 15 mm ;
+* suspension 10 mm ;
+* suspension semi-arche ;
+* suspension main ouverte ;
+* durée ;
+* assistance ;
+* lest.
+
+Tractions
+
+* maximum de tractions sans lest ;
+* tractions lestées ;
+* charge utilisée ;
+* nombre de répétitions ;
+* blocage ;
+* lourd-léger ;
+* tractions endurance.
+
+Préhension
+
+* pince disque ;
+* charge ;
+* durée ;
+* repeaters 7/3 ;
+* repeaters 6/4.
+
+Musculation
+
+* rowing ;
+* facepull ;
+* développé militaire ;
+* squat ;
+* fentes bulgares ;
+* soulevé de terre roumain ;
+* step-up ;
+* mollets.
+
+Gainage
+
+* planche ;
+* planche latérale ;
+* relevés de jambes ;
+* rotations russes ;
+* Superman hold ;
+* Copenhagen plank.
+
+PROGRESSION AUTOMATIQUE
+
+L’application doit analyser l’évolution, mais ne jamais changer les valeurs sans mon accord.
+
+Après deux séances consécutives où toutes les séries prévues sont réussies, proposer une progression.
+
+Afficher :
+
+* Accepter ;
+* Garder le même niveau ;
+* Modifier manuellement.
+
+Ne modifier qu’un paramètre à la fois.
+
+Pour la musculation
+
+Proposer généralement une petite augmentation :
+
+* environ 1 kg pour les charges légères ;
+* environ 2 à 2,5 kg pour les charges moyennes ;
+* jamais augmenter en même temps la charge et les répétitions.
+
+Pour les tractions lestées
+
+Proposer généralement :
+
+* +1 kg ;
+* +1,25 kg ;
+* ou +2,5 kg selon le matériel disponible.
+
+Pour les suspensions
+
+Ne pas diminuer automatiquement la taille de réglette.
+
+Ordre de progression :
+
+1. même réglette ;
+2. même durée ;
+3. réduire légèrement l’aide des pieds ;
+4. passer de deux pieds à un pied ;
+5. passer aux pointes des pieds ;
+6. réaliser quelques secondes sans aide ;
+7. augmenter progressivement le temps sans aide ;
+8. seulement après maîtrise sans aide, proposer éventuellement du lest.
+
+Ne pas proposer de lest tant que la suspension sans assistance n’est pas correctement maîtrisée.
+
+Pour la pince disque
+
+Lorsque 3 séries de 20 secondes sont réussies deux fois :
+
+* proposer une petite augmentation de charge ;
+* sinon proposer 25 secondes ;
+* ne pas augmenter charge et durée en même temps.
+
+Pour le gainage
+
+Lorsque toutes les séries sont réussies deux fois :
+
+* proposer +5 secondes par série ;
+* lorsque la durée devient trop longue, proposer une variante plus difficile.
+
+Plateau
+
+Si aucune progression n’est visible pendant 4 à 6 séances, afficher :
+« Progression stable depuis plusieurs séances »
+
+Puis proposer une seule option :
+
+* conserver la charge ;
+* augmenter le repos ;
+* réduire temporairement le volume ;
+* tester une variante ;
+* réaliser un test de record après récupération.
+
+4. ONGLET CORPS
+
+Créer une silhouette humaine vue de face et de dos.
+
+Colorer les groupes musculaires selon ce qui a été travaillé.
+
+Filtres :
+
+* cette séance ;
+* aujourd’hui ;
+* 7 derniers jours ;
+* 30 derniers jours ;
+* depuis le début.
+
+Niveaux :
+
+* gris foncé : pas travaillé ;
+* gris clair : légèrement travaillé ;
+* blanc cassé : travail moyen ;
+* blanc très lumineux : fortement travaillé.
+
+Comme le design doit rester noir, blanc et gris, ne pas utiliser un arc-en-ciel sur le corps.
+
+Afficher aussi un graphique à barres des groupes musculaires.
+
+Groupes musculaires :
+
+* doigts ;
+* avant-bras ;
+* biceps ;
+* triceps ;
+* épaules ;
+* pectoraux ;
+* dos ;
+* lombaires ;
+* abdominaux ;
+* obliques ;
+* hanches ;
+* fessiers ;
+* quadriceps ;
+* ischio-jambiers ;
+* adducteurs ;
+* mollets ;
+* tibial antérieur ;
+* mobilité.
+
+Chaque exercice doit attribuer des points aux muscles sollicités.
+
+Le score est uniquement un indice interne servant à comparer la répartition, pas une mesure médicale exacte.
+
+Afficher :
+
+* groupes très travaillés ;
+* groupes moyennement travaillés ;
+* groupes peu travaillés.
+
+Proposer une phrase simple :
+« Pour mieux équilibrer ta période récente, tu pourrais privilégier : jambes, pectoraux ou mobilité. »
+
+Ne jamais présenter cette suggestion comme une obligation.
+
+PRÉVENTION BLESSURES
+
+La séance « Prévention blessures » doit :
+
+* rester disponible ;
+* être enregistrée dans l’historique ;
+* être comptée comme une séance effectuée.
+
+Mais elle ne doit PAS être incluse dans :
+
+* la silhouette musculaire ;
+* le graphique de répartition ;
+* les recommandations d’équilibrage ;
+* les records principaux.
+
+DOULEURS
+
+Ajouter une petite zone facultative avant ou après une séance :
+
+* doigts ;
+* poignet droit ;
+* poignet gauche ;
+* coude droit ;
+* coude gauche ;
+* épaule droite ;
+* épaule gauche.
+
+Valeurs de 0 à 10.
+
+Si une douleur est enregistrée, afficher uniquement un avertissement discret à côté des exercices qui chargent la zone.
+
+Ne pas diagnostiquer une blessure.
+
+DONNÉES DES SÉANCES
+
+SÉANCE 1 — FORCE DOIGTS / PUISSANCE
+
+Moment :
+À faire avant la grimpe, après 20 à 30 minutes d’échauffement facile.
+
+1. Suspension semi-arche 20 mm
+    Description : suspension en semi-arche sur une réglette de 20 mm.
+    Par défaut :
+
+* 5 séries ;
+* 10 secondes ;
+* 3 minutes de repos ;
+* assistance : deux pieds au sol, appui moyen.
+
+2. Sauts pour attraper une prise
+    Description : sur la board à côté de la Kilter, réaliser trois sauts explosifs pour attraper une prise.
+    Par défaut :
+
+* 5 séries ;
+* 3 sauts ;
+* 30 secondes de repos.
+
+3. Lourd-léger
+    Description :
+
+* 2 tractions lourdes ;
+* 10 secondes pour enlever le lest ;
+* 3 tractions explosives sans lest.
+    Par défaut :
+* 3 séries ;
+* 3 minutes de repos.
+
+4. Pince disque
+    Description : pincer un disque entre les doigts et le pouce, poignet droit.
+    Par défaut :
+
+* 20 kg ;
+* 20 secondes par main ;
+* 3 séries ;
+* 3 minutes de repos.
+
+Ne pas ajouter l’exercice « serre la boîte ».
+
+SÉANCE 2 — RÉSISTANCE MUSCULAIRE
+
+Moment :
+À faire après la grimpe ou comme séance principale sans blocs très durs.
+
+1. Repeaters 7/3
+    Description :
+
+* 7 secondes suspendu ;
+* 3 secondes de repos ;
+* 10 répétitions.
+    Par défaut :
+* 3 séries ;
+* 3 minutes de repos entre les séries ;
+* assistance : deux pieds au sol, appui moyen.
+
+2. Blocs en dévers
+    Description : choisir un bloc bleu foncé ou turquoise.
+    Par défaut :
+
+* 3 essais ;
+* 1 minute entre les essais ;
+* 2 séries ;
+* 3 minutes entre les séries.
+
+3. Traversées longues
+    Description : traversée facile ou moyenne sans descendre.
+    Par défaut :
+
+* 3 à 5 minutes ;
+* 3 séries ;
+* 3 minutes de repos.
+
+4. Tractions endurance
+    Description : tractions propres sans aller à l’échec.
+    Par défaut :
+
+* 6 à 8 répétitions ;
+* 5 séries ;
+* 1 minute de repos.
+
+5. Suspension facile longue
+    Description : sur une bonne prise, épaules engagées.
+    Par défaut :
+
+* 30 secondes ;
+* 4 séries ;
+* 1 minute de repos.
+
+6. Repeaters faciles 6/4
+    Description :
+
+* 6 secondes suspendu ;
+* 4 secondes de repos ;
+* 10 répétitions.
+    Par défaut :
+* 3 séries ;
+* 3 minutes de repos ;
+* assistance : deux pieds au sol, appui moyen.
+
+7. Dead hang deux mains
+    Description : bras tendus, épaules engagées.
+    Par défaut :
+
+* 20 secondes ;
+* 3 séries ;
+* 2 minutes de repos.
+
+Ne pas ajouter de circuit de blocs.
+Ne pas ajouter de dévers facile en continu.
+
+SÉANCE 3 — DOS / ÉPAULES / FORCE
+
+Moment :
+À faire après la grimpe ou comme séance séparée.
+
+1. Tractions lestées
+    Description : choisir une charge permettant environ 7 répétitions maximum, mais n’en faire que 6.
+    Par défaut :
+
+* 3 séries ;
+* 6 répétitions ;
+* 3 minutes de repos ;
+* lest initial modifiable.
+
+2. Blocages
+    Description :
+
+* 6 secondes de blocage ;
+* puis 2 tractions.
+    Par défaut :
+* 3 séries ;
+* 3 minutes de repos.
+
+3. Rowing haltère
+    Description : buste incliné, dos droit, tirer l’haltère vers les côtes.
+    Par défaut :
+
+* 15 kg ;
+* 3 séries ;
+* 10 à 12 répétitions par bras ;
+* 2 minutes de repos.
+
+4. Lat pulldown avec élastique
+    Description : élastique accroché en hauteur, bras tendu, tirer vers le sol sans plier le bras.
+    Par défaut :
+
+* 3 séries ;
+* 8 répétitions par bras ;
+* 3 minutes de repos.
+
+5. Facepull
+    Description : tirer vers le visage avec les coudes hauts.
+    Par défaut :
+
+* 10 kg modifiables ;
+* 3 séries ;
+* 12 à 15 répétitions ;
+* 90 secondes de repos.
+
+6. Triceps avec élastique
+    Description : coude collé au corps, tendre l’avant-bras vers le bas.
+    Par défaut :
+
+* 3 séries ;
+* 8 répétitions par bras ;
+* 3 minutes de repos.
+
+7. Développé militaire
+    Description : pousser la barre ou les haltères au-dessus de la tête sans cambrer.
+    Par défaut :
+
+* 20 kg ;
+* 3 séries ;
+* 8 à 12 répétitions ;
+* 2 minutes de repos.
+
+SÉANCE 4 — GAINAGE COMPLET
+
+Moment :
+À faire après la grimpe ou séparément.
+
+1. Dead bug
+    Description : bas du dos collé au sol, descendre bras et jambe opposés.
+    Par défaut :
+
+* 3 séries ;
+* 10 répétitions par côté ;
+* 45 secondes de repos.
+
+2. Planche sur les avant-bras
+    Par défaut :
+
+* 3 séries ;
+* 30 à 45 secondes ;
+* 1 minute de repos.
+
+3. Planche latérale
+    Par défaut :
+
+* 3 séries ;
+* 30 secondes par côté ;
+* 1 minute de repos.
+
+4. Pallof press
+    Description : élastique fixé sur le côté, tendre les bras sans laisser le buste tourner.
+    Par défaut :
+
+* 3 séries ;
+* 10 répétitions par côté ;
+* 1 minute de repos.
+
+5. Relevés de jambes suspendus
+    Description : monter les jambes jusqu’à 90 degrés et contrôler la descente.
+    Par défaut :
+
+* 3 séries ;
+* 8 à 12 répétitions ;
+* 90 secondes de repos.
+
+6. Rotations russes
+    Par défaut :
+
+* 6 kg ;
+* 3 séries ;
+* 12 à 20 rotations ;
+* 1 minute de repos.
+
+7. Superman hold
+    Par défaut :
+
+* 3 séries ;
+* 20 à 30 secondes ;
+* 1 minute de repos.
+
+8. Copenhagen plank
+    Description : commencer avec le genou de la jambe supérieure sur un banc.
+    Par défaut :
+
+* 3 séries ;
+* 20 à 30 secondes par côté ;
+* 1 minute de repos.
+
+Ne pas inclure :
+
+* hollow hold ;
+* planche avec touches d’épaules ;
+* serre la boîte.
+
+SÉANCE 5 — SOUPLESSE COMPLÈTE
+
+Moment :
+À faire un jour léger ou après une séance.
+
+Catégorie poignets et avant-bras :
+
+1. Cercles de poignets
+
+* 2 séries ;
+* 10 tours dans chaque sens.
+
+2. Étirement poignet, paume vers l’avant
+
+* 2 séries ;
+* 20 secondes par bras.
+
+3. Étirement poignet, paume vers soi
+
+* 2 séries ;
+* 20 secondes par bras.
+
+4. Étirement des poignets au sol
+
+* 2 séries ;
+* 20 secondes.
+
+Catégorie épaules, dorsaux et haut du dos :
+
+5. Épaules sur chaise ou banc
+    Description : mains sur le support, bras tendus, poitrine vers le sol.
+
+* 3 séries ;
+* 30 secondes.
+
+6. Child pose épaules
+
+* 3 séries ;
+* 30 secondes.
+
+7. Bras au-dessus de la tête
+
+* 2 séries ;
+* 15 secondes.
+
+8. Étirement latéral debout
+
+* 2 séries ;
+* 15 secondes par côté.
+
+9. Étirement triceps et épaule
+
+* 2 séries ;
+* 20 secondes par bras.
+
+Catégorie dos et thorax :
+
+10. Open book
+
+* 2 séries ;
+* 10 répétitions par côté.
+
+11. Rotation assise
+
+* 2 séries ;
+* 15 secondes par côté.
+
+12. Dos rond / dos creux
+
+* 2 séries ;
+* 10 répétitions.
+
+Catégorie hanches, fessiers et adducteurs :
+
+13. Fente profonde
+
+* 3 séries ;
+* 30 secondes par côté.
+
+14. Papillon
+
+* 3 séries ;
+* 30 secondes.
+
+15. Grenouille
+
+* 3 séries ;
+* 30 secondes.
+
+16. Squat profond tenu
+
+* 3 séries ;
+* 30 secondes.
+
+17. Genou vers la poitrine
+
+* 2 séries ;
+* 20 secondes par jambe.
+
+18. Étirement fessier allongé
+
+* 2 séries ;
+* 20 secondes par côté.
+
+Catégorie quadriceps :
+
+19. Quadriceps couché
+
+* 2 séries ;
+* 20 secondes par jambe.
+
+20. Quadriceps debout
+
+* 2 séries ;
+* 20 secondes par jambe.
+
+Catégorie ischio-jambiers :
+
+21. Ischios
+
+* 3 séries ;
+* 30 secondes.
+
+22. Jambe tendue au sol
+
+* 2 séries ;
+* 20 secondes par jambe.
+
+Catégorie mollets et chevilles :
+
+23. Mollet contre un mur
+
+* 2 séries ;
+* 20 secondes par jambe.
+
+24. Mollet avec jambe pliée
+
+* 2 séries ;
+* 20 secondes par jambe.
+
+25. Mobilité de cheville, genou vers l’avant
+
+* 2 séries ;
+* 10 répétitions par cheville.
+
+Catégorie cou et nuque :
+
+26. Inclinaison du cou
+
+* 2 séries ;
+* 10 secondes par côté.
+
+27. Rotation du cou
+
+* 2 séries ;
+* 10 secondes par côté.
+
+SÉANCE 6 — JAMBES
+
+Moment :
+À faire après une grimpe facile ou séparément.
+
+1. Squat
+
+* 3 séries ;
+* 8 à 12 répétitions ;
+* charge modifiable ;
+* 2 minutes de repos.
+
+2. Fentes bulgares
+
+* 3 séries ;
+* 8 à 12 répétitions par jambe ;
+* charge modifiable ;
+* 2 minutes de repos.
+
+3. Soulevé de terre roumain
+
+* 3 séries ;
+* 8 à 12 répétitions ;
+* charge modifiable ;
+* 2 minutes de repos.
+
+4. Step-up
+
+* 3 séries ;
+* 8 à 12 répétitions par jambe ;
+* charge modifiable ;
+* 90 secondes de repos.
+
+5. Mollets debout
+
+* 3 séries ;
+* 12 à 20 répétitions ;
+* charge modifiable ;
+* 1 minute de repos.
+
+6. Tibialis raise
+
+* 3 séries ;
+* 12 à 20 répétitions ;
+* 1 minute de repos.
+
+SÉANCE 7 — PRÉVENTION BLESSURES
+
+Moment :
+À faire après la grimpe ou un jour léger.
+
+Cette séance ne doit pas entrer dans les calculs musculaires.
+
+1. Rotations externes de l’épaule
+
+* 3 séries ;
+* 12 à 15 répétitions par bras ;
+* 1 minute de repos.
+
+2. Scapular pull-ups
+
+* 3 séries ;
+* 8 à 12 répétitions ;
+* 1 minute de repos.
+
+3. Facepull léger
+
+* 3 séries ;
+* 12 à 15 répétitions ;
+* 1 minute de repos.
+
+4. Extension des doigts avec élastique
+
+* 3 séries ;
+* 20 répétitions par main ;
+* 45 secondes de repos.
+
+5. Flexion du poignet
+
+* 3 séries ;
+* 12 à 15 répétitions par bras ;
+* 1 minute de repos.
+
+6. Extension du poignet
+
+* 3 séries ;
+* 12 à 15 répétitions par bras ;
+* 1 minute de repos.
+
+7. Pronation / supination
+
+* 3 séries ;
+* 12 répétitions par bras ;
+* 1 minute de repos.
+
+8. Équilibre sur une jambe
+
+* 3 séries ;
+* 30 secondes par jambe ;
+* 45 secondes de repos.
+
+ATTRIBUTION DES MUSCLES
+
+Utiliser une échelle interne de 0 à 5 pour chaque exercice :
+
+* 0 : pas sollicité ;
+* 1 : très légèrement ;
+* 2 : légèrement ;
+* 3 : moyennement ;
+* 4 : fortement ;
+* 5 : muscle principal.
+
+Exemples :
+
+Suspension 20 mm :
+
+* doigts 5 ;
+* avant-bras 5 ;
+* dos 1 ;
+* épaules 1.
+
+Tractions lestées :
+
+* dos 5 ;
+* biceps 5 ;
+* épaules 3 ;
+* gainage 2 ;
+* avant-bras 2.
+
+Rowing :
+
+* dos 5 ;
+* biceps 3 ;
+* épaules 3 ;
+* gainage 1.
+
+Développé militaire :
+
+* épaules 5 ;
+* triceps 4 ;
+* pectoraux 2 ;
+* gainage 2.
+
+Planche :
+
+* abdominaux 5 ;
+* épaules 2 ;
+* fessiers 2.
+
+Copenhagen plank :
+
+* adducteurs 5 ;
+* obliques 3 ;
+* abdominaux 3.
+
+Squat :
+
+* quadriceps 5 ;
+* fessiers 4 ;
+* abdominaux 2.
+
+Soulevé de terre roumain :
+
+* ischio-jambiers 5 ;
+* fessiers 5 ;
+* lombaires 2.
+
+Pour les autres exercices, attribuer des scores cohérents selon les principaux muscles sollicités.
+
+RÉGLAGES
+
+Créer :
+
+* exporter les données ;
+* importer les données ;
+* sauvegarder une copie ;
+* supprimer toutes les données avec confirmation ;
+* modifier les valeurs par défaut d’un exercice ;
+* rétablir les valeurs d’origine.
+
+EXIGENCES TECHNIQUES
+
+Créer une vraie application fonctionnelle, et pas uniquement une maquette visuelle.
+
+Utiliser une technologie moderne adaptée à Replit.
+
+L’application doit :
+
+* conserver les données après fermeture ;
+* être responsive ;
+* être testée sur petit écran ;
+* ne pas avoir de débordement horizontal ;
+* avoir de gros boutons tactiles ;
+* afficher correctement les accents français ;
+* gérer les erreurs ;
+* permettre de modifier et supprimer les séances ;
+* fonctionner sans connexion après installation si possible.
+
+Commencer par construire une version complète et fonctionnelle avec toutes les séances et fonctionnalités principales. Ensuite tester chaque onglet et corriger les bugs avant de considérer le travail terminé.

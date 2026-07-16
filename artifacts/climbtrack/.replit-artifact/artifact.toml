@@ -1,0 +1,27 @@
+kind = "web"
+previewPath = "/"
+title = "ClimbTrack"
+version = "1.0.0"
+id = "artifacts/climbtrack"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 24367
+
+[services.development]
+run = "pnpm --filter @workspace/climbtrack run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/climbtrack", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/climbtrack/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "24367"
+BASE_PATH = "/"
