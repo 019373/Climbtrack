@@ -1,0 +1,64 @@
+name: Deploy ClimbTrack to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Only one deployment at a time; new pushes cancel in-progress builds.
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build ClimbTrack for GitHub Pages
+        run: pnpm --filter @workspace/climbtrack run build:github
+
+      # GitHub Pages doesn't support SPA client-side routing natively.
+      # Serving index.html as 404.html means any direct URL (e.g. /ClimbTrack/seance/1)
+      # loads the app, and wouter re-routes from the correct base path.
+      - name: Create 404.html for SPA routing
+        run: cp artifacts/climbtrack/dist/index.html artifacts/climbtrack/dist/404.html
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: artifacts/climbtrack/dist
+
+  deploy:
+    name: Deploy
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
