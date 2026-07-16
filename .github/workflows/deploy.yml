@@ -6,9 +6,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
-  pages: write
-  id-token: write
+  contents: write   # required to push the gh-pages branch
 
 # Only one deployment at a time; new pushes cancel in-progress builds.
 concurrency:
@@ -16,8 +14,8 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  build:
-    name: Build
+  build-and-deploy:
+    name: Build & Deploy
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -40,25 +38,18 @@ jobs:
       - name: Build ClimbTrack for GitHub Pages
         run: pnpm --filter @workspace/climbtrack run build:github
 
-      # GitHub Pages doesn't support SPA client-side routing natively.
-      # Serving index.html as 404.html means any direct URL (e.g. /ClimbTrack/seance/1)
-      # loads the app, and wouter re-routes from the correct base path.
+      # GitHub Pages doesn't support SPA client-side routing.
+      # Copying index.html → 404.html means any direct URL loads the app,
+      # and wouter re-routes from the correct base path automatically.
       - name: Create 404.html for SPA routing
         run: cp artifacts/climbtrack/dist/index.html artifacts/climbtrack/dist/404.html
 
-      - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@v3
+      - name: Deploy to gh-pages branch
+        uses: peaceiris/actions-gh-pages@v4
         with:
-          path: artifacts/climbtrack/dist
-
-  deploy:
-    name: Deploy
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    runs-on: ubuntu-latest
-    needs: build
-    steps:
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: artifacts/climbtrack/dist
+          # Keeps gh-pages as a single orphan commit (cleaner history).
+          force_orphan: true
+          # Prevents Jekyll from rewriting asset paths that start with _.
+          enable_jekyll: false
