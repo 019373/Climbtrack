@@ -1,0 +1,2785 @@
+Peut- tu faire en sorte que quand je clique sur une séance les onglet en bas de page disparaissent et réapparaissent quand je quitte la séance. Ainsi que l'option de supprimer une séance ou l'a modifier après l'avoir validée.
+
+
+Troisième problème c'est que j'aimerais pouvoir ajouter juste si j'ai fais une séance de grimpe ( sans parlé des séance de muscu ) juste Grimpe : et le temps. Et que du coup ça mette dans le calendrier et rouge ( le jour où la grimpe a été faite ) quand dans la journée j'ai juste fais la grimpe, en jaune quand j'ai juste fais de la muscu et en orange quand j'ai fais le deux. Et laisse vide quand j'ai rien fais. De plus quand je marque que j'ai juste Grimpe je puisse ajouter si j'ai réussi à passer une nouvelle couleur dans la salle. Et comme ça sous le calendrier ça met les date de passage des couleurs. Les différente couleur sont : ( du plus simple au plus dur ) : Rose, Jaune, Vert, Turquoise, Bleu , Orange , Rouge , Noir , Blanc
+Quatrième problème : J'aimerais avoir un onglet + ou je peux ajouter une séance de muscu ou de grimpe pour le jour présent ou un jour antérieur. 
+Cinquième quand je clique sur une des  séance du moi j’aimerais qu’à ce ouvre et ça montre en vert ce qui a été fait et ce qui n’a pas été fait en rouge ( les exercice de la séance ). 
+
+
+Autre truc à ajouter : Ajoute une carte de chaleur musculaire intelligente sur le corps humain. Je ne veux pas un simple coloriage fixe, mais un système qui calcule automatiquement la sollicitation musculaire.
+1. Couleurs
+
+Utiliser cette échelle de couleurs :
+
+⚫ Noir = 0 pt (muscle non travaillé)
+⚪ Blanc = 1 à 9 pts
+⚪ Gris = 10 à 19 pts
+🟢 Vert = 20 à 34 pts
+🟡 Jaune = 35 à 49 pts
+🟠 Orange = 50 à 64 pts
+🔴 Rouge = 65 à 79 pts
+🟣 Violet = 80 pts et plus
+La transition entre les couleurs doit être fluide.
+
+
+2. Points de base
+
+Chaque exercice doit posséder une valeur de base pour chaque muscle sollicité.
+
+Exemple :
+
+Suspension semi-arche 20 mm (version de base)
+
+Avant-bras : 10 pts
+Doigts : 9 pts
+Biceps : 2 pts
+Épaules : 2 pts
+Grand dorsal : 1 pt
+Abdominaux : 1 pt
+Ces valeurs sont uniquement des points de départ.
+
+
+3. Les points doivent être intelligents
+
+Les points ne sont pas fixes.
+
+L’application doit automatiquement ajuster légèrement les points selon :
+
+le temps de maintien
+le poids ajouté
+le niveau d’assistance
+la taille de la réglette
+les répétitions
+le nombre de séries
+Exemple :
+
+Suspension 20 mm :
+
+Version de base
+
+→ Avant-bras = 10 pts
+
+Même exercice :
+
+sans assistance
+
+→ environ 11 ou 12 pts
+
+Même exercice :
+
+15 secondes
+
+→ environ 11 pts
+
+Même exercice :
+
+25 secondes
+
+→ environ 13 pts
+
+Même exercice :
+
+avec poids
+
+→ environ 14 ou 15 pts
+
+Les changements doivent rester relativement faibles.
+
+Une version plus difficile ne doit jamais doubler les points.
+
+Je souhaite que les modifications restent progressives.
+
+
+4. Accumulation
+
+Les points doivent s’additionner sur toute la séance.
+
+Exemple :
+
+5 séries de suspension
+
+●
+3 séries de tractions lestées
+
+●
+3 séries de pince
+
+=
+
+Avant-bras : 67 pts
+
+Le corps affichera donc les avant-bras en rouge.
+
+
+5. Périodes
+
+Pouvoir afficher la carte musculaire pour :
+
+aujourd’hui
+7 derniers jours
+30 derniers jours
+depuis toujours
+
+6. Zones musculaires
+
+Je veux beaucoup plus de détails sur le corps humain.
+
+Le dessin doit être découpé en nombreuses zones musculaires indépendantes.
+
+Exemples :
+
+Avant :
+
+doigts
+avant-bras
+biceps
+triceps
+deltoïdes avant
+deltoïdes latéraux
+pectoraux
+abdominaux
+obliques
+fléchisseurs de hanche
+quadriceps
+adducteurs
+tibias
+mollets
+Arrière :
+
+avant-bras
+triceps
+deltoïdes arrière
+coiffe des rotateurs
+trapèzes
+rhomboïdes
+grand dorsal
+lombaires
+fessiers
+ischio-jambiers
+mollets
+Chaque zone doit pouvoir avoir sa propre couleur indépendamment des autres.
+
+
+7. Objectif
+
+Je veux que cette carte musculaire représente la fatigue et le volume d’entraînement réellement accumulés, et pas uniquement les muscles théoriquement utilisés.
+
+Le système doit être entièrement automatique. L’utilisateur ne choisit jamais les muscles travaillés : l’application le calcule seule à partir des exercices effectués.
+
+Important : garde le design actuel, sobre et minimaliste, avec un rendu propre sur iPhone. Le corps humain doit être plus détaillé qu’actuellement, tout en restant lisible.
+
+
+
+Corps humain - Zones musculaires pour la Heatmap
+
+Je veux remplacer le corps actuel par un corps humain plus détaillé (toujours minimaliste en noir et blanc), où chaque muscle ou groupe musculaire est une zone indépendante pouvant changer de couleur.
+
+Chaque zone doit pouvoir être colorée individuellement sans influencer les autres.
+
+Vue avant
+
+Cou
+
+Sterno-cléido-mastoïdien
+Épaules
+
+Deltoïde antérieur
+Deltoïde latéral
+Pectoraux
+
+Grand pectoral gauche
+Grand pectoral droit
+Bras
+
+Biceps gauche
+Biceps droit
+Triceps gauche
+Triceps droit
+Avant-bras
+
+Séparer chaque avant-bras en deux parties :
+
+Fléchisseurs (face intérieure)
+Extenseurs (face extérieure)
+Gauche et droite indépendants.
+
+Mains
+
+Doigts gauche
+Doigts droit
+Pouce gauche
+Pouce droit
+Tronc
+
+Grand droit de l’abdomen
+Oblique gauche
+Oblique droit
+Hanches
+
+Fléchisseur hanche gauche
+Fléchisseur hanche droit
+Cuisses
+
+Quadriceps gauche
+Quadriceps droit
+Adducteurs gauche
+Adducteurs droit
+Jambes
+
+Tibial antérieur gauche
+Tibial antérieur droit
+Mollets (vue avant)
+
+Mollet gauche
+Mollet droit
+
+Vue arrière
+
+Cou
+
+Trapèzes supérieurs
+Épaules
+
+Deltoïde postérieur gauche
+Deltoïde postérieur droit
+Haut du dos
+
+Trapèzes moyens
+Rhomboïdes
+Coiffe des rotateurs
+Dos
+
+Grand dorsal gauche
+Grand dorsal droit
+Lombaires
+
+Lombaires
+Bras
+
+Triceps gauche
+Triceps droit
+Avant-bras
+
+Fléchisseurs
+Extenseurs
+Gauche et droite indépendants.
+
+Fessiers
+
+Grand fessier gauche
+Grand fessier droit
+Moyen fessier gauche
+Moyen fessier droit
+Arrière des cuisses
+
+Ischio-jambiers gauche
+Ischio-jambiers droit
+Mollets
+
+Mollet gauche
+Mollet droit
+
+Fonctionnement
+
+Chaque muscle possède sa propre couleur.
+
+Exemple :
+
+Avant-bras rouges
+Grand dorsal orange
+Trapèzes verts
+Pectoraux noirs
+Le reste du corps reste inchangé.
+
+Les muscles gauche et droite doivent être totalement indépendants afin de pouvoir afficher une différence entre les deux côtés si un exercice est unilatéral.
+
+
+Design
+
+Je veux garder un style très épuré, type application Apple :
+
+silhouette minimaliste
+lignes fines
+sans visage
+sans détails inutiles
+uniquement les contours des muscles
+couleurs pleines (sans dégradés)
+très lisible sur iPhone
+possibilité de passer de la vue avant à la vue arrière avec un simple bouton ou un swipe.
+Important : chaque muscle doit être une forme (SVG ou équivalent) indépendante afin que l’application puisse modifier sa couleur individuellement en fonction des points calculés. Ce système servira de base à la carte de chaleur musculaire automatique.
+
+
+Voici les exercices avec les muscle utilisé et les points attribué de base : ( un seul changement est à faire est pour le saut pour attraper une prise : il faut enlever quadriceps, mollet et fessier : Carte musculaire et points de base
+Document prêt à transmettre à l’agent Replit
+
+1. Échelle de couleurs
+• Noir = 0 point.
+• Blanc = 1 à 9 points.
+• Gris = 10 à 19 points.
+• Vert = 20 à 34 points.
+• Jaune = 35 à 49 points.
+• Orange = 50 à 64 points.
+• Rouge = 65 à 79 points.
+• Violet = 80 points et plus.
+2. Règles de calcul
+• Les points listés sont les points de base pour l’exercice complet avec les paramètres de base indiqués.
+• Ne pas multiplier directement les points par le nombre de séries : les valeurs représentent déjà la séance de base complète.
+• Ajuster légèrement selon la durée, les répétitions, les séries, la charge, la taille de prise et l’assistance.
+• Une version plus difficile ne doit pas doubler les points. Limiter généralement le multiplicateur entre 0,70 et 1,50.
+• Pour un exercice unilatéral, attribuer les points uniquement au côté réellement travaillé.
+• Pour un exercice bilatéral, répartir la même valeur sur le côté gauche et le côté droit.
+• Les points s’additionnent entre les exercices et entre les séances selon la période choisie.
+• Les exercices de souplesse ont volontairement peu de points : ils indiquent une zone mobilisée, pas une grosse fatigue musculaire.
+Force doigts / Puissance
+Suspension semi-arche 20 mm
+Paramètres de base : 10 sec, prise 20 mm, pieds en assistance moyenne, 5 à 6 séries.
+
+Muscle / zone
+
+Points de base
+
+Doigts / fléchisseurs des doigts
+
+9
+
+Avant-bras - fléchisseurs
+
+10
+
+Avant-bras - extenseurs
+
+3
+
+Biceps
+
+2
+
+Deltoïdes
+
+2
+
+Grand dorsal
+
+1
+
+Trapèzes inférieurs
+
+1
+
+Abdominaux
+
+1
+
+ 
+
+Sauts pour attraper une prise
+Paramètres de base : 3 sauts par série, 5 séries.
+
+Muscle / zone
+
+Points de base
+
+Doigts / fléchisseurs des doigts
+
+5
+
+Avant-bras - fléchisseurs
+
+6
+
+Avant-bras - extenseurs
+
+3
+
+Biceps
+
+4
+
+Triceps
+
+3
+
+Deltoïdes antérieurs
+
+4
+
+Deltoïdes latéraux
+
+5
+
+Deltoïdes postérieurs
+
+6
+
+Grand dorsal
+
+6
+
+Trapèzes
+
+4
+
+Rhomboïdes
+
+3
+
+Pectoraux
+
+2
+
+Abdominaux
+
+4
+
+Obliques
+
+3
+
+Quadriceps
+
+3
+
+Fessiers
+
+2
+
+Mollets
+
+3
+
+ 
+
+Lourd-léger
+Paramètres de base : 2 tractions lourdes à +5 kg, puis 3 tractions explosives, 2 à 4 séries.
+
+Muscle / zone
+
+Points de base
+
+Doigts / fléchisseurs des doigts
+
+6
+
+Avant-bras - fléchisseurs
+
+8
+
+Avant-bras - extenseurs
+
+3
+
+Biceps
+
+9
+
+Brachial
+
+8
+
+Grand dorsal
+
+10
+
+Grand rond
+
+6
+
+Trapèzes
+
+5
+
+Rhomboïdes
+
+5
+
+Deltoïdes postérieurs
+
+4
+
+Abdominaux
+
+3
+
+Obliques
+
+2
+
+ 
+
+Pince disque
+Paramètres de base : 20 sec à 20 kg par main, 3 séries.
+
+Muscle / zone
+
+Points de base
+
+Pouces / muscles thénariens
+
+10
+
+Doigts / fléchisseurs des doigts
+
+8
+
+Avant-bras - fléchisseurs
+
+10
+
+Avant-bras - extenseurs
+
+5
+
+Brachioradial
+
+3
+
+ 
+
+Résistance
+Repeaters 7/3
+Paramètres de base : 7 sec suspension / 3 sec repos, 10 répétitions, 3 séries.
+
+Muscle / zone
+
+Points de base
+
+Doigts / fléchisseurs des doigts
+
+9
+
+Avant-bras - fléchisseurs
+
+9
+
+Avant-bras - extenseurs
+
+4
+
+Biceps
+
+2
+
+Deltoïdes
+
+2
+
+Grand dorsal
+
+2
+
+Trapèzes inférieurs
+
+1
+
+Abdominaux
+
+1
+
+ 
+
+Blocs en dévers
+Paramètres de base : 3 essais, 2 séries.
+
+Muscle / zone
+
+Points de base
+
+Doigts / fléchisseurs des doigts
+
+8
+
+Avant-bras - fléchisseurs
+
+9
+
+Avant-bras - extenseurs
+
+5
+
+Biceps
+
+7
+
+Brachial
+
+6
+
+Triceps
+
+4
+
+Deltoïdes antérieurs
+
+3
+
+Deltoïdes latéraux
+
+4
+
+Deltoïdes postérieurs
+
+6
+
+Grand dorsal
+
+9
+
+Grand rond
+
+6
+
+Trapèzes
+
+5
+
+Rhomboïdes
+
+5
+
+Coiffe des rotateurs
+
+4
+
+Pectoraux
+
+3
+
+Abdominaux
+
+9
+
+Obliques
+
+7
+
+Lombaires
+
+4
+
+Fléchisseurs de hanche
+
+5
+
+Fessiers
+
+4
+
+Quadriceps
+
+4
+
+Ischio-jambiers
+
+3
+
+Adducteurs
+
+3
+
+Mollets
+
+3
+
+Tibial antérieur
+
+2
+
+ 
+
+Tractions endurance
+Paramètres de base : 6 à 8 répétitions, 5 séries.
+
+Muscle / zone
+
+Points de base
+
+Doigts / fléchisseurs des doigts
+
+4
+
+Avant-bras - fléchisseurs
+
+7
+
+Avant-bras - extenseurs
+
+3
+
+Biceps
+
+8
+
+Brachial
+
+7
+
+Grand dorsal
+
+9
+
+Grand rond
+
+5
+
+Trapèzes
+
+4
+
+Rhomboïdes
+
+4
+
+Deltoïdes postérieurs
+
+3
+
+Abdominaux
+
+2
+
+ 
+
+Suspension facile sur bac
+Paramètres de base : 30 sec sur bac, 4 séries.
+
+Muscle / zone
+
+Points de base
+
+Doigts / fléchisseurs des doigts
+
+2
+
+Avant-bras - fléchisseurs
+
+4
+
+Avant-bras - extenseurs
+
+2
+
+Biceps
+
+1
+
+Deltoïdes
+
+1
+
+Grand dorsal
+
+1
+
+ 
+
+Dead hang sur prise 25 mm
+Paramètres de base : 20 sec, 3 séries.
+
+Muscle / zone
+
+Points de base
+
+Doigts / fléchisseurs des doigts
+
+8
+
+Avant-bras - fléchisseurs
+
+8
+
+Avant-bras - extenseurs
+
+4
+
+Biceps
+
+2
+
+Deltoïdes
+
+2
+
+Grand dorsal
+
+2
+
+Trapèzes inférieurs
+
+1
+
+Abdominaux
+
+1
+
+ 
+
+Dos / Épaules / Force
+Tractions lestées
+Paramètres de base : 6 répétitions, 3 séries, charge proche de 7RM.
+
+Muscle / zone
+
+Points de base
+
+Doigts / fléchisseurs des doigts
+
+5
+
+Avant-bras - fléchisseurs
+
+8
+
+Avant-bras - extenseurs
+
+3
+
+Biceps
+
+10
+
+Brachial
+
+9
+
+Grand dorsal
+
+10
+
+Grand rond
+
+6
+
+Trapèzes
+
+5
+
+Rhomboïdes
+
+5
+
+Deltoïdes postérieurs
+
+4
+
+Coiffe des rotateurs
+
+2
+
+Abdominaux
+
+3
+
+Obliques
+
+2
+
+ 
+
+Blocages
+Paramètres de base : 6 sec de blocage puis 2 tractions, 3 séries.
+
+Muscle / zone
+
+Points de base
+
+Doigts / fléchisseurs des doigts
+
+6
+
+Avant-bras - fléchisseurs
+
+7
+
+Avant-bras - extenseurs
+
+3
+
+Biceps
+
+9
+
+Brachial
+
+8
+
+Grand dorsal
+
+8
+
+Grand rond
+
+5
+
+Trapèzes
+
+4
+
+Rhomboïdes
+
+4
+
+Deltoïdes postérieurs
+
+3
+
+Abdominaux
+
+3
+
+ 
+
+Rowing à un bras
+Paramètres de base : 10 à 12 répétitions à 12,5 kg par bras, 3 séries.
+
+Muscle / zone
+
+Points de base
+
+Avant-bras - fléchisseurs
+
+3
+
+Brachioradial
+
+3
+
+Biceps
+
+6
+
+Grand dorsal
+
+9
+
+Grand rond
+
+5
+
+Trapèzes moyens
+
+7
+
+Trapèzes inférieurs
+
+4
+
+Rhomboïdes
+
+8
+
+Deltoïdes postérieurs
+
+6
+
+Coiffe des rotateurs
+
+3
+
+Obliques
+
+2
+
+Lombaires
+
+2
+
+ 
+
+Tirage bras tendus à la poulie
+Paramètres de base : barre verticale à la poulie, 15 kg, 8 répétitions, 3 séries.
+
+Muscle / zone
+
+Points de base
+
+Grand dorsal
+
+10
+
+Grand rond
+
+6
+
+Triceps - longue portion
+
+3
+
+Deltoïdes postérieurs
+
+3
+
+Trapèzes inférieurs
+
+4
+
+Rhomboïdes
+
+2
+
+Abdominaux
+
+3
+
+Obliques
+
+2
+
+ 
+
+Face pull
+Paramètres de base : 35 kg, 12 à 15 répétitions, 3 séries.
+
+Muscle / zone
+
+Points de base
+
+Deltoïdes postérieurs
+
+10
+
+Trapèzes moyens
+
+8
+
+Trapèzes inférieurs
+
+5
+
+Rhomboïdes
+
+8
+
+Coiffe des rotateurs
+
+8
+
+Biceps
+
+2
+
+Avant-bras
+
+2
+
+ 
+
+Extension triceps à la poulie
+Paramètres de base : barre verticale, 15 kg, 4 x 8 répétitions, 30 sec de repos, 3 min entre les séries.
+
+Muscle / zone
+
+Points de base
+
+Triceps
+
+10
+
+Avant-bras - extenseurs
+
+2
+
+Deltoïdes antérieurs
+
+1
+
+Abdominaux
+
+1
+
+ 
+
+Développé militaire
+Paramètres de base : 20 kg, 8 à 12 répétitions, 3 séries.
+
+Muscle / zone
+
+Points de base
+
+Deltoïdes antérieurs
+
+10
+
+Deltoïdes latéraux
+
+8
+
+Triceps
+
+8
+
+Trapèzes supérieurs
+
+4
+
+Pectoraux supérieurs
+
+3
+
+Coiffe des rotateurs
+
+3
+
+Abdominaux
+
+3
+
+Obliques
+
+2
+
+Lombaires
+
+2
+
+ 
+
+Gainage / Tronc
+Planche sur les avant-bras
+Paramètres de base : 1 min, 3 séries.
+
+Muscle / zone
+
+Points de base
+
+Grand droit de l’abdomen
+
+9
+
+Transverse
+
+9
+
+Obliques
+
+7
+
+Lombaires
+
+4
+
+Fessiers
+
+4
+
+Quadriceps
+
+3
+
+Deltoïdes antérieurs
+
+3
+
+Dentelé antérieur
+
+4
+
+ 
+
+Planche latérale
+Paramètres de base : 50 sec par côté, 3 séries.
+
+Muscle / zone
+
+Points de base
+
+Obliques
+
+10
+
+Transverse
+
+8
+
+Grand droit de l’abdomen
+
+5
+
+Carré des lombes
+
+7
+
+Moyen fessier
+
+5
+
+Adducteurs
+
+3
+
+Deltoïdes
+
+3
+
+ 
+
+Relevés de hanches au sol
+Paramètres de base : couché au sol, 12 répétitions, 3 séries.
+
+Muscle / zone
+
+Points de base
+
+Grand fessier
+
+10
+
+Ischio-jambiers
+
+7
+
+Moyen fessier
+
+4
+
+Adducteurs
+
+2
+
+Lombaires
+
+3
+
+Abdominaux
+
+2
+
+ 
+
+Russian twists
+Paramètres de base : 6 kg, 12 à 20 répétitions, 3 séries.
+
+Muscle / zone
+
+Points de base
+
+Obliques
+
+10
+
+Grand droit de l’abdomen
+
+8
+
+Transverse
+
+6
+
+Fléchisseurs de hanche
+
+4
+
+Lombaires
+
+3
+
+Avant-bras
+
+2
+
+Deltoïdes
+
+1
+
+ 
+
+Superman statique
+Paramètres de base : 20 à 30 sec, 3 séries.
+
+Muscle / zone
+
+Points de base
+
+Lombaires / érecteurs du rachis
+
+10
+
+Grand fessier
+
+5
+
+Ischio-jambiers
+
+4
+
+Trapèzes
+
+4
+
+Rhomboïdes
+
+3
+
+Deltoïdes postérieurs
+
+3
+
+ 
+
+Jambes
+Squat
+Paramètres de base : 8 à 12 répétitions, 3 séries.
+
+Muscle / zone
+
+Points de base
+
+Quadriceps
+
+10
+
+Grand fessier
+
+9
+
+Ischio-jambiers
+
+5
+
+Adducteurs
+
+5
+
+Mollets
+
+3
+
+Tibial antérieur
+
+2
+
+Abdominaux
+
+4
+
+Obliques
+
+3
+
+Lombaires
+
+4
+
+ 
+
+Fentes bulgares
+Paramètres de base : 6 kg dans chaque main, 8 à 12 répétitions par jambe, 3 séries.
+
+Muscle / zone
+
+Points de base
+
+Quadriceps
+
+9
+
+Grand fessier
+
+10
+
+Moyen fessier
+
+6
+
+Ischio-jambiers
+
+5
+
+Adducteurs
+
+4
+
+Mollets
+
+3
+
+Tibial antérieur
+
+2
+
+Abdominaux
+
+3
+
+Obliques
+
+3
+
+ 
+
+Élévations des mollets
+Paramètres de base : 7 kg dans chaque main, 12 à 20 répétitions, 3 séries.
+
+Muscle / zone
+
+Points de base
+
+Gastrocnémien
+
+10
+
+Soléaire
+
+8
+
+Muscles stabilisateurs de cheville
+
+3
+
+Avant-bras
+
+1
+
+ 
+
+Tibialis raise
+Paramètres de base : 30 répétitions, 3 séries.
+
+Muscle / zone
+
+Points de base
+
+Tibial antérieur
+
+10
+
+Extenseurs des orteils
+
+4
+
+Péroniers / fibulaires
+
+2
+
+ 
+
+Souplesse
+Étirement poignets paume vers l’avant
+Paramètres de base : 2 x 20 sec par bras.
+
+Muscle / zone
+
+Points de base
+
+Avant-bras - fléchisseurs
+
+3
+
+Fléchisseurs des doigts
+
+2
+
+ 
+
+Étirement poignets paume vers soi
+Paramètres de base : 2 x 20 sec par bras.
+
+Muscle / zone
+
+Points de base
+
+Avant-bras - extenseurs
+
+3
+
+Extenseurs des doigts
+
+2
+
+ 
+
+Étirement poignets au sol
+Paramètres de base : 2 x 15 à 20 sec.
+
+Muscle / zone
+
+Points de base
+
+Avant-bras - fléchisseurs
+
+4
+
+Fléchisseurs des doigts
+
+3
+
+ 
+
+Épaules sur chaise / banc
+Paramètres de base : 3 x 30 sec.
+
+Muscle / zone
+
+Points de base
+
+Grand dorsal
+
+4
+
+Grand rond
+
+3
+
+Triceps - longue portion
+
+3
+
+Deltoïdes
+
+2
+
+Pectoraux
+
+2
+
+ 
+
+Child pose épaules
+Paramètres de base : 3 x 30 sec.
+
+Muscle / zone
+
+Points de base
+
+Grand dorsal
+
+4
+
+Lombaires
+
+2
+
+Deltoïdes
+
+2
+
+Triceps - longue portion
+
+2
+
+ 
+
+Bras au-dessus de la tête
+Paramètres de base : 2 x 15 sec.
+
+Muscle / zone
+
+Points de base
+
+Deltoïdes
+
+2
+
+Trapèzes
+
+1
+
+Grand dorsal
+
+1
+
+ 
+
+Étirement latéral debout
+Paramètres de base : 2 x 10 à 15 sec par côté.
+
+Muscle / zone
+
+Points de base
+
+Obliques
+
+3
+
+Grand dorsal
+
+2
+
+Carré des lombes
+
+2
+
+ 
+
+Étirement triceps / épaule
+Paramètres de base : 2 x 15 à 20 sec par bras.
+
+Muscle / zone
+
+Points de base
+
+Triceps
+
+3
+
+Deltoïdes
+
+2
+
+Grand dorsal
+
+1
+
+ 
+
+Épaules / trapèzes
+Paramètres de base : 3 x 5 sec.
+
+Muscle / zone
+
+Points de base
+
+Trapèzes supérieurs
+
+2
+
+Élévateur de la scapula
+
+1
+
+ 
+
+Open book
+Paramètres de base : 2 x 10 répétitions par côté.
+
+Muscle / zone
+
+Points de base
+
+Pectoraux
+
+2
+
+Obliques
+
+3
+
+Rhomboïdes
+
+2
+
+Rotation thoracique
+
+3
+
+ 
+
+Rotation assise
+Paramètres de base : 2 x 10 à 15 sec par côté.
+
+Muscle / zone
+
+Points de base
+
+Obliques
+
+3
+
+Lombaires
+
+2
+
+Fessiers
+
+1
+
+Rotation thoracique
+
+2
+
+ 
+
+Rotation thoracique au sol
+Paramètres de base : 2 x 10 répétitions par côté.
+
+Muscle / zone
+
+Points de base
+
+Obliques
+
+3
+
+Rhomboïdes
+
+2
+
+Deltoïdes postérieurs
+
+1
+
+Rotation thoracique
+
+3
+
+ 
+
+Dos rond / dos creux
+Paramètres de base : 2 x 10 répétitions.
+
+Muscle / zone
+
+Points de base
+
+Lombaires
+
+2
+
+Abdominaux
+
+2
+
+Muscles profonds du dos
+
+3
+
+ 
+
+Fente profonde
+Paramètres de base : 3 x 30 sec par côté.
+
+Muscle / zone
+
+Points de base
+
+Fléchisseurs de hanche
+
+4
+
+Quadriceps
+
+2
+
+Adducteurs
+
+2
+
+ 
+
+Papillon
+Paramètres de base : 3 x 30 sec.
+
+Muscle / zone
+
+Points de base
+
+Adducteurs
+
+4
+
+Moyen fessier
+
+1
+
+ 
+
+Ouverture de hanches en grenouille
+Paramètres de base : 3 x 30 sec.
+
+Muscle / zone
+
+Points de base
+
+Adducteurs
+
+5
+
+Fléchisseurs de hanche
+
+2
+
+Fessiers
+
+1
+
+ 
+
+Squat profond tenu
+Paramètres de base : 3 x 30 sec.
+
+Muscle / zone
+
+Points de base
+
+Adducteurs
+
+3
+
+Grand fessier
+
+2
+
+Quadriceps
+
+2
+
+Mollets
+
+2
+
+Tibial antérieur
+
+1
+
+ 
+
+Genou vers poitrine
+Paramètres de base : 2 x 15 à 20 sec par jambe.
+
+Muscle / zone
+
+Points de base
+
+Grand fessier
+
+3
+
+Lombaires
+
+2
+
+ 
+
+Étirement fessier allongé
+Paramètres de base : 2 x 15 à 20 sec par côté.
+
+Muscle / zone
+
+Points de base
+
+Grand fessier
+
+4
+
+Moyen fessier
+
+4
+
+Piriforme
+
+4
+
+ 
+
+Étirement fessier assis
+Paramètres de base : 2 x 10 à 15 sec par côté.
+
+Muscle / zone
+
+Points de base
+
+Grand fessier
+
+3
+
+Moyen fessier
+
+3
+
+Piriforme
+
+3
+
+ 
+
+Étirement quadriceps couché
+Paramètres de base : 2 x 15 à 20 sec par jambe.
+
+Muscle / zone
+
+Points de base
+
+Quadriceps
+
+4
+
+Fléchisseurs de hanche
+
+2
+
+ 
+
+Étirement quadriceps debout
+Paramètres de base : 2 x 15 à 20 sec par jambe.
+
+Muscle / zone
+
+Points de base
+
+Quadriceps
+
+4
+
+Fléchisseurs de hanche
+
+2
+
+Stabilisateurs de cheville
+
+1
+
+ 
+
+Ischios debout ou assis
+Paramètres de base : 3 x 30 sec.
+
+Muscle / zone
+
+Points de base
+
+Ischio-jambiers
+
+5
+
+Mollets
+
+2
+
+Lombaires
+
+2
+
+ 
+
+Jambe tendue au sol
+Paramètres de base : 2 x 15 à 20 sec par jambe.
+
+Muscle / zone
+
+Points de base
+
+Ischio-jambiers
+
+4
+
+Mollets
+
+1
+
+ 
+
+Étirement arrière de jambe assis
+Paramètres de base : 2 x 15 à 20 sec par jambe.
+
+Muscle / zone
+
+Points de base
+
+Ischio-jambiers
+
+4
+
+Mollets
+
+2
+
+Lombaires
+
+1
+
+ 
+
+Étirement mollet contre mur
+Paramètres de base : 2 x 20 sec par jambe.
+
+Muscle / zone
+
+Points de base
+
+Gastrocnémien
+
+4
+
+Soléaire
+
+2
+
+ 
+
+Étirement mollet jambe pliée
+Paramètres de base : 2 x 20 sec par jambe.
+
+Muscle / zone
+
+Points de base
+
+Soléaire
+
+4
+
+Tendon d’Achille / cheville
+
+2
+
+ 
+
+Mobilité cheville sur chapeau mexicain
+Paramètres de base : 2 x 30 répétitions par cheville.
+
+Muscle / zone
+
+Points de base
+
+Tibial antérieur
+
+3
+
+Mollets
+
+3
+
+Péroniers / fibulaires
+
+3
+
+Stabilisateurs de cheville
+
+4
+
+ 
+
+Prévention blessures / Renforcement précis
+Rotations externes épaule
+Paramètres de base : 3 x 12 à 15 répétitions par bras.
+
+Muscle / zone
+
+Points de base
+
+Coiffe des rotateurs
+
+10
+
+Deltoïdes postérieurs
+
+3
+
+Rhomboïdes
+
+2
+
+ 
+
+Scapular pull-ups
+Paramètres de base : 3 x 8 à 12 répétitions.
+
+Muscle / zone
+
+Points de base
+
+Trapèzes inférieurs
+
+8
+
+Trapèzes moyens
+
+4
+
+Rhomboïdes
+
+6
+
+Grand dorsal
+
+5
+
+Dentelé antérieur
+
+4
+
+Coiffe des rotateurs
+
+3
+
+Avant-bras
+
+2
+
+ 
+
+Face pull léger
+Paramètres de base : 3 x 12 à 15 répétitions.
+
+Muscle / zone
+
+Points de base
+
+Deltoïdes postérieurs
+
+8
+
+Trapèzes moyens
+
+7
+
+Trapèzes inférieurs
+
+4
+
+Rhomboïdes
+
+7
+
+Coiffe des rotateurs
+
+8
+
+Biceps
+
+1
+
+ 
+
+Extension des doigts avec élastique
+Paramètres de base : 3 x 20 répétitions par main.
+
+Muscle / zone
+
+Points de base
+
+Extenseurs des doigts
+
+10
+
+Avant-bras - extenseurs
+
+8
+
+Muscles intrinsèques de la main
+
+3
+
+ 
+
+Flexion poignet
+Paramètres de base : 2 à 3 x 12 à 15 répétitions par bras.
+
+Muscle / zone
+
+Points de base
+
+Avant-bras - fléchisseurs
+
+10
+
+Fléchisseurs des doigts
+
+4
+
+Brachioradial
+
+2
+
+ 
+
+Extension poignet
+Paramètres de base : 2 à 3 x 12 à 15 répétitions par bras.
+
+Muscle / zone
+
+Points de base
+
+Avant-bras - extenseurs
+
+10
+
+Extenseurs des doigts
+
+4
+
+Brachioradial
+
+2
+
+ 
+
+Pronation / supination
+Paramètres de base : 2 à 3 x 12 répétitions par bras.
+
+Muscle / zone
+
+Points de base
+
+Pronateurs de l’avant-bras
+
+8
+
+Supinateurs de l’avant-bras
+
+8
+
+Brachioradial
+
+4
+
+Muscles du poignet
+
+3
+
+ 
+
+Équilibre une jambe
+Paramètres de base : 3 x 30 sec par jambe sur chapeau mexicain.
+
+Muscle / zone
+
+Points de base
+
+Stabilisateurs de cheville
+
+7
+
+Péroniers / fibulaires
+
+5
+
+Tibial antérieur
+
+4
+
+Mollets
+
+5
+
+Moyen fessier
+
+4
+
+Quadriceps
+
+2
+
+Ischio-jambiers
+
+2
+
+ 
+
+Zones musculaires à représenter sur le corps
+Le dessin doit comporter une vue avant et une vue arrière. Chaque zone doit être colorable indépendamment. Les côtés gauche et droit doivent être séparés.
+
+Vue avant
+• Sterno-cléido-mastoïdien
+• Trapèzes supérieurs
+• Deltoïde antérieur gauche/droit
+• Deltoïde latéral gauche/droit
+• Grand pectoral gauche/droit
+• Dentelé antérieur gauche/droit
+• Biceps gauche/droit
+• Brachial gauche/droit
+• Triceps gauche/droit (portion visible)
+• Avant-bras fléchisseurs gauche/droit
+• Avant-bras extenseurs gauche/droit
+• Pronateurs/supinateurs gauche/droit
+• Doigts gauche/droit
+• Pouce gauche/droit
+• Grand droit de l’abdomen
+• Transverse (zone abdominale profonde)
+• Oblique gauche/droit
+• Fléchisseur de hanche gauche/droit
+• Quadriceps gauche/droit
+• Adducteurs gauche/droit
+• Tibial antérieur gauche/droit
+• Péroniers/fibulaires gauche/droit
+• Mollet gauche/droit
+Vue arrière
+• Trapèzes supérieurs
+• Trapèzes moyens
+• Trapèzes inférieurs
+• Deltoïde postérieur gauche/droit
+• Coiffe des rotateurs gauche/droit
+• Rhomboïdes gauche/droit
+• Grand dorsal gauche/droit
+• Grand rond gauche/droit
+• Triceps gauche/droit
+• Avant-bras fléchisseurs gauche/droit
+• Avant-bras extenseurs gauche/droit
+• Doigts gauche/droit
+• Lombaires / érecteurs du rachis
+• Carré des lombes gauche/droit
+• Grand fessier gauche/droit
+• Moyen fessier gauche/droit
+• Ischio-jambiers gauche/droit
+• Adducteurs arrière gauche/droit
+• Gastrocnémien gauche/droit
+• Soléaire gauche/droit
+• Stabilisateurs de cheville gauche/droit
+Consignes techniques pour l’agent
+• Stabilisateurs de cheville gauche/droit
+• Utiliser un SVG avec une vue avant et une vue arrière.
+• Chaque zone musculaire doit être un path SVG indépendant avec un identifiant stable.
+• Le côté gauche et le côté droit doivent être indépendants.
+• Toutes les zones doivent accepter les couleurs de la heatmap.
+• Si une zone anatomique est trop petite pour être lisible sur iPhone, la regrouper visuellement avec sa zone fonctionnelle, mais conserver son identifiant de données.
+• Le corps doit rester minimaliste, propre et lisible sur iPhone.
+• Ajouter un bouton ou un swipe pour passer de la vue avant à la vue arrière.
+• Au toucher sur une zone, afficher : nom du muscle, points, couleur, exercices contributeurs et période sélectionnée.
+
+Système de badges - ClimbTrack
+
+Je souhaite ajouter une page Badges dans l’application.
+
+Le but n’est pas de créer un jeu, mais de rendre la progression plus motivante et agréable à suivre.
+
+Les badges doivent avoir un design premium, moderne et minimaliste, parfaitement intégré au style actuel de l’application.
+
+
+Design
+
+Chaque badge possède :
+
+une illustration unique
+un nom
+une courte description
+une date de déblocage
+un niveau (Bronze, Argent, Or ou Diamant)
+Tous les badges sont visibles dès le début.
+
+Les badges non débloqués apparaissent entièrement gris.
+
+Une fois débloqués, ils prennent leurs vraies couleurs.
+
+
+Apparence
+
+Je veux une forme hexagonale.
+
+Le contour doit avoir un léger effet 3D (sans être trop chargé).
+
+Le niveau est représenté uniquement par le contour.
+
+Par exemple :
+
+🥉 Bronze
+
+contour bronze métallique
+🥈 Argent
+
+contour argent métallique
+🥇 Or
+
+contour or métallique
+💎 Diamant
+
+contour bleu cristal avec quelques reflets
+Je veux quelque chose de discret.
+
+Le contour peut être légèrement en relief avec quelques reflets, mais il ne doit pas ressembler à un jeu vidéo.
+
+L’intérieur reste totalement plat (2D).
+
+Le dessin est donc en 2D.
+
+Seul le contour possède un très léger effet premium.
+
+
+Badges vivants
+
+Chaque badge doit représenter directement son objectif.
+
+Je ne veux pas de simples icônes.
+
+Je veux de vraies petites illustrations.
+
+Exemples :
+
+Suspension 20 mm
+
+→ une vraie réglette avec “20 mm” gravé dessus.
+
+Tractions lestées
+
+→ une barre de traction avec un disque.
+
+Pince
+
+→ une main pinçant un disque.
+
+Face pull
+
+→ une poulie.
+
+Développé militaire
+
+→ une barre au-dessus de la tête.
+
+Squat
+
+→ une silhouette faisant un squat.
+
+Couleurs
+
+→ une vraie prise d’escalade de la couleur correspondante.
+
+Chaque badge doit être immédiatement reconnaissable sans lire son nom.
+
+
+Évolution
+
+Je ne veux pas plusieurs badges pour le même exercice.
+
+Je veux un seul badge qui évolue.
+
+Bronze → Argent → Or → Diamant.
+
+À chaque évolution :
+
+le contour change
+quelques détails de l’illustration peuvent être améliorés
+les couleurs deviennent légèrement plus riches
+Le dessin principal reste toujours le même.
+
+
+Déblocage
+
+Lorsqu’un badge est obtenu :
+
+petite animation
+vibration si disponible
+message :
+🎉 Nouveau badge débloqué !
+
+avec le badge affiché.
+
+
+Liste des badges
+
+Couleurs
+
+Les couleurs sont :
+
+🌸 Rose
+
+🟡 Jaune
+
+🟢 Vert
+
+🟦 Turquoise
+
+🔵 Bleu
+
+🟠 Orange
+
+🔴 Rouge
+
+⚫ Noir
+
+⚪ Blanc
+
+Chaque badge représente une prise d’escalade de cette couleur.
+
+Le badge se débloque lorsque cette couleur est enregistrée comme première couleur réussie dans le suivi des blocs.
+
+Il n’y a qu’un seul niveau pour ces badges.
+
+
+Tractions lestées
+
+Illustration :
+
+barre de traction avec disque.
+
+Évolution :
+
+🥉 +1 kg
+
+🥈 +10 kg
+
+🥇 +20 kg
+
+💎 +35 kg
+
+
+Suspension semi-arche 20 mm
+
+Illustration :
+
+réglette “20 mm”.
+
+🥉 Première suspension sans assistance
+
+🥈 20 secondes
+
+🥇 30 secondes
+
+💎 45 secondes
+
+
+Suspension 15 mm
+
+Illustration :
+
+réglette “15 mm”.
+
+🥉 Première suspension
+
+🥈 15 secondes
+
+🥇 25 secondes
+
+💎 35 secondes
+
+
+Suspension 10 mm
+
+Illustration :
+
+réglette “10 mm”.
+
+🥉 Première suspension
+
+🥈 10 secondes
+
+🥇 20 secondes
+
+💎 30 secondes
+
+
+Pince disque
+
+Illustration :
+
+main pinçant un disque.
+
+🥉 15 kg
+
+🥈 20 kg
+
+🥇 25 kg
+
+💎 30 kg
+
+
+Lourd-léger
+
+Illustration :
+
+barre + éclair.
+
+🥉 +5 kg
+
+🥈 +10 kg
+
+🥇 +15 kg
+
+💎 +20 kg
+
+
+Sauts pour attraper une prise
+
+Illustration :
+
+main attrapant une prise.
+
+🥉 Première séance
+
+🥈 +5 cm
+
+🥇 +10 cm
+
+💎 +20 cm
+
+
+Repeaters
+
+Illustration :
+
+réglette avec chronomètre.
+
+🥉 Première séance
+
+🥈 Sans assistance
+
+🥇 Réglette plus petite
+
+💎 Avec lest
+
+
+Dead Hang 25 mm
+
+Illustration :
+
+deux mains suspendues sur une réglette.
+
+🥉 20 secondes
+
+🥈 30 secondes
+
+🥇 45 secondes
+
+💎 60 secondes
+
+
+Développé militaire
+
+Illustration :
+
+barre au-dessus de la tête.
+
+🥉 20 kg
+
+🥈 30 kg
+
+🥇 40 kg
+
+💎 50 kg
+
+
+Rowing un bras
+
+Illustration :
+
+haltère.
+
+🥉 12,5 kg
+
+🥈 20 kg
+
+🥇 30 kg
+
+💎 40 kg
+
+
+Face Pull
+
+Illustration :
+
+poulie.
+
+🥉 35 kg
+
+🥈 45 kg
+
+🥇 55 kg
+
+💎 65 kg
+
+
+Planche
+
+Illustration :
+
+silhouette en gainage.
+
+🥉 1 min
+
+🥈 2 min
+
+🥇 3 min
+
+💎 5 min
+
+
+Planche latérale
+
+Illustration :
+
+silhouette en planche latérale.
+
+🥉 50 secondes
+
+🥈 1 min 30
+
+🥇 2 min
+
+💎 3 min
+
+
+Relevés de hanches
+
+Illustration :
+
+silhouette en pont.
+
+🥉 12 répétitions
+
+🥈 +10 kg
+
+🥇 +20 kg
+
+💎 +40 kg
+
+
+Squat
+
+Illustration :
+
+personne faisant un squat.
+
+🥉 20 kg
+
+🥈 50 kg
+
+🥇 80 kg
+
+💎 120 kg
+
+
+Fentes bulgares
+
+Illustration :
+
+silhouette avec haltères.
+
+🥉 6 kg
+
+🥈 12 kg
+
+🥇 18 kg
+
+💎 24 kg
+
+
+Élévations mollets
+
+Illustration :
+
+mollet en élévation.
+
+🥉 7 kg
+
+🥈 15 kg
+
+🥇 25 kg
+
+💎 40 kg
+
+
+Tibialis Raise
+
+Illustration :
+
+tibia stylisé.
+
+🥉 30 répétitions
+
+🥈 +5 kg
+
+🥇 +10 kg
+
+💎 +20 kg
+
+
+Progression générale
+
+Illustration :
+
+graphique qui monte.
+
+🥉 10 records personnels battus
+
+🥈 25 records
+
+🥇 50 records
+
+💎 100 records
+
+
+Important
+
+Les seuils doivent être facilement modifiables dans un seul fichier de configuration (par exemple badges.ts ou badges.json).
+
+Je souhaite pouvoir ajuster les objectifs sans modifier le reste de l’application.
+
+Les illustrations doivent être réalisées en SVG ou dans un format vectoriel afin qu’elles restent parfaitement nettes sur iPhone et qu’elles puissent évoluer facilement avec les différents niveaux de badges.
+
+

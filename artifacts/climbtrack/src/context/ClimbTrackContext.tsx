@@ -1,5 +1,9 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { SESSIONS, ExerciseDef, TrackingType } from '../data/sessions';
+import { BadgeLevel } from '../data/badges';
+import { findNewlyUnlocked, applyNewUnlocks, EarnedBadgeEntry } from '../utils/badgeEngine';
+
+// ── Types ─────────────────────────────────────────────────────────────────────
 
 export type ExerciseDefaults = {
   sets: number;
@@ -36,24 +40,27 @@ export type ExerciseOverride = {
   category?: string;
   tracking?: TrackingType;
   description?: string;
-  /** Explicit session assignment (overrides built-in or custom default). */
   sessionIds?: string[];
-  /** If true, exercise is hidden from all sessions (data kept for history). */
   hidden?: boolean;
+};
+
+export type PendingBadgeNotification = {
+  badgeId: string;
+  level: BadgeLevel;
 };
 
 export type AppData = {
   sessionLogs: SessionLog[];
   exerciseDefaults: Record<string, ExerciseDefaults>;
-  /** User-created exercises */
   customExercises: ExerciseDef[];
-  /** User-created category names */
   customCategories: string[];
-  /** Per-exercise metadata overrides (name, category, sessions, hidden) */
   exerciseOverrides: Record<string, ExerciseOverride>;
-  /** Ordered exercise IDs per category name */
   exerciseCategoryOrder: Record<string, string[]>;
+  earnedBadges: Record<string, EarnedBadgeEntry[]>;
+  pendingBadgeNotifications: PendingBadgeNotification[];
 };
+
+// ── Storage ───────────────────────────────────────────────────────────────────
 
 const STORAGE_KEY = 'climbtrack_data';
 
@@ -69,6 +76,8 @@ const getInitialData = (): AppData => {
         customCategories: parsed.customCategories ?? [],
         exerciseOverrides: parsed.exerciseOverrides ?? {},
         exerciseCategoryOrder: parsed.exerciseCategoryOrder ?? {},
+        earnedBadges: parsed.earnedBadges ?? {},
+        pendingBadgeNotifications: parsed.pendingBadgeNotifications ?? [],
       };
     }
   } catch (e) {
@@ -87,8 +96,28 @@ const getInitialData = (): AppData => {
     customCategories: [],
     exerciseOverrides: {},
     exerciseCategoryOrder: {},
+    earnedBadges: {},
+    pendingBadgeNotifications: [],
   };
 };
+
+// ── Badge evaluation helper ───────────────────────────────────────────────────
+
+function evaluateAndMergeBadges(
+  logs: SessionLog[],
+  currentEarned: Record<string, EarnedBadgeEntry[]>,
+  date: string,
+): {
+  earnedBadges: Record<string, EarnedBadgeEntry[]>;
+  newNotifications: PendingBadgeNotification[];
+} {
+  const newUnlocks = findNewlyUnlocked(logs, currentEarned);
+  const earnedBadges = applyNewUnlocks(currentEarned, newUnlocks, date);
+  const newNotifications = newUnlocks.map(u => ({ badgeId: u.badgeId, level: u.level }));
+  return { earnedBadges, newNotifications };
+}
+
+// ── Context ───────────────────────────────────────────────────────────────────
 
 type ClimbTrackContextType = {
   data: AppData;
@@ -109,6 +138,8 @@ type ClimbTrackContextType = {
   addCategory: (name: string) => void;
   renameCategory: (oldName: string, newName: string) => void;
   deleteCategory: (name: string, fallbackCategory: string) => void;
+  // Badge management
+  clearBadgeNotification: (badgeId: string, level: BadgeLevel) => void;
   // Data management
   exportData: () => void;
   importData: (jsonData: string) => boolean;
@@ -117,6 +148,8 @@ type ClimbTrackContextType = {
 
 const ClimbTrackContext = createContext<ClimbTrackContextType | undefined>(undefined);
 
+// ── Provider ──────────────────────────────────────────────────────────────────
+
 export function ClimbTrackProvider({ children }: { children: React.ReactNode }) {
   const [data, setData] = useState<AppData>(getInitialData);
 
@@ -124,19 +157,60 @@ export function ClimbTrackProvider({ children }: { children: React.ReactNode }) 
     localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
   }, [data]);
 
-  const addSessionLog = (log: SessionLog) =>
-    setData(prev => ({ ...prev, sessionLogs: [...prev.sessionLogs, log] }));
+  // ── Session logs ───────────────────────────────────────────────────────────
 
-  const deleteSessionLog = (id: string) =>
-    setData(prev => ({ ...prev, sessionLogs: prev.sessionLogs.filter(s => s.id !== id) }));
+  const addSessionLog = useCallback((log: SessionLog) => {
+    setData(prev => {
+      const newLogs = [...prev.sessionLogs, log];
+      const { earnedBadges, newNotifications } = evaluateAndMergeBadges(
+        newLogs,
+        prev.earnedBadges,
+        log.date,
+      );
+      return {
+        ...prev,
+        sessionLogs: newLogs,
+        earnedBadges,
+        pendingBadgeNotifications: [
+          ...prev.pendingBadgeNotifications,
+          ...newNotifications,
+        ],
+      };
+    });
+  }, []);
 
-  const updateSessionLog = (id: string, log: SessionLog) =>
-    setData(prev => ({
-      ...prev,
-      sessionLogs: prev.sessionLogs.map(s => s.id === id ? log : s),
-    }));
+  const deleteSessionLog = useCallback((id: string) => {
+    setData(prev => {
+      const newLogs = prev.sessionLogs.filter(s => s.id !== id);
+      // Re-evaluate badges after deletion (some may be removed)
+      const { earnedBadges } = evaluateAndMergeBadges(newLogs, {}, new Date().toISOString().split('T')[0]);
+      return { ...prev, sessionLogs: newLogs, earnedBadges };
+    });
+  }, []);
 
-  const updateExerciseDefault = (exerciseId: string, defs: Partial<ExerciseDefaults>) =>
+  const updateSessionLog = useCallback((id: string, log: SessionLog) => {
+    setData(prev => {
+      const newLogs = prev.sessionLogs.map(s => s.id === id ? log : s);
+      const { earnedBadges, newNotifications } = evaluateAndMergeBadges(
+        newLogs,
+        prev.earnedBadges,
+        log.date,
+      );
+      return {
+        ...prev,
+        sessionLogs: newLogs,
+        earnedBadges,
+        pendingBadgeNotifications: [
+          ...prev.pendingBadgeNotifications,
+          ...newNotifications,
+        ],
+      };
+    });
+  }, []);
+
+  // ── Exercise defaults ──────────────────────────────────────────────────────
+
+  const updateExerciseDefault = useCallback((exerciseId: string, defs: Partial<ExerciseDefaults>) => {
     setData(prev => ({
       ...prev,
       exerciseDefaults: {
@@ -144,25 +218,23 @@ export function ClimbTrackProvider({ children }: { children: React.ReactNode }) 
         [exerciseId]: { ...prev.exerciseDefaults[exerciseId], ...defs },
       },
     }));
+  }, []);
 
-  const resetDefaults = () => {
+  const resetDefaults = useCallback(() => {
     const defaultExDefs: Record<string, ExerciseDefaults> = {};
     SESSIONS.forEach(s => {
       s.exercises.forEach(e => { defaultExDefs[e.id] = { ...e.defaultValues }; });
     });
     setData(prev => ({ ...prev, exerciseDefaults: defaultExDefs }));
-  };
+  }, []);
 
   // ── Exercise management ────────────────────────────────────────────────────
 
-  const addExercise = (ex: Omit<ExerciseDef, 'id'> & { sessionIds?: string[] }) => {
+  const addExercise = useCallback((ex: Omit<ExerciseDef, 'id'> & { sessionIds?: string[] }) => {
     const id = `custom-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
     const newEx: ExerciseDef = {
-      id,
-      name: ex.name,
-      description: ex.description ?? '',
-      category: ex.category,
-      tracking: ex.tracking,
+      id, name: ex.name, description: ex.description ?? '',
+      category: ex.category, tracking: ex.tracking,
       defaultValues: ex.defaultValues,
       assistanceOptions: ex.assistanceOptions,
       isHangboard: ex.isHangboard,
@@ -173,9 +245,9 @@ export function ClimbTrackProvider({ children }: { children: React.ReactNode }) 
       customExercises: [...prev.customExercises, newEx],
       exerciseDefaults: { ...prev.exerciseDefaults, [id]: { ...ex.defaultValues } },
     }));
-  };
+  }, []);
 
-  const deleteExercise = (id: string) =>
+  const deleteExercise = useCallback((id: string) => {
     setData(prev => ({
       ...prev,
       exerciseOverrides: {
@@ -183,8 +255,9 @@ export function ClimbTrackProvider({ children }: { children: React.ReactNode }) 
         [id]: { ...prev.exerciseOverrides[id], hidden: true },
       },
     }));
+  }, []);
 
-  const restoreExercise = (id: string) =>
+  const restoreExercise = useCallback((id: string) => {
     setData(prev => {
       const { hidden: _hidden, ...rest } = prev.exerciseOverrides[id] ?? {};
       return {
@@ -192,8 +265,9 @@ export function ClimbTrackProvider({ children }: { children: React.ReactNode }) 
         exerciseOverrides: { ...prev.exerciseOverrides, [id]: rest },
       };
     });
+  }, []);
 
-  const updateExerciseOverride = (id: string, override: Partial<ExerciseOverride>) =>
+  const updateExerciseOverride = useCallback((id: string, override: Partial<ExerciseOverride>) => {
     setData(prev => ({
       ...prev,
       exerciseOverrides: {
@@ -201,81 +275,85 @@ export function ClimbTrackProvider({ children }: { children: React.ReactNode }) 
         [id]: { ...prev.exerciseOverrides[id], ...override },
       },
     }));
+  }, []);
 
-  const setExerciseCategoryOrder = (category: string, orderedIds: string[]) =>
+  const setExerciseCategoryOrder = useCallback((category: string, orderedIds: string[]) => {
     setData(prev => ({
       ...prev,
       exerciseCategoryOrder: { ...prev.exerciseCategoryOrder, [category]: orderedIds },
     }));
+  }, []);
 
   // ── Category management ────────────────────────────────────────────────────
 
-  const addCategory = (name: string) =>
+  const addCategory = useCallback((name: string) => {
     setData(prev => ({
       ...prev,
       customCategories: prev.customCategories.includes(name)
         ? prev.customCategories
         : [...prev.customCategories, name],
     }));
+  }, []);
 
-  const renameCategory = (oldName: string, newName: string) => {
+  const renameCategory = useCallback((oldName: string, newName: string) => {
     setData(prev => {
-      // Update custom exercises whose category matches
       const updatedCustom = prev.customExercises.map(ex =>
         ex.category === oldName ? { ...ex, category: newName } : ex,
       );
-      // Update overrides whose category matches
       const updatedOverrides: Record<string, ExerciseOverride> = {};
       Object.entries(prev.exerciseOverrides).forEach(([id, ov]) => {
         updatedOverrides[id] = ov.category === oldName ? { ...ov, category: newName } : ov;
       });
-      // Update category order map
       const updatedOrder = { ...prev.exerciseCategoryOrder };
       if (updatedOrder[oldName]) {
         updatedOrder[newName] = updatedOrder[oldName];
         delete updatedOrder[oldName];
       }
-      // Update custom categories list
-      const updatedCustomCats = prev.customCategories.map(c => c === oldName ? newName : c);
       return {
         ...prev,
         customExercises: updatedCustom,
         exerciseOverrides: updatedOverrides,
         exerciseCategoryOrder: updatedOrder,
-        customCategories: updatedCustomCats,
+        customCategories: prev.customCategories.map(c => c === oldName ? newName : c),
       };
     });
-  };
+  }, []);
 
-  const deleteCategory = (name: string, fallbackCategory: string) => {
+  const deleteCategory = useCallback((name: string, fallbackCategory: string) => {
     setData(prev => {
-      // Move custom exercises in this category to fallback
       const updatedCustom = prev.customExercises.map(ex =>
         ex.category === name ? { ...ex, category: fallbackCategory } : ex,
       );
-      // Move built-in exercise overrides with this category to fallback
       const updatedOverrides: Record<string, ExerciseOverride> = {};
       Object.entries(prev.exerciseOverrides).forEach(([id, ov]) => {
         updatedOverrides[id] = ov.category === name ? { ...ov, category: fallbackCategory } : ov;
       });
-      // Remove from custom categories
-      const updatedCustomCats = prev.customCategories.filter(c => c !== name);
-      // Clean up category order
       const updatedOrder = { ...prev.exerciseCategoryOrder };
       delete updatedOrder[name];
       return {
         ...prev,
         customExercises: updatedCustom,
         exerciseOverrides: updatedOverrides,
-        customCategories: updatedCustomCats,
+        customCategories: prev.customCategories.filter(c => c !== name),
         exerciseCategoryOrder: updatedOrder,
       };
     });
-  };
+  }, []);
+
+  // ── Badge management ───────────────────────────────────────────────────────
+
+  const clearBadgeNotification = useCallback((badgeId: string, level: BadgeLevel) => {
+    setData(prev => ({
+      ...prev,
+      pendingBadgeNotifications: prev.pendingBadgeNotifications.filter(
+        n => !(n.badgeId === badgeId && n.level === level),
+      ),
+    }));
+  }, []);
 
   // ── Data management ────────────────────────────────────────────────────────
 
-  const exportData = () => {
+  const exportData = useCallback(() => {
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -285,9 +363,9 @@ export function ClimbTrackProvider({ children }: { children: React.ReactNode }) 
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-  };
+  }, [data]);
 
-  const importData = (jsonData: string) => {
+  const importData = useCallback((jsonData: string) => {
     try {
       const parsed = JSON.parse(jsonData);
       if (parsed && Array.isArray(parsed.sessionLogs) && parsed.exerciseDefaults) {
@@ -298,6 +376,8 @@ export function ClimbTrackProvider({ children }: { children: React.ReactNode }) 
           customCategories: parsed.customCategories ?? [],
           exerciseOverrides: parsed.exerciseOverrides ?? {},
           exerciseCategoryOrder: parsed.exerciseCategoryOrder ?? {},
+          earnedBadges: parsed.earnedBadges ?? {},
+          pendingBadgeNotifications: [],
         });
         return true;
       }
@@ -305,9 +385,9 @@ export function ClimbTrackProvider({ children }: { children: React.ReactNode }) 
     } catch {
       return false;
     }
-  };
+  }, []);
 
-  const clearData = () => {
+  const clearData = useCallback(() => {
     const defaultExDefs: Record<string, ExerciseDefaults> = {};
     SESSIONS.forEach(s => {
       s.exercises.forEach(e => { defaultExDefs[e.id] = { ...e.defaultValues }; });
@@ -319,8 +399,10 @@ export function ClimbTrackProvider({ children }: { children: React.ReactNode }) 
       customCategories: [],
       exerciseOverrides: {},
       exerciseCategoryOrder: {},
+      earnedBadges: {},
+      pendingBadgeNotifications: [],
     });
-  };
+  }, []);
 
   return (
     <ClimbTrackContext.Provider value={{
@@ -330,6 +412,7 @@ export function ClimbTrackProvider({ children }: { children: React.ReactNode }) 
       addExercise, deleteExercise, restoreExercise,
       updateExerciseOverride, setExerciseCategoryOrder,
       addCategory, renameCategory, deleteCategory,
+      clearBadgeNotification,
       exportData, importData, clearData,
     }}>
       {children}
