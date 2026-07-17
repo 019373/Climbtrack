@@ -1,0 +1,3 @@
+- [ClimbTrack stack](climbtrack-stack.md) — React+Vite+Tailwind PWA, tout en localStorage, thème noir monochrome, français.
+- [GitHub Pages deploy](github-pages-deploy.md) — base path `/Climbtrack/` (casse exacte), GITHUB_PAT peut expirer, push via `x-access-token:${GITHUB_PAT}@github.com`.
+- [Badge system design](badge-system.md) — moteur d'évaluation dans badgeEngine.ts, niveaux cumulatifs, earnedBadges dans AppData, pendingBadgeNotifications pour les toasts.
