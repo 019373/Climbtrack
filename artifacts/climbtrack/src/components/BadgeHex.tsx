@@ -1,385 +1,1521 @@
-import { BadgeLevel, BADGE_LEVEL_META } from '@/data/badges';
+import {
+  useId,
+  type ReactElement,
+} from "react";
 
-// ── SVG Illustrations ─────────────────────────────────────────────────────────
+import {
+  BADGE_LEVEL_META,
+} from "@/data/badges";
 
-function IllustrationPullup({ c }: { c: string }) {
-  return (
-    <g>
-      {/* Bar */}
-      <rect x="8" y="11" width="24" height="2.5" rx="1.2" fill={c} />
-      {/* Hands */}
-      <rect x="12" y="11" width="2.5" height="5" rx="1" fill={c} />
-      <rect x="25.5" y="11" width="2.5" height="5" rx="1" fill={c} />
-      {/* Body */}
-      <ellipse cx="20" cy="22" rx="3" ry="5" fill={c} opacity="0.9" />
-      {/* Weight disc */}
-      <ellipse cx="20" cy="29" rx="6" ry="2.5" stroke={c} strokeWidth="1.5" fill="none" />
-      <line x1="20" y1="27" x2="20" y2="16" stroke={c} strokeWidth="1.5" />
-    </g>
-  );
-}
+import type {
+  BadgeLevel,
+} from "@/data/badges";
 
-function IllustrationFingerboard20({ c }: { c: string }) {
-  return (
-    <g>
-      {/* Board */}
-      <rect x="7" y="14" width="26" height="9" rx="2" stroke={c} strokeWidth="1.5" fill="none" />
-      {/* Edge cutouts */}
-      <rect x="10" y="17" width="5" height="3" rx="1" fill={c} opacity="0.5" />
-      <rect x="17.5" y="17" width="5" height="3" rx="1" fill={c} opacity="0.5" />
-      <rect x="25" y="17" width="5" height="3" rx="1" fill={c} opacity="0.5" />
-      {/* Text */}
-      <text x="20" y="12" textAnchor="middle" fill={c} fontSize="5.5" fontWeight="bold" fontFamily="monospace">20mm</text>
-      {/* Hanging lines */}
-      <line x1="13" y1="9" x2="13" y2="14" stroke={c} strokeWidth="1.2" />
-      <line x1="27" y1="9" x2="27" y2="14" stroke={c} strokeWidth="1.2" />
-      {/* Anchor bar */}
-      <line x1="10" y1="9" x2="30" y2="9" stroke={c} strokeWidth="1.5" />
-    </g>
-  );
-}
-
-function IllustrationDeadHang({ c }: { c: string }) {
-  return (
-    <g>
-      {/* Bar */}
-      <rect x="7" y="10" width="26" height="2.5" rx="1.2" fill={c} />
-      {/* Left hand */}
-      <rect x="11" y="12.5" width="3" height="4" rx="1" fill={c} />
-      {/* Right hand */}
-      <rect x="26" y="12.5" width="3" height="4" rx="1" fill={c} />
-      {/* Arms */}
-      <line x1="12.5" y1="16.5" x2="15" y2="21" stroke={c} strokeWidth="1.5" />
-      <line x1="27.5" y1="16.5" x2="25" y2="21" stroke={c} strokeWidth="1.5" />
-      {/* Body */}
-      <ellipse cx="20" cy="24" rx="4" ry="6" fill={c} opacity="0.85" />
-    </g>
-  );
-}
-
-function IllustrationPinch({ c }: { c: string }) {
-  return (
-    <g>
-      {/* Disc */}
-      <circle cx="20" cy="24" r="7" stroke={c} strokeWidth="2" fill="none" />
-      <circle cx="20" cy="24" r="2.5" fill={c} opacity="0.4" />
-      {/* Fingers pinching */}
-      <path d="M14 16 Q12 20 14 24" stroke={c} strokeWidth="1.8" fill="none" strokeLinecap="round" />
-      <path d="M26 16 Q28 20 26 24" stroke={c} strokeWidth="1.8" fill="none" strokeLinecap="round" />
-      <path d="M16 13 L16 17" stroke={c} strokeWidth="2" strokeLinecap="round" />
-      <path d="M24 13 L24 17" stroke={c} strokeWidth="2" strokeLinecap="round" />
-      <path d="M20 11 L20 16" stroke={c} strokeWidth="2" strokeLinecap="round" />
-    </g>
-  );
-}
-
-function IllustrationRepeaters({ c }: { c: string }) {
-  return (
-    <g>
-      {/* Board */}
-      <rect x="8" y="16" width="24" height="7" rx="2" stroke={c} strokeWidth="1.5" fill="none" />
-      <rect x="11" y="18.5" width="4" height="2.5" rx="1" fill={c} opacity="0.5" />
-      <rect x="18" y="18.5" width="4" height="2.5" rx="1" fill={c} opacity="0.5" />
-      <rect x="25" y="18.5" width="4" height="2.5" rx="1" fill={c} opacity="0.5" />
-      {/* Clock */}
-      <circle cx="20" cy="10" r="4.5" stroke={c} strokeWidth="1.2" fill="none" />
-      <line x1="20" y1="10" x2="20" y2="7" stroke={c} strokeWidth="1.2" strokeLinecap="round" />
-      <line x1="20" y1="10" x2="22.5" y2="11.5" stroke={c} strokeWidth="1.2" strokeLinecap="round" />
-    </g>
-  );
-}
-
-function IllustrationJump({ c }: { c: string }) {
-  return (
-    <g>
-      {/* Prise */}
-      <ellipse cx="20" cy="10" rx="5" ry="4" stroke={c} strokeWidth="1.5" fill={c} opacity="0.3" />
-      {/* Hand reaching up */}
-      <line x1="20" y1="14" x2="20" y2="22" stroke={c} strokeWidth="2" strokeLinecap="round" />
-      {/* Body jumping */}
-      <circle cx="20" cy="25" r="3" fill={c} opacity="0.85" />
-      <line x1="20" y1="28" x2="17" y2="33" stroke={c} strokeWidth="1.5" strokeLinecap="round" />
-      <line x1="20" y1="28" x2="23" y2="33" stroke={c} strokeWidth="1.5" strokeLinecap="round" />
-    </g>
-  );
-}
-
-function IllustrationHeavyLight({ c }: { c: string }) {
-  return (
-    <g>
-      {/* Barbell */}
-      <rect x="9" y="18" width="22" height="2.5" rx="1" fill={c} />
-      {/* Heavy disc left */}
-      <rect x="7" y="13" width="4" height="12" rx="1.5" fill={c} opacity="0.9" />
-      {/* Light disc left-inner */}
-      <rect x="11.5" y="15" width="2.5" height="8" rx="1" fill={c} opacity="0.6" />
-      {/* Light disc right-inner */}
-      <rect x="26" y="15" width="2.5" height="8" rx="1" fill={c} opacity="0.6" />
-      {/* Heavy disc right */}
-      <rect x="29" y="13" width="4" height="12" rx="1.5" fill={c} opacity="0.9" />
-      {/* Lightning bolt */}
-      <path d="M19 8 L17 16 L20 14 L18 22" stroke={c} strokeWidth="1.5" fill="none" strokeLinejoin="round" />
-    </g>
-  );
-}
-
-function IllustrationMilitaryPress({ c }: { c: string }) {
-  return (
-    <g>
-      {/* Overhead bar */}
-      <rect x="8" y="10" width="24" height="2.5" rx="1.2" fill={c} />
-      {/* Discs */}
-      <rect x="6" y="8" width="3.5" height="7" rx="1" fill={c} opacity="0.9" />
-      <rect x="30.5" y="8" width="3.5" height="7" rx="1" fill={c} opacity="0.9" />
-      {/* Arms */}
-      <line x1="14" y1="12.5" x2="16" y2="20" stroke={c} strokeWidth="2" strokeLinecap="round" />
-      <line x1="26" y1="12.5" x2="24" y2="20" stroke={c} strokeWidth="2" strokeLinecap="round" />
-      {/* Body */}
-      <ellipse cx="20" cy="25" rx="4" ry="6" fill={c} opacity="0.85" />
-    </g>
-  );
-}
-
-function IllustrationDumbbell({ c }: { c: string }) {
-  return (
-    <g>
-      {/* Handle */}
-      <rect x="13" y="18.5" width="14" height="3" rx="1.5" fill={c} />
-      {/* Left discs */}
-      <rect x="8" y="14" width="5" height="11" rx="2" fill={c} opacity="0.9" />
-      {/* Right discs */}
-      <rect x="27" y="14" width="5" height="11" rx="2" fill={c} opacity="0.9" />
-      {/* Arrow up (rowing motion) */}
-      <path d="M20 8 L20 13 M18 10.5 L20 8 L22 10.5" stroke={c} strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round" />
-    </g>
-  );
-}
-
-function IllustrationPulley({ c }: { c: string }) {
-  return (
-    <g>
-      {/* Wheel */}
-      <circle cx="20" cy="12" r="5.5" stroke={c} strokeWidth="1.5" fill="none" />
-      <circle cx="20" cy="12" r="2" fill={c} opacity="0.5" />
-      {/* Rope left */}
-      <line x1="14.5" y1="12" x2="10" y2="26" stroke={c} strokeWidth="1.5" strokeLinecap="round" />
-      {/* Rope right */}
-      <line x1="25.5" y1="12" x2="30" y2="26" stroke={c} strokeWidth="1.5" strokeLinecap="round" />
-      {/* Handle */}
-      <rect x="7" y="25" width="6" height="4" rx="1.5" stroke={c} strokeWidth="1.2" fill="none" />
-      <rect x="27" y="25" width="6" height="4" rx="1.5" stroke={c} strokeWidth="1.2" fill="none" />
-    </g>
-  );
-}
-
-function IllustrationPlank({ c }: { c: string }) {
-  return (
-    <g>
-      {/* Ground */}
-      <line x1="7" y1="30" x2="33" y2="30" stroke={c} strokeWidth="1.2" opacity="0.4" />
-      {/* Body */}
-      <rect x="10" y="20" width="20" height="5" rx="2.5" fill={c} opacity="0.85" />
-      {/* Arms */}
-      <line x1="12" y1="25" x2="12" y2="30" stroke={c} strokeWidth="2" strokeLinecap="round" />
-      <line x1="18" y1="25" x2="18" y2="30" stroke={c} strokeWidth="2" strokeLinecap="round" />
-      {/* Legs */}
-      <line x1="27" y1="25" x2="27" y2="30" stroke={c} strokeWidth="2" strokeLinecap="round" />
-      {/* Head */}
-      <circle cx="31" cy="22.5" r="3" fill={c} opacity="0.85" />
-    </g>
-  );
-}
-
-function IllustrationSidePlank({ c }: { c: string }) {
-  return (
-    <g>
-      {/* Ground */}
-      <line x1="6" y1="30" x2="34" y2="30" stroke={c} strokeWidth="1.2" opacity="0.4" />
-      {/* Body - tilted */}
-      <rect x="10" y="17" width="4" height="17" rx="2" fill={c} opacity="0.85" transform="rotate(-15 12 25)" />
-      {/* Arm up */}
-      <line x1="18" y1="20" x2="25" y2="12" stroke={c} strokeWidth="2" strokeLinecap="round" />
-      {/* Elbow support */}
-      <line x1="10" y1="27" x2="13" y2="30" stroke={c} strokeWidth="2.5" strokeLinecap="round" />
-      {/* Head */}
-      <circle cx="28" cy="17" r="3.5" fill={c} opacity="0.85" />
-    </g>
-  );
-}
-
-function IllustrationSquat({ c }: { c: string }) {
-  return (
-    <g>
-      {/* Bar on shoulders */}
-      <rect x="7" y="12" width="26" height="2.5" rx="1.2" fill={c} />
-      <rect x="5" y="10" width="4" height="7" rx="1.2" fill={c} opacity="0.8" />
-      <rect x="31" y="10" width="4" height="7" rx="1.2" fill={c} opacity="0.8" />
-      {/* Torso (squatting position — leaning forward) */}
-      <ellipse cx="20" cy="19" rx="3.5" ry="5" fill={c} opacity="0.85" transform="rotate(-10 20 19)" />
-      {/* Legs */}
-      <line x1="18" y1="23" x2="14" y2="31" stroke={c} strokeWidth="2.5" strokeLinecap="round" />
-      <line x1="22" y1="23" x2="26" y2="31" stroke={c} strokeWidth="2.5" strokeLinecap="round" />
-    </g>
-  );
-}
-
-function IllustrationLunge({ c }: { c: string }) {
-  return (
-    <g>
-      {/* Body */}
-      <ellipse cx="20" cy="14" rx="3" ry="5" fill={c} opacity="0.85" />
-      {/* Front leg */}
-      <line x1="19" y1="19" x2="14" y2="27" stroke={c} strokeWidth="2.5" strokeLinecap="round" />
-      <line x1="14" y1="27" x2="11" y2="31" stroke={c} strokeWidth="2" strokeLinecap="round" />
-      {/* Back leg */}
-      <line x1="21" y1="19" x2="26" y2="26" stroke={c} strokeWidth="2.5" strokeLinecap="round" />
-      <line x1="26" y1="26" x2="28" y2="31" stroke={c} strokeWidth="2" strokeLinecap="round" />
-      {/* Dumbbells */}
-      <rect x="10" y="18" width="6" height="2.5" rx="1" fill={c} opacity="0.8" />
-      <rect x="24" y="18" width="6" height="2.5" rx="1" fill={c} opacity="0.8" />
-    </g>
-  );
-}
-
-function IllustrationCalf({ c }: { c: string }) {
-  return (
-    <g>
-      {/* Leg */}
-      <ellipse cx="20" cy="14" rx="5" ry="8" fill={c} opacity="0.85" />
-      {/* Ankle */}
-      <rect x="16" y="22" width="8" height="3" rx="1.5" fill={c} opacity="0.7" />
-      {/* Foot on toes (elevated) */}
-      <ellipse cx="20" cy="28" rx="4" ry="2.5" fill={c} opacity="0.9" />
-      {/* Step platform */}
-      <rect x="8" y="30" width="24" height="3.5" rx="1.5" fill={c} opacity="0.4" />
-      {/* Arrow up */}
-      <path d="M27 20 L27 12 M25 14.5 L27 12 L29 14.5" stroke={c} strokeWidth="1.4" fill="none" strokeLinecap="round" strokeLinejoin="round" />
-    </g>
-  );
-}
-
-function IllustrationChart({ c }: { c: string }) {
-  return (
-    <g>
-      {/* Axes */}
-      <line x1="9" y1="28" x2="9" y2="11" stroke={c} strokeWidth="1.5" strokeLinecap="round" />
-      <line x1="9" y1="28" x2="31" y2="28" stroke={c} strokeWidth="1.5" strokeLinecap="round" />
-      {/* Bars */}
-      <rect x="12" y="24" width="4" height="4" rx="1" fill={c} opacity="0.5" />
-      <rect x="18" y="20" width="4" height="8" rx="1" fill={c} opacity="0.7" />
-      <rect x="24" y="15" width="4" height="13" rx="1" fill={c} opacity="0.9" />
-      {/* Star on top */}
-      <text x="26" y="13" textAnchor="middle" fill={c} fontSize="8">★</text>
-    </g>
-  );
-}
-
-// Illustration registry
-const ILLUSTRATIONS: Record<string, (props: { c: string }) => React.ReactElement> = {
-  'pullup':         IllustrationPullup,
-  'fingerboard-20': IllustrationFingerboard20,
-  'dead-hang':      IllustrationDeadHang,
-  'pinch':          IllustrationPinch,
-  'repeaters':      IllustrationRepeaters,
-  'jump':           IllustrationJump,
-  'heavy-light':    IllustrationHeavyLight,
-  'military-press': IllustrationMilitaryPress,
-  'dumbbell':       IllustrationDumbbell,
-  'pulley':         IllustrationPulley,
-  'plank':          IllustrationPlank,
-  'side-plank':     IllustrationSidePlank,
-  'squat':          IllustrationSquat,
-  'lunge':          IllustrationLunge,
-  'calf':           IllustrationCalf,
-  'chart':          IllustrationChart,
+type IllustrationProps = {
+  c: string;
 };
 
-// ── Hexagon SVG ───────────────────────────────────────────────────────────────
+function Fingerboard({
+  c,
+  label,
+}: IllustrationProps & {
+  label: string;
+}) {
+  return (
+    <g>
+      <rect
+        x="20"
+        y="29"
+        width="60"
+        height="28"
+        rx="5"
+        fill={c}
+        opacity="0.14"
+      />
 
-function hexPoints(cx: number, cy: number, r: number): string {
-  return Array.from({ length: 6 }, (_, i) => {
-    const angle = (Math.PI / 180) * (60 * i - 30);
-    return `${cx + r * Math.cos(angle)},${cy + r * Math.sin(angle)}`;
-  }).join(' ');
+      <rect
+        x="20"
+        y="29"
+        width="60"
+        height="28"
+        rx="5"
+        fill="none"
+        stroke={c}
+        strokeWidth="3"
+      />
+
+      <rect
+        x="27"
+        y="40"
+        width="18"
+        height="6"
+        rx="2"
+        fill={c}
+      />
+
+      <rect
+        x="55"
+        y="40"
+        width="18"
+        height="6"
+        rx="2"
+        fill={c}
+      />
+
+      <circle
+        cx="27"
+        cy="35"
+        r="2"
+        fill={c}
+      />
+
+      <circle
+        cx="73"
+        cy="35"
+        r="2"
+        fill={c}
+      />
+
+      <text
+        x="50"
+        y="70"
+        textAnchor="middle"
+        fill={c}
+        fontSize="12"
+        fontWeight="900"
+        fontFamily="ui-monospace, monospace"
+      >
+        {label}
+      </text>
+    </g>
+  );
 }
 
-// ── Main component ────────────────────────────────────────────────────────────
+function IllustrationFingerboard20(
+  props: IllustrationProps,
+) {
+  return (
+    <Fingerboard
+      {...props}
+      label="20 mm"
+    />
+  );
+}
+
+function IllustrationFingerboard25(
+  props: IllustrationProps,
+) {
+  return (
+    <Fingerboard
+      {...props}
+      label="25 mm"
+    />
+  );
+}
+
+function IllustrationSloper({
+  c,
+}: IllustrationProps) {
+  return (
+    <g>
+      <rect
+        x="19"
+        y="27"
+        width="62"
+        height="35"
+        rx="6"
+        fill={c}
+        opacity="0.12"
+      />
+
+      <rect
+        x="19"
+        y="27"
+        width="62"
+        height="35"
+        rx="6"
+        fill="none"
+        stroke={c}
+        strokeWidth="3"
+      />
+
+      <path
+        d="M26 51
+           Q31 35 39 35
+           Q47 35 50 51
+           Z"
+        fill={c}
+      />
+
+      <path
+        d="M51 51
+           Q56 30 66 30
+           Q76 30 78 51
+           Z"
+        fill={c}
+      />
+
+      <text
+        x="37"
+        y="73"
+        textAnchor="middle"
+        fill={c}
+        fontSize="11"
+        fontWeight="900"
+      >
+        30°
+      </text>
+
+      <text
+        x="66"
+        y="73"
+        textAnchor="middle"
+        fill={c}
+        fontSize="11"
+        fontWeight="900"
+      >
+        45°
+      </text>
+    </g>
+  );
+}
+
+function IllustrationPinch({
+  c,
+}: IllustrationProps) {
+  return (
+    <g>
+      <circle
+        cx="50"
+        cy="50"
+        r="23"
+        fill={c}
+        opacity="0.14"
+      />
+
+      <circle
+        cx="50"
+        cy="50"
+        r="23"
+        fill="none"
+        stroke={c}
+        strokeWidth="4"
+      />
+
+      <circle
+        cx="50"
+        cy="50"
+        r="8"
+        fill="none"
+        stroke={c}
+        strokeWidth="3"
+      />
+
+      <circle
+        cx="50"
+        cy="50"
+        r="2.5"
+        fill={c}
+      />
+    </g>
+  );
+}
+
+function IllustrationRepeaters({
+  c,
+}: IllustrationProps) {
+  return (
+    <g>
+      <circle
+        cx="50"
+        cy="32"
+        r="17"
+        fill={c}
+        opacity="0.12"
+      />
+
+      <circle
+        cx="50"
+        cy="32"
+        r="17"
+        fill="none"
+        stroke={c}
+        strokeWidth="2.5"
+      />
+
+      <line
+        x1="50"
+        y1="32"
+        x2="50"
+        y2="20"
+        stroke={c}
+        strokeWidth="2.5"
+        strokeLinecap="round"
+      />
+
+      <line
+        x1="50"
+        y1="32"
+        x2="59"
+        y2="37"
+        stroke={c}
+        strokeWidth="2.5"
+        strokeLinecap="round"
+      />
+
+      <circle
+        cx="50"
+        cy="32"
+        r="2.5"
+        fill={c}
+      />
+
+      <path
+        d="M50 15 A17 17 0 0 1 65 40"
+        fill="none"
+        stroke={c}
+        strokeWidth="4"
+        strokeLinecap="round"
+      />
+
+      <rect
+        x="18"
+        y="57"
+        width="64"
+        height="17"
+        rx="4"
+        fill={c}
+        opacity="0.14"
+      />
+
+      <rect
+        x="18"
+        y="57"
+        width="64"
+        height="17"
+        rx="4"
+        fill="none"
+        stroke={c}
+        strokeWidth="2"
+      />
+
+      <rect
+        x="25"
+        y="61"
+        width="16"
+        height="5"
+        rx="2"
+        fill={c}
+      />
+
+      <rect
+        x="59"
+        y="61"
+        width="16"
+        height="5"
+        rx="2"
+        fill={c}
+      />
+
+      <text
+        x="50"
+        y="87"
+        textAnchor="middle"
+        fill={c}
+        fontSize="11"
+        fontWeight="900"
+        fontFamily="ui-monospace, monospace"
+      >
+        7 / 3
+      </text>
+    </g>
+  );
+}
+
+function IllustrationJump({
+  c,
+}: IllustrationProps) {
+  return (
+    <g>
+      <rect
+        x="23"
+        y="68"
+        width="34"
+        height="6"
+        rx="3"
+        fill={c}
+      />
+
+      <rect
+        x="34"
+        y="55"
+        width="34"
+        height="6"
+        rx="3"
+        fill={c}
+      />
+
+      <rect
+        x="23"
+        y="42"
+        width="34"
+        height="6"
+        rx="3"
+        fill={c}
+      />
+
+      <rect
+        x="34"
+        y="29"
+        width="34"
+        height="6"
+        rx="3"
+        fill={c}
+      />
+
+      <rect
+        x="23"
+        y="16"
+        width="34"
+        height="6"
+        rx="3"
+        fill={c}
+      />
+
+      <path
+        d="M77 70 V25"
+        fill="none"
+        stroke={c}
+        strokeWidth="5"
+        strokeLinecap="round"
+      />
+
+      <path
+        d="M68 34 L77 23 L86 34"
+        fill="none"
+        stroke={c}
+        strokeWidth="5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </g>
+  );
+}
+
+function IllustrationHeavyLight({
+  c,
+}: IllustrationProps) {
+  return (
+    <g>
+      <rect
+        x="17"
+        y="27"
+        width="66"
+        height="6"
+        rx="3"
+        fill={c}
+      />
+
+      <rect
+        x="21"
+        y="32"
+        width="5"
+        height="22"
+        rx="2"
+        fill={c}
+        opacity="0.45"
+      />
+
+      <rect
+        x="74"
+        y="32"
+        width="5"
+        height="22"
+        rx="2"
+        fill={c}
+        opacity="0.45"
+      />
+
+      <path
+        d="M56 17
+           L40 48
+           H49
+           L43 79
+           L64 43
+           H54
+           Z"
+        fill={c}
+      />
+    </g>
+  );
+}
+
+function IllustrationPullup({
+  c,
+}: IllustrationProps) {
+  return (
+    <g>
+      <rect
+        x="18"
+        y="21"
+        width="64"
+        height="6"
+        rx="3"
+        fill={c}
+      />
+
+      <line
+        x1="50"
+        y1="27"
+        x2="50"
+        y2="57"
+        stroke={c}
+        strokeWidth="3"
+      />
+
+      <circle
+        cx="50"
+        cy="70"
+        r="11"
+        fill="none"
+        stroke={c}
+        strokeWidth="4"
+      />
+
+      <circle
+        cx="50"
+        cy="70"
+        r="3"
+        fill={c}
+      />
+    </g>
+  );
+}
+
+function IllustrationBarbell({
+  c,
+}: IllustrationProps) {
+  return (
+    <g>
+      <rect
+        x="18"
+        y="47"
+        width="64"
+        height="6"
+        rx="3"
+        fill={c}
+      />
+
+      <rect
+        x="10"
+        y="34"
+        width="8"
+        height="32"
+        rx="3"
+        fill={c}
+      />
+
+      <rect
+        x="82"
+        y="34"
+        width="8"
+        height="32"
+        rx="3"
+        fill={c}
+      />
+
+      <rect
+        x="18"
+        y="39"
+        width="6"
+        height="22"
+        rx="2"
+        fill={c}
+        opacity="0.7"
+      />
+
+      <rect
+        x="76"
+        y="39"
+        width="6"
+        height="22"
+        rx="2"
+        fill={c}
+        opacity="0.7"
+      />
+    </g>
+  );
+}
+
+function IllustrationDumbbell({
+  c,
+}: IllustrationProps) {
+  return (
+    <g transform="rotate(-18 50 50)">
+      <rect
+        x="32"
+        y="46"
+        width="36"
+        height="8"
+        rx="4"
+        fill={c}
+      />
+
+      <rect
+        x="22"
+        y="35"
+        width="11"
+        height="30"
+        rx="4"
+        fill={c}
+      />
+
+      <rect
+        x="67"
+        y="35"
+        width="11"
+        height="30"
+        rx="4"
+        fill={c}
+      />
+
+      <rect
+        x="16"
+        y="40"
+        width="6"
+        height="20"
+        rx="3"
+        fill={c}
+        opacity="0.7"
+      />
+
+      <rect
+        x="78"
+        y="40"
+        width="6"
+        height="20"
+        rx="3"
+        fill={c}
+        opacity="0.7"
+      />
+    </g>
+  );
+}
+
+function IllustrationPulley({
+  c,
+}: IllustrationProps) {
+  return (
+    <g>
+      <circle
+        cx="50"
+        cy="25"
+        r="12"
+        fill={c}
+        opacity="0.13"
+      />
+
+      <circle
+        cx="50"
+        cy="25"
+        r="12"
+        fill="none"
+        stroke={c}
+        strokeWidth="4"
+      />
+
+      <circle
+        cx="50"
+        cy="25"
+        r="4"
+        fill={c}
+      />
+
+      <path
+        d="M40 27 L28 68"
+        fill="none"
+        stroke={c}
+        strokeWidth="4"
+        strokeLinecap="round"
+      />
+
+      <path
+        d="M60 27 L72 68"
+        fill="none"
+        stroke={c}
+        strokeWidth="4"
+        strokeLinecap="round"
+      />
+
+      <circle
+        cx="27"
+        cy="71"
+        r="5"
+        fill={c}
+      />
+
+      <circle
+        cx="73"
+        cy="71"
+        r="5"
+        fill={c}
+      />
+    </g>
+  );
+}
+
+function Stopwatch({
+  c,
+  x,
+  y,
+}: {
+  c: string;
+  x: number;
+  y: number;
+}) {
+  return (
+    <g>
+      <circle
+        cx={x}
+        cy={y}
+        r="10"
+        fill="none"
+        stroke={c}
+        strokeWidth="4"
+      />
+
+      <rect
+        x={x - 3}
+        y={y - 15}
+        width="6"
+        height="5"
+        rx="2"
+        fill={c}
+      />
+
+      <line
+        x1={x}
+        y1={y}
+        x2={x}
+        y2={y - 6}
+        stroke={c}
+        strokeWidth="2.5"
+        strokeLinecap="round"
+      />
+
+      <line
+        x1={x}
+        y1={y}
+        x2={x + 5}
+        y2={y + 3}
+        stroke={c}
+        strokeWidth="2.5"
+        strokeLinecap="round"
+      />
+    </g>
+  );
+}
+
+function IllustrationPlank({
+  c,
+}: IllustrationProps) {
+  return (
+    <g>
+      <rect
+        x="20"
+        y="48"
+        width="51"
+        height="7"
+        rx="3.5"
+        fill={c}
+      />
+
+      <path
+        d="M25 55 L19 72 H31"
+        fill="none"
+        stroke={c}
+        strokeWidth="5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+
+      <path
+        d="M67 55 L75 72"
+        fill="none"
+        stroke={c}
+        strokeWidth="5"
+        strokeLinecap="round"
+      />
+
+      <Stopwatch
+        c={c}
+        x={79}
+        y={44}
+      />
+    </g>
+  );
+}
+
+function IllustrationSidePlank({
+  c,
+}: IllustrationProps) {
+  return (
+    <g>
+      <path
+        d="M25 68 L70 43"
+        fill="none"
+        stroke={c}
+        strokeWidth="8"
+        strokeLinecap="round"
+      />
+
+      <path
+        d="M29 66 L21 77 H34"
+        fill="none"
+        stroke={c}
+        strokeWidth="5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+
+      <Stopwatch
+        c={c}
+        x={78}
+        y={37}
+      />
+    </g>
+  );
+}
+
+function Footprint({
+  c,
+  x,
+  y,
+  rotation = 0,
+}: {
+  c: string;
+  x: number;
+  y: number;
+  rotation?: number;
+}) {
+  return (
+    <g
+      transform={`rotate(${rotation} ${x} ${y})`}
+    >
+      <ellipse
+        cx={x}
+        cy={y}
+        rx="6"
+        ry="11"
+        fill={c}
+      />
+
+      <circle
+        cx={x - 5}
+        cy={y - 11}
+        r="2"
+        fill={c}
+      />
+
+      <circle
+        cx={x - 2}
+        cy={y - 14}
+        r="2.2"
+        fill={c}
+      />
+
+      <circle
+        cx={x + 2}
+        cy={y - 14}
+        r="2.3"
+        fill={c}
+      />
+
+      <circle
+        cx={x + 6}
+        cy={y - 12}
+        r="2"
+        fill={c}
+      />
+    </g>
+  );
+}
+
+function IllustrationSquat({
+  c,
+}: IllustrationProps) {
+  return (
+    <g>
+      <Footprint
+        c={c}
+        x={32}
+        y={64}
+        rotation={-8}
+      />
+
+      <Footprint
+        c={c}
+        x={68}
+        y={64}
+        rotation={8}
+      />
+
+      <path
+        d="M50 22 V48"
+        fill="none"
+        stroke={c}
+        strokeWidth="5"
+        strokeLinecap="round"
+      />
+
+      <path
+        d="M41 40 L50 51 L59 40"
+        fill="none"
+        stroke={c}
+        strokeWidth="5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </g>
+  );
+}
+
+function IllustrationLunge({
+  c,
+}: IllustrationProps) {
+  return (
+    <g>
+      <rect
+        x="54"
+        y="60"
+        width="31"
+        height="8"
+        rx="3"
+        fill={c}
+        opacity="0.35"
+      />
+
+      <rect
+        x="58"
+        y="68"
+        width="5"
+        height="12"
+        rx="2"
+        fill={c}
+        opacity="0.35"
+      />
+
+      <rect
+        x="77"
+        y="68"
+        width="5"
+        height="12"
+        rx="2"
+        fill={c}
+        opacity="0.35"
+      />
+
+      <Footprint
+        c={c}
+        x={69}
+        y={48}
+        rotation={88}
+      />
+
+      <Footprint
+        c={c}
+        x={31}
+        y={69}
+        rotation={-7}
+      />
+
+      <path
+        d="M45 23 V46"
+        fill="none"
+        stroke={c}
+        strokeWidth="5"
+        strokeLinecap="round"
+      />
+
+      <path
+        d="M36 39 L45 50 L54 39"
+        fill="none"
+        stroke={c}
+        strokeWidth="5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </g>
+  );
+}
+
+function IllustrationCalf({
+  c,
+}: IllustrationProps) {
+  return (
+    <g>
+      <rect
+        x="20"
+        y="68"
+        width="60"
+        height="9"
+        rx="3"
+        fill={c}
+        opacity="0.35"
+      />
+
+      <path
+        d="M28 59
+           Q38 51 53 53
+           Q65 54 72 64
+           L55 66
+           Q43 62 28 64
+           Z"
+        fill={c}
+      />
+
+      <circle
+        cx="70"
+        cy="63"
+        r="4"
+        fill={c}
+      />
+
+      <path
+        d="M82 61 V31"
+        fill="none"
+        stroke={c}
+        strokeWidth="5"
+        strokeLinecap="round"
+      />
+
+      <path
+        d="M73 40 L82 29 L91 40"
+        fill="none"
+        stroke={c}
+        strokeWidth="5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </g>
+  );
+}
+
+function IllustrationChart({
+  c,
+}: IllustrationProps) {
+  return (
+    <g>
+      <line
+        x1="20"
+        y1="76"
+        x2="20"
+        y2="24"
+        stroke={c}
+        strokeWidth="3"
+        strokeLinecap="round"
+      />
+
+      <line
+        x1="20"
+        y1="76"
+        x2="81"
+        y2="76"
+        stroke={c}
+        strokeWidth="3"
+        strokeLinecap="round"
+      />
+
+      <path
+        d="M24 66
+           L37 59
+           L50 62
+           L63 45
+           L78 27"
+        fill="none"
+        stroke={c}
+        strokeWidth="5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+
+      <circle
+        cx="78"
+        cy="27"
+        r="4"
+        fill={c}
+      />
+    </g>
+  );
+}
+
+const ILLUSTRATIONS: Record<
+  string,
+  (props: IllustrationProps) =>
+    ReactElement
+> = {
+  pullup: IllustrationPullup,
+  "fingerboard-20":
+    IllustrationFingerboard20,
+  "fingerboard-25":
+    IllustrationFingerboard25,
+  sloper: IllustrationSloper,
+  pinch: IllustrationPinch,
+  repeaters: IllustrationRepeaters,
+  jump: IllustrationJump,
+  "heavy-light":
+    IllustrationHeavyLight,
+  barbell: IllustrationBarbell,
+  dumbbell: IllustrationDumbbell,
+  pulley: IllustrationPulley,
+  plank: IllustrationPlank,
+  "side-plank":
+    IllustrationSidePlank,
+  squat: IllustrationSquat,
+  lunge: IllustrationLunge,
+  calf: IllustrationCalf,
+  chart: IllustrationChart,
+};
+
+function hexPoints(
+  centerX: number,
+  centerY: number,
+  radius: number,
+): string {
+  return Array.from(
+    { length: 6 },
+    (_, index) => {
+      const angle =
+        ((60 * index - 30) *
+          Math.PI) /
+        180;
+
+      return `${
+        centerX +
+        radius * Math.cos(angle)
+      },${
+        centerY +
+        radius * Math.sin(angle)
+      }`;
+    },
+  ).join(" ");
+}
+
+function getLevelPalette(
+  level: BadgeLevel | null,
+) {
+  if (!level) {
+    return {
+      light: "#4A4A4A",
+      middle: "#292929",
+      dark: "#151515",
+      shadow: "#050505",
+      innerTop: "#1C1C1C",
+      innerBottom: "#090909",
+      illustration: "#505050",
+      glow: "#000000",
+    };
+  }
+
+  switch (level) {
+    case "bronze":
+      return {
+        light: "#FFD0A0",
+        middle: "#CD7F32",
+        dark: "#7D451E",
+        shadow: "#2C1408",
+        innerTop: "#251B15",
+        innerBottom: "#0E0B09",
+        illustration: "#FFF7EF",
+        glow: "#CD7F32",
+      };
+
+    case "silver":
+      return {
+        light: "#FFFFFF",
+        middle: "#C7CCD3",
+        dark: "#747B85",
+        shadow: "#22262C",
+        innerTop: "#202328",
+        innerBottom: "#0C0D0F",
+        illustration: "#FFFFFF",
+        glow: "#C7CCD3",
+      };
+
+    case "gold":
+      return {
+        light: "#FFF4A8",
+        middle: "#FFD700",
+        dark: "#A66A00",
+        shadow: "#3C2200",
+        innerTop: "#28210C",
+        innerBottom: "#0E0C06",
+        illustration: "#FFFFFF",
+        glow: "#FFD700",
+      };
+
+    case "diamond":
+      return {
+        light: "#EFFFFF",
+        middle: "#67E8F9",
+        dark: "#218AB6",
+        shadow: "#062A40",
+        innerTop: "#10262D",
+        innerBottom: "#071013",
+        illustration: "#FFFFFF",
+        glow: "#67E8F9",
+      };
+  }
+}
 
 interface BadgeHexProps {
   icon: string;
-  level: BadgeLevel | null;        // null = locked
-  size?: number;                   // outer px size, default 90
-  showLevelRing?: boolean;         // whether to draw the metallic border
-  animate?: boolean;               // pulse animation on unlock
+  level: BadgeLevel | null;
+  size?: number;
+  showLevelRing?: boolean;
+  animate?: boolean;
 }
 
-export function BadgeHex({ icon, level, size = 90, showLevelRing = true, animate = false }: BadgeHexProps) {
-  const meta = level ? BADGE_LEVEL_META[level] : null;
-  const locked = !level;
-  const Illustration = ILLUSTRATIONS[icon];
+export function BadgeHex({
+  icon,
+  level,
+  size = 90,
+  showLevelRing = true,
+  animate = false,
+}: BadgeHexProps) {
+  const rawId = useId();
 
-  const cx = 50;
-  const cy = 50;
-  const rOuter = 44;
-  const rInner = 38;
+  const uniqueId =
+    rawId.replace(/:/g, "");
 
-  const borderColor = meta?.border ?? '#333';
-  const illustrationColor = locked ? '#404040' : '#ffffff';
-  const fillColor = locked ? '#111' : '#1a1a1a';
-  const bgOpacity = locked ? 0.6 : 0.95;
+  const locked = level === null;
+
+  const Illustration =
+    ILLUSTRATIONS[icon];
+
+  const palette =
+    getLevelPalette(level);
+
+  const borderGradientId =
+    `border-${uniqueId}`;
+
+  const innerGradientId =
+    `inner-${uniqueId}`;
+
+  const shineGradientId =
+    `shine-${uniqueId}`;
+
+  const shadowFilterId =
+    `shadow-${uniqueId}`;
+
+  const glowFilterId =
+    `glow-${uniqueId}`;
 
   return (
     <svg
       width={size}
       height={size}
       viewBox="0 0 100 100"
-      className={animate ? 'animate-pulse' : ''}
+      xmlns="http://www.w3.org/2000/svg"
+      role="img"
+      aria-label={
+        level
+          ? `Badge ${
+              BADGE_LEVEL_META[level]
+                .label
+            }`
+          : "Badge verrouillé"
+      }
+      className={
+        animate
+          ? "badge-unlock-animation"
+          : undefined
+      }
+      style={{
+        overflow: "visible",
+      }}
     >
       <defs>
-        {meta && (
-          <>
-            <linearGradient id={`border-grad-${level}`} x1="0%" y1="0%" x2="100%" y2="100%">
-              <stop offset="0%" stopColor={meta.border} stopOpacity="1" />
-              <stop offset="40%" stopColor="#ffffff" stopOpacity="0.5" />
-              <stop offset="100%" stopColor={meta.border} stopOpacity="0.8" />
-            </linearGradient>
-            <filter id={`glow-${level}`} x="-20%" y="-20%" width="140%" height="140%">
-              <feGaussianBlur stdDeviation="2.5" result="blur" />
-              <feFlood floodColor={meta.border} floodOpacity="0.6" result="color" />
-              <feComposite in="color" in2="blur" operator="in" result="glow" />
-              <feMerge><feMergeNode in="glow" /><feMergeNode in="SourceGraphic" /></feMerge>
-            </filter>
-          </>
-        )}
+        <linearGradient
+          id={borderGradientId}
+          x1="15%"
+          y1="5%"
+          x2="85%"
+          y2="95%"
+        >
+          <stop
+            offset="0%"
+            stopColor={palette.light}
+          />
+
+          <stop
+            offset="28%"
+            stopColor={palette.middle}
+          />
+
+          <stop
+            offset="60%"
+            stopColor={palette.dark}
+          />
+
+          <stop
+            offset="82%"
+            stopColor={palette.middle}
+          />
+
+          <stop
+            offset="100%"
+            stopColor={palette.shadow}
+          />
+        </linearGradient>
+
+        <linearGradient
+          id={innerGradientId}
+          x1="0%"
+          y1="0%"
+          x2="0%"
+          y2="100%"
+        >
+          <stop
+            offset="0%"
+            stopColor={
+              palette.innerTop
+            }
+          />
+
+          <stop
+            offset="100%"
+            stopColor={
+              palette.innerBottom
+            }
+          />
+        </linearGradient>
+
+        <linearGradient
+          id={shineGradientId}
+          x1="0%"
+          y1="0%"
+          x2="100%"
+          y2="100%"
+        >
+          <stop
+            offset="0%"
+            stopColor="#FFFFFF"
+            stopOpacity="0.75"
+          />
+
+          <stop
+            offset="45%"
+            stopColor="#FFFFFF"
+            stopOpacity="0.08"
+          />
+
+          <stop
+            offset="100%"
+            stopColor="#FFFFFF"
+            stopOpacity="0"
+          />
+        </linearGradient>
+
+        <filter
+          id={shadowFilterId}
+          x="-25%"
+          y="-25%"
+          width="150%"
+          height="160%"
+        >
+          <feDropShadow
+            dx="0"
+            dy="4"
+            stdDeviation="2.5"
+            floodColor="#000000"
+            floodOpacity="0.75"
+          />
+        </filter>
+
+        <filter
+          id={glowFilterId}
+          x="-40%"
+          y="-40%"
+          width="180%"
+          height="180%"
+        >
+          <feDropShadow
+            dx="0"
+            dy="0"
+            stdDeviation="2.2"
+            floodColor={palette.glow}
+            floodOpacity={
+              locked ? 0 : 0.45
+            }
+          />
+        </filter>
+
+        <clipPath id={`clip-${uniqueId}`}>
+          <polygon
+            points={hexPoints(
+              50,
+              49,
+              32.5,
+            )}
+          />
+        </clipPath>
       </defs>
 
-      {/* Outer hex border */}
+      <polygon
+        points={hexPoints(
+          50,
+          53,
+          43,
+        )}
+        fill="#000000"
+        opacity="0.55"
+      />
+
       {showLevelRing && (
         <polygon
-          points={hexPoints(cx, cy, rOuter)}
-          fill={meta ? `url(#border-grad-${level})` : '#2a2a2a'}
-          filter={meta ? `url(#glow-${level})` : undefined}
-          opacity={locked ? 0.4 : 1}
+          points={hexPoints(
+            50,
+            49,
+            44,
+          )}
+          fill={`url(#${borderGradientId})`}
+          filter={`url(#${shadowFilterId})`}
+          opacity={
+            locked ? 0.5 : 1
+          }
         />
       )}
 
-      {/* Inner hex bg */}
       <polygon
-        points={hexPoints(cx, cy, rInner)}
-        fill={fillColor}
-        opacity={bgOpacity}
+        points={hexPoints(
+          50,
+          49,
+          39.5,
+        )}
+        fill={
+          locked
+            ? "#222222"
+            : palette.dark
+        }
+        opacity="0.96"
       />
 
-      {/* Illustration */}
-      {Illustration && (
-        <g>
-          <Illustration c={illustrationColor} />
+      <polygon
+        points={hexPoints(
+          50,
+          49,
+          35,
+        )}
+        fill={`url(#${innerGradientId})`}
+        stroke={
+          locked
+            ? "#343434"
+            : palette.middle
+        }
+        strokeWidth="1"
+        strokeOpacity={
+          locked ? 0.55 : 0.5
+        }
+      />
+
+      {!locked && (
+        <path
+          d="M15 27 L50 6.5 L85 27 L81 30 L50 12 L19 30 Z"
+          fill={`url(#${shineGradientId})`}
+          opacity="0.65"
+        />
+      )}
+
+      <g
+        clipPath={`url(#clip-${uniqueId})`}
+        opacity={
+          locked ? 0.38 : 1
+        }
+        transform="translate(10 10) scale(0.8)"
+        filter={
+          locked
+            ? undefined
+            : `url(#${glowFilterId})`
+        }
+        pointerEvents="none"
+      >
+        {Illustration ? (
+          <Illustration
+            c={palette.illustration}
+          />
+        ) : (
+          <text
+            x="50"
+            y="56"
+            textAnchor="middle"
+            fill={
+              palette.illustration
+            }
+            fontSize="24"
+            fontWeight="900"
+          >
+            ?
+          </text>
+        )}
+      </g>
+
+      {locked && (
+        <g
+          transform="translate(0 1)"
+          opacity="0.9"
+          pointerEvents="none"
+        >
+          <circle
+            cx="50"
+            cy="78"
+            r="10"
+            fill="#101010"
+            stroke="#414141"
+            strokeWidth="1.2"
+          />
+
+          <path
+            d="M46 75 V72.5 C46 67 54 67 54 72.5 V75"
+            fill="none"
+            stroke="#757575"
+            strokeWidth="2"
+            strokeLinecap="round"
+          />
+
+          <rect
+            x="44.5"
+            y="74"
+            width="11"
+            height="8.5"
+            rx="2"
+            fill="#626262"
+          />
+
+          <circle
+            cx="50"
+            cy="78"
+            r="1.2"
+            fill="#202020"
+          />
         </g>
       )}
 
-      {/* Lock overlay */}
-      {locked && (
-        <text x="50" y="60" textAnchor="middle" fontSize="20" opacity="0.2">🔒</text>
+      {level === "diamond" && (
+        <g pointerEvents="none">
+          <path
+            d="M50 3 L55 8 L50 13 L45 8 Z"
+            fill="#F4FFFF"
+            stroke="#67E8F9"
+            strokeWidth="1"
+          />
+
+          <path
+            d="M50 3 V13 M45 8 H55"
+            stroke="#218AB6"
+            strokeWidth="0.7"
+          />
+        </g>
       )}
     </svg>
   );

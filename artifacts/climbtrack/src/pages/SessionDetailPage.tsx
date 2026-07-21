@@ -1,152 +1,552 @@
-import { useState, useEffect, useRef } from "react";
-import { useRoute, useLocation } from "wouter";
-import { ChevronLeft } from "lucide-react";
-import { SESSIONS, SessionDef } from "@/data/sessions";
-import { useClimbTrack, ExerciseLog, SessionLog } from "@/context/ClimbTrackContext";
-import { ExerciseRow } from "@/components/ExerciseRow";
-import { MUSCLE_SCORES } from "@/data/muscleScores";
-import { getSessionExercises } from "@/utils/exercises";
-import type { ExerciseDef } from "@/data/sessions";
+import {
+  useEffect,
+  useRef,
+  useState,
+} from "react";
+
+import {
+  useLocation,
+  useRoute,
+} from "wouter";
+
+import {
+  ChevronLeft,
+} from "lucide-react";
+
+import {
+  SESSIONS,
+} from "@/data/sessions";
+
+import type {
+  ExerciseDef,
+  SessionDef,
+} from "@/data/sessions";
+
+import {
+  useClimbTrack,
+} from "@/context/ClimbTrackContext";
+
+import type {
+  ExerciseLog,
+  FinisherType,
+  SessionLog,
+} from "@/context/ClimbTrackContext";
+
+import {
+  ExerciseRow,
+} from "@/components/ExerciseRow";
+
+import {
+  MUSCLE_SCORES,
+} from "@/data/muscleScores";
+
+import {
+  getSessionExercises,
+} from "@/utils/exercises";
+
+import {
+  getTodayLocalDate,
+} from "@/utils/dailySuggestion";
 
 export function SessionDetailPage() {
-  const [match, params] = useRoute("/seance/:id");
-  const [, setLocation] = useLocation();
-  const { data, addSessionLog, updateExerciseDefault } = useClimbTrack();
+  const [
+    match,
+    params,
+  ] = useRoute(
+    "/seance/:id",
+  );
 
-  const [sessionDef, setSessionDef] = useState<SessionDef | null>(null);
-  const [sessionExercises, setSessionExercises] = useState<ExerciseDef[]>([]);
-  const [logs, setLogs] = useState<Record<string, ExerciseLog>>({});
-  const [painAreas, setPainAreas] = useState<Record<string, number>>({});
-  const [note, setNote] = useState("");
+  const [
+    ,
+    setLocation,
+  ] = useLocation();
 
-  // Keep a ref to data so the init effect can read it without being a dep
-  const dataRef = useRef(data);
-  dataRef.current = data;
+  const {
+    data,
+    addSessionLog,
+    updateExerciseDefault,
+  } = useClimbTrack();
 
-  // Initialize only when the session changes (not on every data update)
+  const [
+    sessionDef,
+    setSessionDef,
+  ] =
+    useState<SessionDef | null>(
+      null,
+    );
+
+  const [
+    sessionExercises,
+    setSessionExercises,
+  ] = useState<ExerciseDef[]>(
+    [],
+  );
+
+  const [
+    logs,
+    setLogs,
+  ] = useState<
+    Record<
+      string,
+      ExerciseLog
+    >
+  >({});
+
+  const [
+    painAreas,
+    setPainAreas,
+  ] = useState<
+    Record<
+      string,
+      number
+    >
+  >({});
+
+  const [
+    note,
+    setNote,
+  ] = useState("");
+
+  const search =
+    new URLSearchParams(
+      window.location.search,
+    );
+
+  const manualDate =
+    search.get("date");
+
+  const finisherType =
+    search.get(
+      "finisherType",
+    ) as FinisherType | null;
+
+  const requestedExercises =
+    search
+      .get("exerciseIds")
+      ?.split(",")
+      .filter(Boolean);
+
+  const dataRef =
+    useRef(data);
+
+  dataRef.current =
+    data;
+
   useEffect(() => {
-    if (!match || !params?.id) return;
-    const def = SESSIONS.find(s => s.id === params.id);
-    if (!def) { setLocation("/"); return; }
+    if (
+      !match ||
+      !params?.id
+    ) {
+      return;
+    }
 
-    setSessionDef(def);
-    const exercises = getSessionExercises(params.id, dataRef.current);
-    setSessionExercises(exercises);
+    const definition =
+      SESSIONS.find(
+        (session) =>
+          session.id ===
+          params.id,
+      );
 
-    const initialLogs: Record<string, ExerciseLog> = {};
-    exercises.forEach(ex => {
-      const defaults = dataRef.current.exerciseDefaults[ex.id] ?? ex.defaultValues;
-      initialLogs[ex.id] = {
-        exerciseId: ex.id,
-        completed: false,
-        sets: defaults.sets,
-        reps: defaults.reps,
-        duration: defaults.duration,
-        weight: defaults.weight,
-        assistance: defaults.assistance,
+    if (!definition) {
+      setLocation("/");
+      return;
+    }
+
+    setSessionDef(
+      definition,
+    );
+
+    let exercises =
+      getSessionExercises(
+        params.id,
+        dataRef.current,
+      );
+
+    if (
+      requestedExercises?.length
+    ) {
+      const requested =
+        new Set(
+          requestedExercises,
+        );
+
+      exercises =
+        exercises.filter(
+          (exercise) =>
+            requested.has(
+              exercise.id,
+            ),
+        );
+    }
+
+    setSessionExercises(
+      exercises,
+    );
+
+    const initialLogs: Record<
+      string,
+      ExerciseLog
+    > = {};
+
+    exercises.forEach(
+      (exercise) => {
+        const defaults =
+          dataRef.current
+            .exerciseDefaults[
+              exercise.id
+            ] ??
+          exercise.defaultValues;
+
+        initialLogs[
+          exercise.id
+        ] = {
+          exerciseId:
+            exercise.id,
+
+          completed:
+            false,
+
+          sets:
+            defaults.sets,
+
+          reps:
+            defaults.reps,
+
+          duration:
+            defaults.duration,
+
+          weight:
+            defaults.weight,
+
+          assistance:
+            defaults.assistance,
+
+          progressionValue:
+            exercise.id ===
+            "suspension-slopers"
+              ? 30
+              : undefined,
+
+          leftHandJumps:
+            exercise.id ===
+            "sauts-prise"
+              ? 3
+              : undefined,
+
+          rightHandJumps:
+            exercise.id ===
+            "sauts-prise"
+              ? 3
+              : undefined,
+        };
+      },
+    );
+
+    setLogs(
+      initialLogs,
+    );
+  }, [
+    match,
+    params?.id,
+    setLocation,
+  ]);
+
+  if (!sessionDef) {
+    return null;
+  }
+
+  function handleFinish() {
+    const date =
+      manualDate ??
+      getTodayLocalDate();
+
+    const newSessionLog: SessionLog =
+      {
+        id:
+          crypto.randomUUID(),
+
+        date,
+
+        sessionId:
+          sessionDef.id,
+
+        exerciseLogs:
+          Object.values(
+            logs,
+          ),
+
+        note:
+          note.trim() ||
+          undefined,
+
+        pain:
+          Object.keys(
+            painAreas,
+          ).length > 0
+            ? painAreas
+            : undefined,
+
+        finisherType:
+          finisherType ??
+          undefined,
       };
-    });
-    setLogs(initialLogs);
-  }, [match, params?.id, setLocation]);
 
-  if (!sessionDef) return null;
+    addSessionLog(
+      newSessionLog,
+    );
 
-  const handleLogChange = (exId: string, updatedLog: ExerciseLog) =>
-    setLogs(prev => ({ ...prev, [exId]: updatedLog }));
-
-  const handleFinish = () => {
-    const today = new Date().toISOString().split('T')[0];
-    const newSessionLog: SessionLog = {
-      id: crypto.randomUUID(),
-      date: today,
-      sessionId: sessionDef.id,
-      exerciseLogs: Object.values(logs),
-      note: note.trim() || undefined,
-      pain: Object.keys(painAreas).length > 0 ? painAreas : undefined,
-    };
-    addSessionLog(newSessionLog);
     setLocation("/");
-  };
+  }
 
-  const getPainWarning = (exId: string) => {
-    const scores = MUSCLE_SCORES[exId];
-    if (!scores) return false;
-    if (painAreas['Doigts'] > 3 && scores['doigts'] >= 3) return true;
-    if ((painAreas['Épaule droite'] > 3 || painAreas['Épaule gauche'] > 3) && scores['épaules'] >= 3) return true;
-    return false;
-  };
+  function getPainWarning(
+    exerciseId: string,
+  ) {
+    const scores =
+      MUSCLE_SCORES[
+        exerciseId
+      ];
 
-  const PAIN_SLIDERS = [
-    'Doigts', 'Poignet droit', 'Poignet gauche',
-    'Coude droit', 'Coude gauche', 'Épaule droite', 'Épaule gauche',
+    if (!scores) {
+      return false;
+    }
+
+    const fingersPain =
+      (
+        painAreas[
+          "Doigts"
+        ] ?? 0
+      ) > 3 &&
+      (
+        scores.doigts ??
+        0
+      ) >= 3;
+
+    const shoulderPain =
+      (
+        (
+          painAreas[
+            "Épaule droite"
+          ] ?? 0
+        ) > 3 ||
+        (
+          painAreas[
+            "Épaule gauche"
+          ] ?? 0
+        ) > 3
+      ) &&
+      (
+        scores.épaules ??
+        0
+      ) >= 3;
+
+    return (
+      fingersPain ||
+      shoulderPain
+    );
+  }
+
+  const painSliders = [
+    "Doigts",
+    "Poignet droit",
+    "Poignet gauche",
+    "Coude droit",
+    "Coude gauche",
+    "Épaule droite",
+    "Épaule gauche",
   ];
 
   return (
     <div className="min-h-screen bg-background pb-32">
-      <header className="sticky top-0 z-10 bg-background/95 backdrop-blur-md border-b border-border pt-safe">
-        <div className="flex items-center px-4 py-4 gap-3">
-          <button onClick={() => setLocation("/")} className="p-2 -ml-2 rounded-full hover:bg-white/10 active:scale-95 transition-all">
-            <ChevronLeft size={24} className="text-white" />
+      <header className="sticky top-0 z-10 border-b border-border bg-background/95 pt-safe backdrop-blur-md">
+        <div className="flex items-center gap-3 px-4 py-4">
+          <button
+            type="button"
+            onClick={() =>
+              setLocation("/")
+            }
+            className="-ml-2 rounded-full p-2 hover:bg-white/10"
+          >
+            <ChevronLeft
+              size={24}
+              className="text-white"
+            />
           </button>
+
           <div>
-            <h1 className="text-lg font-bold tracking-tight text-white leading-tight">{sessionDef.name}</h1>
+            <h1 className="text-lg font-bold text-white">
+              {
+                sessionDef.name
+              }
+            </h1>
+
+            {manualDate && (
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                Séance du{" "}
+                {new Date(
+                  `${manualDate}T12:00:00`,
+                ).toLocaleDateString(
+                  "fr-CH",
+                  {
+                    day:
+                      "2-digit",
+                    month:
+                      "long",
+                    year:
+                      "numeric",
+                  },
+                )}
+              </p>
+            )}
           </div>
         </div>
       </header>
 
-      <main className="p-4 space-y-4">
-        {sessionExercises.map(ex => (
-          <ExerciseRow
-            key={ex.id}
-            exercise={ex}
-            defaults={data.exerciseDefaults[ex.id] ?? ex.defaultValues}
-            log={logs[ex.id]}
-            onChange={(l) => handleLogChange(ex.id, l)}
-            onUpdateDefault={(defs) => updateExerciseDefault(ex.id, defs)}
-            isPainful={getPainWarning(ex.id)}
-          />
-        ))}
+      <main className="space-y-4 p-4">
+        {sessionExercises.map(
+          (exercise) => {
+            const exerciseLog =
+              logs[
+                exercise.id
+              ];
 
-        {sessionExercises.length === 0 && (
-          <div className="text-center py-16 text-muted-foreground">
-            <p className="text-sm">Aucun exercice dans cette séance.</p>
-            <p className="text-xs mt-1">Ajoutez-en depuis Réglages → Gérer les exercices.</p>
-          </div>
+            if (!exerciseLog) {
+              return null;
+            }
+
+            return (
+              <ExerciseRow
+                key={
+                  exercise.id
+                }
+
+                exercise={
+                  exercise
+                }
+
+                defaults={
+                  data
+                    .exerciseDefaults[
+                      exercise.id
+                    ] ??
+                  exercise.defaultValues
+                }
+
+                log={
+                  exerciseLog
+                }
+
+                onChange={(
+                  updatedLog,
+                ) =>
+                  setLogs(
+                    (
+                      previous,
+                    ) => ({
+                      ...previous,
+
+                      [exercise.id]:
+                        updatedLog,
+                    }),
+                  )
+                }
+
+                onUpdateDefault={(
+                  defaults,
+                ) =>
+                  updateExerciseDefault(
+                    exercise.id,
+                    defaults,
+                  )
+                }
+
+                isPainful={getPainWarning(
+                  exercise.id,
+                )}
+              />
+            );
+          },
         )}
 
-        <div className="mt-8 pt-6 border-t border-border">
-          <h3 className="text-sm font-bold text-white uppercase tracking-wider mb-4">Douleurs & Gênes (Optionnel)</h3>
-          <div className="bg-card border border-border rounded-xl p-4 space-y-4">
-            {PAIN_SLIDERS.map(area => (
-              <div key={area} className="flex items-center gap-4">
-                <span className="text-sm text-muted-foreground w-1/3">{area}</span>
-                <input
-                  type="range" min="0" max="10"
-                  value={painAreas[area] || 0}
-                  onChange={(e) => setPainAreas(prev => ({ ...prev, [area]: parseInt(e.target.value) }))}
-                  className="flex-1 accent-white"
-                />
-                <span className="text-xs font-mono w-4 text-right">{painAreas[area] || 0}</span>
-              </div>
-            ))}
+        <div className="mt-8 border-t border-border pt-6">
+          <h3 className="mb-4 text-sm font-bold uppercase tracking-wider text-white">
+            Douleurs & gênes
+          </h3>
+
+          <div className="space-y-4 rounded-xl border border-border bg-card p-4">
+            {painSliders.map(
+              (area) => (
+                <div
+                  key={area}
+                  className="flex items-center gap-4"
+                >
+                  <span className="w-1/3 text-sm text-muted-foreground">
+                    {area}
+                  </span>
+
+                  <input
+                    type="range"
+                    min="0"
+                    max="10"
+                    value={
+                      painAreas[
+                        area
+                      ] ?? 0
+                    }
+                    onChange={(
+                      event,
+                    ) =>
+                      setPainAreas(
+                        (
+                          previous,
+                        ) => ({
+                          ...previous,
+
+                          [area]:
+                            Number(
+                              event
+                                .target
+                                .value,
+                            ),
+                        }),
+                      )
+                    }
+                    className="flex-1 accent-white"
+                  />
+
+                  <span className="w-4 text-right font-mono text-xs">
+                    {
+                      painAreas[
+                        area
+                      ] ?? 0
+                    }
+                  </span>
+                </div>
+              ),
+            )}
           </div>
         </div>
 
-        <div className="mt-6">
-          <h3 className="text-sm font-bold text-white uppercase tracking-wider mb-4">Note</h3>
-          <textarea
-            className="w-full bg-card border border-border rounded-xl p-4 text-white placeholder:text-muted-foreground/50 resize-none min-h-[100px]"
-            placeholder="Comment s'est passée la séance ?"
-            value={note}
-            onChange={(e) => setNote(e.target.value)}
-          />
-        </div>
+        <textarea
+          className="min-h-[100px] w-full resize-none rounded-xl border border-border bg-card p-4 text-white"
+          placeholder="Comment s’est passée la séance ?"
+          value={note}
+          onChange={(
+            event,
+          ) =>
+            setNote(
+              event.target.value,
+            )
+          }
+        />
       </main>
 
-      <div className="fixed bottom-0 left-0 right-0 p-4 bg-background/90 backdrop-blur-md border-t border-border pb-safe">
+      <div className="fixed bottom-0 left-0 right-0 border-t border-border bg-background/90 p-4 pb-safe backdrop-blur-md">
         <button
-          onClick={handleFinish}
-          className="w-full bg-white text-black font-bold py-4 rounded-xl text-lg hover:bg-white/90 active:scale-[0.98] transition-all"
+          type="button"
+          onClick={
+            handleFinish
+          }
+          className="w-full rounded-xl bg-white py-4 text-lg font-bold text-black"
         >
           Terminer la séance
         </button>

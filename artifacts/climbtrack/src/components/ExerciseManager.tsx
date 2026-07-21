@@ -1,24 +1,53 @@
-import { useState } from 'react';
 import {
-  ChevronDown, ChevronRight, Plus, Pencil, Trash2, ArrowUp, ArrowDown,
-  RotateCcw, Check, X, FolderPlus,
-} from 'lucide-react';
-import { useClimbTrack } from '@/context/ClimbTrackContext';
-import { ExerciseDef, SESSIONS, TrackingType, ASSISTANCE_OPTIONS } from '@/data/sessions';
+  useState,
+  type Dispatch,
+  type ReactNode,
+  type SetStateAction,
+} from "react";
+import { createPortal } from "react-dom";
 import {
-  getAllCategories, getAllManagedExercises, getExerciseSessionIds,
-  isExerciseHidden, BUILTIN_CATEGORIES, TRACKING_LABELS, TRACKING_TYPES,
-} from '@/utils/exercises';
-import { useToast } from '@/hooks/use-toast';
+  ChevronDown,
+  ChevronRight,
+  Plus,
+  Pencil,
+  Trash2,
+  ArrowUp,
+  ArrowDown,
+  RotateCcw,
+  Check,
+  X,
+  FolderPlus,
+} from "lucide-react";
+import { useClimbTrack } from "@/context/ClimbTrackContext";
+import {
+  ExerciseDef,
+  SESSIONS,
+  TrackingType,
+  ASSISTANCE_OPTIONS,
+} from "@/data/sessions";
+import {
+  getAllCategories,
+  getAllManagedExercises,
+  getExerciseSessionIds,
+  isExerciseHidden,
+  BUILTIN_CATEGORIES,
+  TRACKING_LABELS,
+  TRACKING_TYPES,
+} from "@/utils/exercises";
+import { useToast } from "@/hooks/use-toast";
 
-/* ── helpers ── */
+/* ── Helpers ─────────────────────────────────────────────────────────────── */
+
 const BUILTIN_IDS = new Set(
-  SESSIONS.flatMap(s => s.exercises.map(e => e.id))
+  SESSIONS.flatMap((session) =>
+    session.exercises.map((exercise) => exercise.id),
+  ),
 );
+
 const isBuiltin = (id: string) => BUILTIN_IDS.has(id);
 
 type EditState = {
-  id: string | null; // null = new
+  id: string | null;
   name: string;
   description: string;
   category: string;
@@ -33,542 +62,1275 @@ type EditState = {
   isHangboard: boolean;
 };
 
-const TRACKING_HAS: Record<TrackingType, { reps: boolean; duration: boolean; weight: boolean; assistance: boolean }> = {
-  'duration+assistance': { reps: false, duration: true, weight: false, assistance: true },
-  'reps':                { reps: true,  duration: false, weight: false, assistance: false },
-  'weight':              { reps: false, duration: false, weight: true,  assistance: false },
-  'weight+duration':     { reps: false, duration: true,  weight: true,  assistance: false },
-  'assistance':          { reps: true,  duration: true,  weight: false, assistance: true },
-  'weight+reps':         { reps: true,  duration: false, weight: true,  assistance: false },
-  'duration':            { reps: false, duration: true,  weight: false, assistance: false },
-  'none':                { reps: false, duration: false, weight: false, assistance: false },
+const TRACKING_HAS: Record<
+  TrackingType,
+  {
+    reps: boolean;
+    duration: boolean;
+    weight: boolean;
+    assistance: boolean;
+  }
+> = {
+  "duration+assistance": {
+    reps: false,
+    duration: true,
+    weight: false,
+    assistance: true,
+  },
+  reps: {
+    reps: true,
+    duration: false,
+    weight: false,
+    assistance: false,
+  },
+  weight: {
+    reps: false,
+    duration: false,
+    weight: true,
+    assistance: false,
+  },
+  "weight+duration": {
+    reps: false,
+    duration: true,
+    weight: true,
+    assistance: false,
+  },
+  assistance: {
+    reps: true,
+    duration: true,
+    weight: false,
+    assistance: true,
+  },
+  "weight+reps": {
+    reps: true,
+    duration: false,
+    weight: true,
+    assistance: false,
+  },
+  duration: {
+    reps: false,
+    duration: true,
+    weight: false,
+    assistance: false,
+  },
+  none: {
+    reps: false,
+    duration: false,
+    weight: false,
+    assistance: false,
+  },
 };
 
-function emptyEdit(category = ''): EditState {
+function emptyEdit(category = ""): EditState {
   return {
-    id: null, name: '', description: '', category,
-    tracking: 'reps', sessionIds: [],
-    sets: 3, reps: 8, duration: 30, weight: 0, restSeconds: 90, assistance: ASSISTANCE_OPTIONS[5],
+    id: null,
+    name: "",
+    description: "",
+    category,
+    tracking: "reps",
+    sessionIds: [],
+    sets: 3,
+    reps: 8,
+    duration: 30,
+    weight: 0,
+    restSeconds: 90,
+    assistance: ASSISTANCE_OPTIONS[5],
     isHangboard: false,
   };
 }
 
-function exerciseToEdit(ex: ExerciseDef, data: ReturnType<typeof useClimbTrack>['data']): EditState {
-  const sessionIds = getExerciseSessionIds(ex.id, data);
-  const def = data.exerciseDefaults[ex.id] ?? ex.defaultValues;
+function exerciseToEdit(
+  exercise: ExerciseDef,
+  data: ReturnType<typeof useClimbTrack>["data"],
+): EditState {
+  const sessionIds = getExerciseSessionIds(exercise.id, data);
+
+  const defaults =
+    data.exerciseDefaults[exercise.id] ??
+    exercise.defaultValues;
+
   return {
-    id: ex.id,
-    name: ex.name,
-    description: ex.description,
-    category: ex.category,
-    tracking: ex.tracking,
+    id: exercise.id,
+    name: exercise.name,
+    description: exercise.description,
+    category: exercise.category,
+    tracking: exercise.tracking,
     sessionIds,
-    sets: def.sets ?? 3,
-    reps: def.reps ?? 8,
-    duration: def.duration ?? 30,
-    weight: def.weight ?? 0,
-    restSeconds: def.restSeconds ?? 90,
-    assistance: def.assistance ?? ASSISTANCE_OPTIONS[5],
-    isHangboard: ex.isHangboard ?? false,
+    sets: defaults.sets ?? 3,
+    reps: defaults.reps ?? 8,
+    duration: defaults.duration ?? 30,
+    weight: defaults.weight ?? 0,
+    restSeconds: defaults.restSeconds ?? 90,
+    assistance:
+      defaults.assistance ?? ASSISTANCE_OPTIONS[5],
+    isHangboard: exercise.isHangboard ?? false,
   };
 }
 
-/* ── sub-components ── */
+/* ── Champs ──────────────────────────────────────────────────────────────── */
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+function Field({
+  label,
+  children,
+}: {
+  label: string;
+  children: ReactNode;
+}) {
   return (
-    <div className="space-y-1">
-      <label className="text-xs text-muted-foreground font-medium uppercase tracking-wide">{label}</label>
+    <div className="space-y-1.5">
+      <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+        {label}
+      </label>
+
       {children}
     </div>
   );
 }
 
-function Input({ value, onChange, type = 'text', placeholder = '' }: {
-  value: string | number; onChange: (v: string) => void; type?: string; placeholder?: string;
+function Input({
+  value,
+  onChange,
+  type = "text",
+  placeholder = "",
+  min,
+  step,
+}: {
+  value: string | number;
+  onChange: (value: string) => void;
+  type?: string;
+  placeholder?: string;
+  min?: number;
+  step?: number;
 }) {
   return (
     <input
       type={type}
       value={value}
-      onChange={e => onChange(e.target.value)}
+      min={min}
+      step={step}
+      onChange={(event) =>
+        onChange(event.target.value)
+      }
       placeholder={placeholder}
-      className="w-full bg-background border border-border rounded-lg px-3 py-2.5 text-white text-sm placeholder:text-muted-foreground/50 focus:outline-none focus:border-white/40"
+      className="w-full rounded-lg border border-border bg-card px-3 py-3 text-sm text-white placeholder:text-muted-foreground/50 focus:border-white/40 focus:outline-none"
     />
   );
 }
 
-function Select({ value, onChange, options }: {
-  value: string; onChange: (v: string) => void;
-  options: { value: string; label: string }[];
+function Select({
+  value,
+  onChange,
+  options,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  options: {
+    value: string;
+    label: string;
+  }[];
 }) {
   return (
     <select
       value={value}
-      onChange={e => onChange(e.target.value)}
-      className="w-full bg-background border border-border rounded-lg px-3 py-2.5 text-white text-sm focus:outline-none focus:border-white/40"
+      onChange={(event) =>
+        onChange(event.target.value)
+      }
+      className="w-full rounded-lg border border-border bg-card px-3 py-3 text-sm text-white focus:border-white/40 focus:outline-none"
     >
-      {options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+      {options.map((option) => (
+        <option
+          key={option.value}
+          value={option.value}
+        >
+          {option.label}
+        </option>
+      ))}
     </select>
   );
 }
 
-/* ── EditForm ── */
-function EditForm({
-  state, setState, categories, onSave, onCancel,
+/* ── Fenêtre de création/modification ────────────────────────────────────── */
+
+function ExerciseEditSheet({
+  state,
+  setState,
+  categories,
+  onSave,
+  onCancel,
 }: {
   state: EditState;
-  setState: React.Dispatch<React.SetStateAction<EditState>>;
+  setState: Dispatch<SetStateAction<EditState>>;
   categories: string[];
   onSave: () => void;
   onCancel: () => void;
 }) {
-  const has = TRACKING_HAS[state.tracking];
-  const set = (k: keyof EditState) => (v: string) =>
-    setState(prev => ({ ...prev, [k]: v }));
-  const setNum = (k: keyof EditState) => (v: string) =>
-    setState(prev => ({ ...prev, [k]: Number(v) || 0 }));
+  const trackingFields = TRACKING_HAS[state.tracking];
 
-  const toggleSession = (sid: string) =>
-    setState(prev => ({
-      ...prev,
-      sessionIds: prev.sessionIds.includes(sid)
-        ? prev.sessionIds.filter(s => s !== sid)
-        : [...prev.sessionIds, sid],
+  const setText =
+    (key: keyof EditState) => (value: string) => {
+      setState((previous) => ({
+        ...previous,
+        [key]: value,
+      }));
+    };
+
+  const setNumber =
+    (key: keyof EditState) => (value: string) => {
+      const parsedValue = Number(value);
+
+      setState((previous) => ({
+        ...previous,
+        [key]: Number.isFinite(parsedValue)
+          ? parsedValue
+          : 0,
+      }));
+    };
+
+  const toggleSession = (sessionId: string) => {
+    setState((previous) => ({
+      ...previous,
+      sessionIds: previous.sessionIds.includes(
+        sessionId,
+      )
+        ? previous.sessionIds.filter(
+            (id) => id !== sessionId,
+          )
+        : [...previous.sessionIds, sessionId],
     }));
+  };
 
   return (
-    <div className="bg-background border border-border/60 rounded-xl p-4 space-y-4 mt-1">
-      {/* Name */}
-      <Field label="Nom">
-        <Input value={state.name} onChange={set('name')} placeholder="Nom de l'exercice" />
-      </Field>
+    <div
+      className="fixed inset-0 z-[99999] bg-background"
+      onClick={onCancel}
+    >
+      <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" />
 
-      {/* Description */}
-      <Field label="Description (optionnel)">
-        <Input value={state.description} onChange={set('description')} placeholder="Courte description" />
-      </Field>
+      <div
+        className="relative z-[100000] flex h-[100dvh] w-full flex-col overflow-hidden bg-background pt-safe"
+        onClick={(event) =>
+          event.stopPropagation()
+        }
+      >
+        {/* En-tête fixe */}
+        <div className="flex flex-shrink-0 items-center justify-between gap-3 border-b border-border px-5 py-4">
+          <div className="min-w-0">
+            <h3 className="text-lg font-extrabold text-white">
+              {state.id === null
+                ? "Nouvel exercice"
+                : "Modifier l’exercice"}
+            </h3>
 
-      {/* Category + tracking in 2 cols */}
-      <div className="grid grid-cols-2 gap-3">
-        <Field label="Catégorie">
-          <Select value={state.category} onChange={set('category')}
-            options={categories.map(c => ({ value: c, label: c }))} />
-        </Field>
-        <Field label="Type de suivi">
-          <Select value={state.tracking} onChange={v => setState(p => ({ ...p, tracking: v as TrackingType }))}
-            options={TRACKING_TYPES.map(t => ({ value: t, label: TRACKING_LABELS[t] }))} />
-        </Field>
-      </div>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              Configure le suivi et les séances de
+              l’exercice.
+            </p>
+          </div>
 
-      {/* Defaults */}
-      <div className="grid grid-cols-2 gap-3">
-        <Field label="Séries">
-          <Input type="number" value={state.sets} onChange={setNum('sets')} />
-        </Field>
-        <Field label="Repos (s)">
-          <Input type="number" value={state.restSeconds} onChange={setNum('restSeconds')} />
-        </Field>
-        {has.reps && (
-          <Field label="Répétitions">
-            <Input type="number" value={state.reps} onChange={setNum('reps')} />
+          <button
+            type="button"
+            onClick={onCancel}
+            className="flex-shrink-0 rounded-full p-2 hover:bg-white/10"
+            aria-label="Fermer"
+          >
+            <X
+              size={20}
+              className="text-muted-foreground"
+            />
+          </button>
+        </div>
+
+        {/* Contenu défilable */}
+        <div className="flex-1 space-y-5 overflow-y-auto px-5 py-5 pb-32">
+          <Field label="Nom">
+            <Input
+              value={state.name}
+              onChange={setText("name")}
+              placeholder="Nom de l’exercice"
+            />
           </Field>
-        )}
-        {has.duration && (
-          <Field label="Durée (s)">
-            <Input type="number" value={state.duration} onChange={setNum('duration')} />
+
+          <Field label="Description facultative">
+            <Input
+              value={state.description}
+              onChange={setText("description")}
+              placeholder="Courte description"
+            />
           </Field>
-        )}
-        {has.weight && (
-          <Field label="Charge (kg)">
-            <Input type="number" value={state.weight} onChange={setNum('weight')} />
-          </Field>
-        )}
-        {has.assistance && (
-          <div className="col-span-2">
-            <Field label="Assistance par défaut">
-              <Select value={state.assistance} onChange={set('assistance')}
-                options={ASSISTANCE_OPTIONS.map(a => ({ value: a, label: a }))} />
+
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Catégorie">
+              <Select
+                value={state.category}
+                onChange={setText("category")}
+                options={categories.map(
+                  (category) => ({
+                    value: category,
+                    label: category,
+                  }),
+                )}
+              />
+            </Field>
+
+            <Field label="Type de suivi">
+              <Select
+                value={state.tracking}
+                onChange={(value) =>
+                  setState((previous) => ({
+                    ...previous,
+                    tracking:
+                      value as TrackingType,
+                  }))
+                }
+                options={TRACKING_TYPES.map(
+                  (trackingType) => ({
+                    value: trackingType,
+                    label:
+                      TRACKING_LABELS[
+                        trackingType
+                      ],
+                  }),
+                )}
+              />
             </Field>
           </div>
-        )}
-      </div>
 
-      {/* Sessions */}
-      <Field label="Apparaît dans les séances">
-        <div className="space-y-1.5 pt-1">
-          {SESSIONS.map(s => (
-            <label key={s.id} className="flex items-center gap-2.5 cursor-pointer py-1">
-              <div
-                className={`w-5 h-5 rounded flex items-center justify-center border flex-shrink-0 transition-colors ${
-                  state.sessionIds.includes(s.id)
-                    ? 'bg-white border-white'
-                    : 'border-border bg-transparent'
-                }`}
-                onClick={() => toggleSession(s.id)}
-              >
-                {state.sessionIds.includes(s.id) && <Check size={12} className="text-black" />}
-              </div>
-              <span className="text-sm text-white">{s.name}</span>
-            </label>
-          ))}
+          <div className="rounded-xl border border-border bg-card/40 p-4">
+            <h4 className="mb-4 text-xs font-bold uppercase tracking-wider text-muted-foreground">
+              Valeurs par défaut
+            </h4>
+
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Séries">
+                <Input
+                  type="number"
+                  min={1}
+                  value={state.sets}
+                  onChange={setNumber("sets")}
+                />
+              </Field>
+
+              <Field label="Repos (secondes)">
+                <Input
+                  type="number"
+                  min={0}
+                  value={state.restSeconds}
+                  onChange={setNumber(
+                    "restSeconds",
+                  )}
+                />
+              </Field>
+
+              {trackingFields.reps && (
+                <Field label="Répétitions">
+                  <Input
+                    type="number"
+                    min={0}
+                    value={state.reps}
+                    onChange={setNumber("reps")}
+                  />
+                </Field>
+              )}
+
+              {trackingFields.duration && (
+                <Field label="Durée (secondes)">
+                  <Input
+                    type="number"
+                    min={0}
+                    value={state.duration}
+                    onChange={setNumber(
+                      "duration",
+                    )}
+                  />
+                </Field>
+              )}
+
+              {trackingFields.weight && (
+                <Field label="Charge (kg)">
+                  <Input
+                    type="number"
+                    min={0}
+                    step={0.5}
+                    value={state.weight}
+                    onChange={setNumber(
+                      "weight",
+                    )}
+                  />
+                </Field>
+              )}
+
+              {trackingFields.assistance && (
+                <div className="col-span-2">
+                  <Field label="Assistance par défaut">
+                    <Select
+                      value={state.assistance}
+                      onChange={setText(
+                        "assistance",
+                      )}
+                      options={ASSISTANCE_OPTIONS.map(
+                        (assistance) => ({
+                          value: assistance,
+                          label: assistance,
+                        }),
+                      )}
+                    />
+                  </Field>
+                </div>
+              )}
+            </div>
+          </div>
+
+          <Field label="Apparaît dans les séances">
+            <div className="space-y-2 pt-1">
+              {SESSIONS.map((session) => {
+                const selected =
+                  state.sessionIds.includes(
+                    session.id,
+                  );
+
+                return (
+                  <button
+                    key={session.id}
+                    type="button"
+                    onClick={() =>
+                      toggleSession(session.id)
+                    }
+                    className="flex w-full items-center gap-3 rounded-xl border border-border bg-card px-3 py-3 text-left"
+                  >
+                    <div
+                      className={`flex h-5 w-5 flex-shrink-0 items-center justify-center rounded border transition-colors ${
+                        selected
+                          ? "border-white bg-white"
+                          : "border-border bg-transparent"
+                      }`}
+                    >
+                      {selected && (
+                        <Check
+                          size={12}
+                          className="text-black"
+                        />
+                      )}
+                    </div>
+
+                    <span className="text-sm text-white">
+                      {session.name}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </Field>
         </div>
-      </Field>
 
-      {/* Actions */}
-      <div className="flex gap-3 pt-1">
-        <button
-          onClick={onCancel}
-          className="flex-1 py-3 rounded-xl border border-border text-muted-foreground text-sm font-medium hover:bg-white/5 transition-colors"
-        >
-          Annuler
-        </button>
-        <button
-          onClick={onSave}
-          disabled={!state.name.trim()}
-          className="flex-1 py-3 rounded-xl bg-white text-black text-sm font-bold hover:bg-white/90 transition-colors disabled:opacity-40"
-        >
-          Enregistrer
-        </button>
+        {/* Boutons fixes au-dessus du bas d’écran */}
+        <div className="flex flex-shrink-0 gap-3 border-t border-border bg-background px-5 py-4 pb-[calc(env(safe-area-inset-bottom)+16px)]">
+          <button
+            type="button"
+            onClick={onCancel}
+            className="flex-1 rounded-xl border border-border py-3 text-sm font-medium text-muted-foreground transition-colors hover:bg-white/5"
+          >
+            Annuler
+          </button>
+
+          <button
+            type="button"
+            onClick={onSave}
+            disabled={
+              !state.name.trim() ||
+              !state.category.trim()
+            }
+            className="flex-1 rounded-xl bg-white py-3 text-sm font-bold text-black transition-colors hover:bg-white/90 disabled:opacity-40"
+          >
+            Enregistrer
+          </button>
+        </div>
       </div>
     </div>
   );
 }
 
-/* ── ExerciseManager (main export) ── */
+/* ── Gestionnaire principal ──────────────────────────────────────────────── */
+
 export function ExerciseManager() {
   const {
     data,
-    addExercise, deleteExercise, restoreExercise,
-    updateExerciseOverride, updateExerciseDefault,
+    addExercise,
+    deleteExercise,
+    restoreExercise,
+    updateExerciseOverride,
+    updateExerciseDefault,
     setExerciseCategoryOrder,
-    addCategory, renameCategory, deleteCategory,
+    addCategory,
+    renameCategory,
+    deleteCategory,
   } = useClimbTrack();
+
   const { toast } = useToast();
 
   const categories = getAllCategories(data);
-  const allExercises = getAllManagedExercises(data);
-  const overrides = data.exerciseOverrides ?? {};
+  const allExercises =
+    getAllManagedExercises(data);
+  const overrides =
+    data.exerciseOverrides ?? {};
 
-  const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
-  const [editState, setEditState] = useState<EditState | null>(null);
-  const [editingCategory, setEditingCategory] = useState<string | null>(null);
-  const [newCategoryInput, setNewCategoryInput] = useState('');
-  const [renameCategoryInput, setRenameCategoryInput] = useState('');
-  const [showNewCatInput, setShowNewCatInput] = useState(false);
+  const [collapsed, setCollapsed] = useState<
+    Record<string, boolean>
+  >({});
 
-  /* ── Helpers ── */
+  const [editState, setEditState] =
+    useState<EditState | null>(null);
 
-  const toggleCollapse = (cat: string) =>
-    setCollapsed(p => ({ ...p, [cat]: !p[cat] }));
+  const [
+    editingCategory,
+    setEditingCategory,
+  ] = useState<string | null>(null);
 
-  const exercisesByCategory = (cat: string) => {
-    const ordered = data.exerciseCategoryOrder?.[cat];
-    const exs = allExercises.filter(e => e.category === cat);
-    if (!ordered || ordered.length === 0) return exs;
+  const [
+    newCategoryInput,
+    setNewCategoryInput,
+  ] = useState("");
+
+  const [
+    renameCategoryInput,
+    setRenameCategoryInput,
+  ] = useState("");
+
+  const [
+    showNewCategoryInput,
+    setShowNewCategoryInput,
+  ] = useState(false);
+
+  const toggleCollapse = (category: string) => {
+    setCollapsed((previous) => ({
+      ...previous,
+      [category]: !previous[category],
+    }));
+  };
+
+  const exercisesByCategory = (
+    category: string,
+  ) => {
+    const orderedIds =
+      data.exerciseCategoryOrder?.[category];
+
+    const exercises = allExercises.filter(
+      (exercise) =>
+        exercise.category === category,
+    );
+
+    if (
+      !orderedIds ||
+      orderedIds.length === 0
+    ) {
+      return exercises;
+    }
+
+    const orderedExercises = orderedIds
+      .map((id) =>
+        exercises.find(
+          (exercise) =>
+            exercise.id === id,
+        ),
+      )
+      .filter(
+        (
+          exercise,
+        ): exercise is ExerciseDef =>
+          exercise !== undefined,
+      );
+
+    const remainingExercises =
+      exercises.filter(
+        (exercise) =>
+          !orderedIds.includes(exercise.id),
+      );
+
     return [
-      ...ordered.map(id => exs.find(e => e.id === id)).filter(Boolean) as ExerciseDef[],
-      ...exs.filter(e => !ordered.includes(e.id)),
+      ...orderedExercises,
+      ...remainingExercises,
     ];
   };
 
-  const moveExercise = (cat: string, id: string, dir: -1 | 1) => {
-    const exs = exercisesByCategory(cat);
-    const idx = exs.findIndex(e => e.id === id);
-    if (idx === -1) return;
-    const newIdx = idx + dir;
-    if (newIdx < 0 || newIdx >= exs.length) return;
-    const newOrder = exs.map(e => e.id);
-    [newOrder[idx], newOrder[newIdx]] = [newOrder[newIdx], newOrder[idx]];
-    setExerciseCategoryOrder(cat, newOrder);
+  const moveExercise = (
+    category: string,
+    exerciseId: string,
+    direction: -1 | 1,
+  ) => {
+    const exercises =
+      exercisesByCategory(category);
+
+    const currentIndex =
+      exercises.findIndex(
+        (exercise) =>
+          exercise.id === exerciseId,
+      );
+
+    if (currentIndex === -1) return;
+
+    const newIndex =
+      currentIndex + direction;
+
+    if (
+      newIndex < 0 ||
+      newIndex >= exercises.length
+    ) {
+      return;
+    }
+
+    const newOrder = exercises.map(
+      (exercise) => exercise.id,
+    );
+
+    [
+      newOrder[currentIndex],
+      newOrder[newIndex],
+    ] = [
+      newOrder[newIndex],
+      newOrder[currentIndex],
+    ];
+
+    setExerciseCategoryOrder(
+      category,
+      newOrder,
+    );
   };
 
-  /* ── Save (create or update) ── */
   const handleSave = () => {
-    if (!editState || !editState.name.trim()) return;
+    if (
+      !editState ||
+      !editState.name.trim()
+    ) {
+      return;
+    }
+
+    const trackingFields =
+      TRACKING_HAS[editState.tracking];
+
     const defaults = {
       sets: editState.sets,
-      restSeconds: editState.restSeconds,
-      ...(TRACKING_HAS[editState.tracking].reps && { reps: editState.reps }),
-      ...(TRACKING_HAS[editState.tracking].duration && { duration: editState.duration }),
-      ...(TRACKING_HAS[editState.tracking].weight && { weight: editState.weight }),
-      ...(TRACKING_HAS[editState.tracking].assistance && { assistance: editState.assistance }),
+      restSeconds:
+        editState.restSeconds,
+
+      ...(trackingFields.reps && {
+        reps: editState.reps,
+      }),
+
+      ...(trackingFields.duration && {
+        duration: editState.duration,
+      }),
+
+      ...(trackingFields.weight && {
+        weight: editState.weight,
+      }),
+
+      ...(trackingFields.assistance && {
+        assistance:
+          editState.assistance,
+      }),
     };
 
     if (editState.id === null) {
-      // New exercise
       addExercise({
         name: editState.name.trim(),
-        description: editState.description.trim(),
+        description:
+          editState.description.trim(),
         category: editState.category,
         tracking: editState.tracking,
         defaultValues: defaults,
         sessionIds: editState.sessionIds,
-        isHangboard: editState.isHangboard,
-        ...(editState.isHangboard && { assistanceOptions: ASSISTANCE_OPTIONS }),
+        isHangboard:
+          editState.isHangboard,
+
+        ...(editState.isHangboard && {
+          assistanceOptions:
+            ASSISTANCE_OPTIONS,
+        }),
       });
-      toast({ title: 'Exercice ajouté', description: editState.name.trim() });
+
+      toast({
+        title: "Exercice ajouté",
+        description:
+          editState.name.trim(),
+      });
     } else {
-      // Update existing
-      updateExerciseOverride(editState.id, {
-        name: editState.name.trim(),
-        description: editState.description.trim(),
-        category: editState.category,
-        tracking: editState.tracking,
-        sessionIds: editState.sessionIds,
+      updateExerciseOverride(
+        editState.id,
+        {
+          name: editState.name.trim(),
+          description:
+            editState.description.trim(),
+          category:
+            editState.category,
+          tracking:
+            editState.tracking,
+          sessionIds:
+            editState.sessionIds,
+        },
+      );
+
+      updateExerciseDefault(
+        editState.id,
+        defaults,
+      );
+
+      toast({
+        title: "Exercice mis à jour",
+        description:
+          editState.name.trim(),
       });
-      updateExerciseDefault(editState.id, defaults);
-      toast({ title: 'Exercice mis à jour', description: editState.name.trim() });
     }
+
     setEditState(null);
   };
 
-  /* ── Delete ── */
-  const handleDelete = (ex: ExerciseDef) => {
-    const msg = isBuiltin(ex.id)
-      ? `Masquer "${ex.name}" de toutes les séances ? L'historique est conservé.`
-      : `Supprimer "${ex.name}" de toutes les séances ? L'historique est conservé.`;
-    if (!window.confirm(msg)) return;
-    deleteExercise(ex.id);
-    toast({ title: 'Exercice masqué', description: 'Données historiques conservées.' });
-    if (editState?.id === ex.id) setEditState(null);
+  const handleDelete = (
+    exercise: ExerciseDef,
+  ) => {
+    const message = isBuiltin(exercise.id)
+      ? `Masquer « ${exercise.name} » de toutes les séances ? L’historique sera conservé.`
+      : `Supprimer « ${exercise.name} » de toutes les séances ? L’historique sera conservé.`;
+
+    if (!window.confirm(message)) return;
+
+    deleteExercise(exercise.id);
+
+    toast({
+      title: "Exercice masqué",
+      description:
+        "Les données historiques sont conservées.",
+    });
+
+    if (
+      editState?.id === exercise.id
+    ) {
+      setEditState(null);
+    }
   };
 
-  /* ── Category management ── */
   const handleAddCategory = () => {
-    const name = newCategoryInput.trim();
-    if (!name || categories.includes(name)) return;
-    addCategory(name);
-    setNewCategoryInput('');
-    setShowNewCatInput(false);
-    toast({ title: 'Catégorie créée', description: name });
-  };
+    const name =
+      newCategoryInput.trim();
 
-  const handleRenameCategory = (oldName: string) => {
-    const newName = renameCategoryInput.trim();
-    if (!newName || newName === oldName || categories.includes(newName)) return;
-    renameCategory(oldName, newName);
-    setEditingCategory(null);
-    setRenameCategoryInput('');
-    toast({ title: 'Catégorie renommée' });
-  };
-
-  const handleDeleteCategory = (name: string) => {
-    const isCustom = !BUILTIN_CATEGORIES.includes(name);
-    const exsInCat = allExercises.filter(e => e.category === name && !isExerciseHidden(e.id, data));
-    if (exsInCat.length > 0 && !isCustom) {
-      toast({ variant: 'destructive', title: 'Impossible', description: 'Réassignez d\'abord les exercices de cette catégorie.' });
+    if (
+      !name ||
+      categories.includes(name)
+    ) {
       return;
     }
-    const fallback = categories.find(c => c !== name) ?? 'Musculation';
-    const msg = exsInCat.length > 0
-      ? `Supprimer "${name}" ? Les ${exsInCat.length} exercice(s) seront déplacés vers "${fallback}".`
-      : `Supprimer la catégorie "${name}" ?`;
-    if (!window.confirm(msg)) return;
-    deleteCategory(name, fallback);
-    setEditingCategory(null);
-    toast({ title: 'Catégorie supprimée' });
+
+    addCategory(name);
+    setNewCategoryInput("");
+    setShowNewCategoryInput(false);
+
+    toast({
+      title: "Catégorie créée",
+      description: name,
+    });
   };
 
-  /* ── Render ── */
+  const handleRenameCategory = (
+    oldName: string,
+  ) => {
+    const newName =
+      renameCategoryInput.trim();
+
+    if (
+      !newName ||
+      newName === oldName ||
+      categories.includes(newName)
+    ) {
+      return;
+    }
+
+    renameCategory(oldName, newName);
+    setEditingCategory(null);
+    setRenameCategoryInput("");
+
+    toast({
+      title: "Catégorie renommée",
+    });
+  };
+
+  const handleDeleteCategory = (
+    categoryName: string,
+  ) => {
+    const customCategory =
+      !BUILTIN_CATEGORIES.includes(
+        categoryName,
+      );
+
+    const exercisesInCategory =
+      allExercises.filter(
+        (exercise) =>
+          exercise.category ===
+            categoryName &&
+          !isExerciseHidden(
+            exercise.id,
+            data,
+          ),
+      );
+
+    if (
+      exercisesInCategory.length > 0 &&
+      !customCategory
+    ) {
+      toast({
+        variant: "destructive",
+        title: "Impossible",
+        description:
+          "Réassigne d’abord les exercices de cette catégorie.",
+      });
+
+      return;
+    }
+
+    const fallbackCategory =
+      categories.find(
+        (category) =>
+          category !== categoryName,
+      ) ?? "Musculation";
+
+    const message =
+      exercisesInCategory.length > 0
+        ? `Supprimer « ${categoryName} » ? Les ${exercisesInCategory.length} exercice(s) seront déplacés vers « ${fallbackCategory} ».`
+        : `Supprimer la catégorie « ${categoryName} » ?`;
+
+    if (!window.confirm(message)) {
+      return;
+    }
+
+    deleteCategory(
+      categoryName,
+      fallbackCategory,
+    );
+
+    setEditingCategory(null);
+
+    toast({
+      title: "Catégorie supprimée",
+    });
+  };
+
   return (
-    <div className="space-y-4">
+    <>
+      <div className="space-y-4">
+        {/* Nouvelle catégorie */}
+        {showNewCategoryInput ? (
+          <div className="flex gap-2">
+            <input
+              autoFocus
+              value={newCategoryInput}
+              onChange={(event) =>
+                setNewCategoryInput(
+                  event.target.value,
+                )
+              }
+              onKeyDown={(event) => {
+                if (event.key === "Enter") {
+                  handleAddCategory();
+                }
 
-      {/* New category button */}
-      {showNewCatInput ? (
-        <div className="flex gap-2">
-          <input
-            autoFocus
-            value={newCategoryInput}
-            onChange={e => setNewCategoryInput(e.target.value)}
-            onKeyDown={e => { if (e.key === 'Enter') handleAddCategory(); if (e.key === 'Escape') setShowNewCatInput(false); }}
-            placeholder="Nom de la catégorie"
-            className="flex-1 bg-card border border-border rounded-lg px-3 py-2.5 text-white text-sm placeholder:text-muted-foreground/50 focus:outline-none focus:border-white/40"
-          />
-          <button onClick={handleAddCategory} className="p-2.5 rounded-lg bg-white text-black hover:bg-white/90"><Check size={18} /></button>
-          <button onClick={() => setShowNewCatInput(false)} className="p-2.5 rounded-lg border border-border text-muted-foreground hover:bg-white/5"><X size={18} /></button>
-        </div>
-      ) : (
-        <button
-          onClick={() => setShowNewCatInput(true)}
-          className="w-full flex items-center justify-center gap-2 py-3 border border-dashed border-border rounded-xl text-muted-foreground text-sm hover:border-white/30 hover:text-white transition-colors"
-        >
-          <FolderPlus size={16} />
-          Nouvelle catégorie
-        </button>
-      )}
+                if (
+                  event.key === "Escape"
+                ) {
+                  setShowNewCategoryInput(
+                    false,
+                  );
+                }
+              }}
+              placeholder="Nom de la catégorie"
+              className="min-w-0 flex-1 rounded-lg border border-border bg-card px-3 py-2.5 text-sm text-white placeholder:text-muted-foreground/50 focus:border-white/40 focus:outline-none"
+            />
 
-      {/* Categories */}
-      {categories.map(cat => {
-        const exs = exercisesByCategory(cat);
-        const visibleExs = exs.filter(e => !isExerciseHidden(e.id, data));
-        const hiddenExs = exs.filter(e => isExerciseHidden(e.id, data));
-        const isOpen = !collapsed[cat];
-        const isCustomCat = !BUILTIN_CATEGORIES.includes(cat);
+            <button
+              type="button"
+              onClick={handleAddCategory}
+              className="rounded-lg bg-white p-2.5 text-black hover:bg-white/90"
+            >
+              <Check size={18} />
+            </button>
 
-        return (
-          <div key={cat} className="bg-card border border-border rounded-xl overflow-hidden">
+            <button
+              type="button"
+              onClick={() =>
+                setShowNewCategoryInput(
+                  false,
+                )
+              }
+              className="rounded-lg border border-border p-2.5 text-muted-foreground hover:bg-white/5"
+            >
+              <X size={18} />
+            </button>
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={() =>
+              setShowNewCategoryInput(true)
+            }
+            className="flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-border py-3 text-sm text-muted-foreground transition-colors hover:border-white/30 hover:text-white"
+          >
+            <FolderPlus size={16} />
+            Nouvelle catégorie
+          </button>
+        )}
 
-            {/* Category header */}
-            <div className="flex items-center px-4 py-3 gap-2">
-              <button
-                onClick={() => toggleCollapse(cat)}
-                className="flex items-center gap-2 flex-1 min-w-0 text-left"
-              >
-                {isOpen ? <ChevronDown size={16} className="text-muted-foreground flex-shrink-0" /> : <ChevronRight size={16} className="text-muted-foreground flex-shrink-0" />}
-                {editingCategory === cat ? (
-                  <input
-                    autoFocus
-                    value={renameCategoryInput}
-                    onChange={e => setRenameCategoryInput(e.target.value)}
-                    onKeyDown={e => {
-                      e.stopPropagation();
-                      if (e.key === 'Enter') handleRenameCategory(cat);
-                      if (e.key === 'Escape') setEditingCategory(null);
-                    }}
-                    onClick={e => e.stopPropagation()}
-                    className="flex-1 bg-transparent border-b border-white/40 text-white text-sm font-bold focus:outline-none"
-                  />
-                ) : (
-                  <span className="font-bold text-sm text-white uppercase tracking-wide truncate">{cat}</span>
-                )}
-                <span className="text-xs text-muted-foreground ml-1 flex-shrink-0">({visibleExs.length})</span>
-              </button>
+        {/* Catégories */}
+        {categories.map((category) => {
+          const exercises =
+            exercisesByCategory(category);
 
-              {/* Category actions */}
-              <div className="flex gap-1 flex-shrink-0">
-                {editingCategory === cat ? (
-                  <>
-                    <button onClick={() => handleRenameCategory(cat)} className="p-1.5 rounded-lg hover:bg-white/10 text-white"><Check size={14} /></button>
-                    <button onClick={() => setEditingCategory(null)} className="p-1.5 rounded-lg hover:bg-white/10 text-muted-foreground"><X size={14} /></button>
-                  </>
-                ) : (
-                  <>
-                    <button
-                      onClick={() => { setEditingCategory(cat); setRenameCategoryInput(cat); }}
-                      className="p-1.5 rounded-lg hover:bg-white/10 text-muted-foreground hover:text-white transition-colors"
-                    ><Pencil size={14} /></button>
-                    {isCustomCat && (
+          const visibleExercises =
+            exercises.filter(
+              (exercise) =>
+                !isExerciseHidden(
+                  exercise.id,
+                  data,
+                ),
+            );
+
+          const hiddenExercises =
+            exercises.filter((exercise) =>
+              isExerciseHidden(
+                exercise.id,
+                data,
+              ),
+            );
+
+          const isOpen =
+            !collapsed[category];
+
+          const isCustomCategory =
+            !BUILTIN_CATEGORIES.includes(
+              category,
+            );
+
+          return (
+            <div
+              key={category}
+              className="overflow-hidden rounded-xl border border-border bg-card"
+            >
+              {/* En-tête catégorie */}
+              <div className="flex items-center gap-2 px-4 py-3">
+                <button
+                  type="button"
+                  onClick={() =>
+                    toggleCollapse(category)
+                  }
+                  className="flex min-w-0 flex-1 items-center gap-2 text-left"
+                >
+                  {isOpen ? (
+                    <ChevronDown
+                      size={16}
+                      className="flex-shrink-0 text-muted-foreground"
+                    />
+                  ) : (
+                    <ChevronRight
+                      size={16}
+                      className="flex-shrink-0 text-muted-foreground"
+                    />
+                  )}
+
+                  {editingCategory ===
+                  category ? (
+                    <input
+                      autoFocus
+                      value={
+                        renameCategoryInput
+                      }
+                      onChange={(event) =>
+                        setRenameCategoryInput(
+                          event.target.value,
+                        )
+                      }
+                      onKeyDown={(event) => {
+                        event.stopPropagation();
+
+                        if (
+                          event.key ===
+                          "Enter"
+                        ) {
+                          handleRenameCategory(
+                            category,
+                          );
+                        }
+
+                        if (
+                          event.key ===
+                          "Escape"
+                        ) {
+                          setEditingCategory(
+                            null,
+                          );
+                        }
+                      }}
+                      onClick={(event) =>
+                        event.stopPropagation()
+                      }
+                      className="min-w-0 flex-1 border-b border-white/40 bg-transparent text-sm font-bold text-white focus:outline-none"
+                    />
+                  ) : (
+                    <span className="truncate text-sm font-bold uppercase tracking-wide text-white">
+                      {category}
+                    </span>
+                  )}
+
+                  <span className="ml-1 flex-shrink-0 text-xs text-muted-foreground">
+                    ({visibleExercises.length})
+                  </span>
+                </button>
+
+                <div className="flex flex-shrink-0 gap-1">
+                  {editingCategory ===
+                  category ? (
+                    <>
                       <button
-                        onClick={() => handleDeleteCategory(cat)}
-                        className="p-1.5 rounded-lg hover:bg-destructive/20 text-muted-foreground hover:text-destructive transition-colors"
-                      ><Trash2 size={14} /></button>
-                    )}
-                  </>
-                )}
-              </div>
-            </div>
+                        type="button"
+                        onClick={() =>
+                          handleRenameCategory(
+                            category,
+                          )
+                        }
+                        className="rounded-lg p-1.5 text-white hover:bg-white/10"
+                      >
+                        <Check size={14} />
+                      </button>
 
-            {/* Exercise list */}
-            {isOpen && (
-              <div className="border-t border-border divide-y divide-border/50">
-                {visibleExs.map((ex, idx) => {
-                  const isEditing = editState?.id === ex.id;
-                  return (
-                    <div key={ex.id}>
-                      {/* Exercise row */}
-                      <div className="flex items-center gap-2 px-4 py-3">
-                        {/* Reorder */}
-                        <div className="flex flex-col gap-0.5 flex-shrink-0">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setEditingCategory(
+                            null,
+                          )
+                        }
+                        className="rounded-lg p-1.5 text-muted-foreground hover:bg-white/10"
+                      >
+                        <X size={14} />
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditingCategory(
+                            category,
+                          );
+
+                          setRenameCategoryInput(
+                            category,
+                          );
+                        }}
+                        className="rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-white/10 hover:text-white"
+                      >
+                        <Pencil size={14} />
+                      </button>
+
+                      {isCustomCategory && (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            handleDeleteCategory(
+                              category,
+                            )
+                          }
+                          className="rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-destructive/20 hover:text-destructive"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      )}
+                    </>
+                  )}
+                </div>
+              </div>
+
+              {/* Liste des exercices */}
+              {isOpen && (
+                <div className="divide-y divide-border/50 border-t border-border">
+                  {visibleExercises.map(
+                    (exercise, index) => (
+                      <div
+                        key={exercise.id}
+                        className="flex items-center gap-2 px-4 py-3"
+                      >
+                        <div className="flex flex-shrink-0 flex-col gap-0.5">
                           <button
-                            onClick={() => moveExercise(cat, ex.id, -1)}
-                            disabled={idx === 0}
-                            className="p-0.5 rounded text-muted-foreground hover:text-white disabled:opacity-20 disabled:pointer-events-none transition-colors"
-                          ><ArrowUp size={14} /></button>
+                            type="button"
+                            onClick={() =>
+                              moveExercise(
+                                category,
+                                exercise.id,
+                                -1,
+                              )
+                            }
+                            disabled={index === 0}
+                            className="rounded p-0.5 text-muted-foreground transition-colors hover:text-white disabled:pointer-events-none disabled:opacity-20"
+                          >
+                            <ArrowUp size={14} />
+                          </button>
+
                           <button
-                            onClick={() => moveExercise(cat, ex.id, 1)}
-                            disabled={idx === visibleExs.length - 1}
-                            className="p-0.5 rounded text-muted-foreground hover:text-white disabled:opacity-20 disabled:pointer-events-none transition-colors"
-                          ><ArrowDown size={14} /></button>
+                            type="button"
+                            onClick={() =>
+                              moveExercise(
+                                category,
+                                exercise.id,
+                                1,
+                              )
+                            }
+                            disabled={
+                              index ===
+                              visibleExercises.length -
+                                1
+                            }
+                            className="rounded p-0.5 text-muted-foreground transition-colors hover:text-white disabled:pointer-events-none disabled:opacity-20"
+                          >
+                            <ArrowDown
+                              size={14}
+                            />
+                          </button>
                         </div>
 
-                        {/* Name */}
-                        <span className="flex-1 text-sm text-white min-w-0 truncate">{ex.name}</span>
+                        <span className="min-w-0 flex-1 truncate text-sm text-white">
+                          {exercise.name}
+                        </span>
 
-                        {/* Actions */}
-                        <div className="flex gap-1 flex-shrink-0">
-                          {overrides[ex.id] && (
+                        <div className="flex flex-shrink-0 gap-1">
+                          {overrides[
+                            exercise.id
+                          ] && (
                             <button
-                              onClick={() => toast({ title: 'Restaurer', description: 'Pour restaurer les valeurs d\'origine, utilisez "Rétablir les valeurs par défaut" dans les réglages.' })}
-                              className="p-1.5 rounded-lg hover:bg-white/10 text-muted-foreground/50 hover:text-muted-foreground transition-colors"
+                              type="button"
+                              onClick={() =>
+                                toast({
+                                  title:
+                                    "Exercice modifié",
+                                  description:
+                                    "Les valeurs d’origine peuvent être restaurées depuis les réglages.",
+                                })
+                              }
+                              className="rounded-lg p-1.5 text-muted-foreground/50 transition-colors hover:bg-white/10 hover:text-muted-foreground"
                               title="Modifié"
-                            ><RotateCcw size={13} /></button>
+                            >
+                              <RotateCcw
+                                size={13}
+                              />
+                            </button>
                           )}
+
                           <button
-                            onClick={() => {
-                              if (isEditing) { setEditState(null); return; }
-                              setEditState(exerciseToEdit(ex, data));
-                            }}
-                            className={`p-1.5 rounded-lg hover:bg-white/10 transition-colors ${isEditing ? 'text-white bg-white/10' : 'text-muted-foreground hover:text-white'}`}
-                          ><Pencil size={15} /></button>
+                            type="button"
+                            onClick={() =>
+                              setEditState(
+                                exerciseToEdit(
+                                  exercise,
+                                  data,
+                                ),
+                              )
+                            }
+                            className="rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-white/10 hover:text-white"
+                            aria-label={`Modifier ${exercise.name}`}
+                          >
+                            <Pencil size={15} />
+                          </button>
+
                           <button
-                            onClick={() => handleDelete(ex)}
-                            className="p-1.5 rounded-lg hover:bg-destructive/20 text-muted-foreground hover:text-destructive transition-colors"
-                          ><Trash2 size={15} /></button>
+                            type="button"
+                            onClick={() =>
+                              handleDelete(
+                                exercise,
+                              )
+                            }
+                            className="rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-destructive/20 hover:text-destructive"
+                            aria-label={`Supprimer ${exercise.name}`}
+                          >
+                            <Trash2 size={15} />
+                          </button>
                         </div>
                       </div>
+                    ),
+                  )}
 
-                      {/* Inline edit form */}
-                      {isEditing && editState && (
-                        <div className="px-4 pb-4">
-                          <EditForm
-                            state={editState}
-                            setState={setEditState as React.Dispatch<React.SetStateAction<EditState>>}
-                            categories={categories}
-                            onSave={handleSave}
-                            onCancel={() => setEditState(null)}
-                          />
-                        </div>
+                  {/* Exercices masqués */}
+                  {hiddenExercises.length >
+                    0 && (
+                    <div className="px-4 py-3">
+                      <p className="mb-2 text-xs text-muted-foreground/50">
+                        Masqués (
+                        {hiddenExercises.length})
+                      </p>
+
+                      {hiddenExercises.map(
+                        (exercise) => (
+                          <div
+                            key={exercise.id}
+                            className="flex items-center gap-2 py-1.5"
+                          >
+                            <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground/50 line-through">
+                              {exercise.name}
+                            </span>
+
+                            <button
+                              type="button"
+                              onClick={() => {
+                                restoreExercise(
+                                  exercise.id,
+                                );
+
+                                toast({
+                                  title:
+                                    "Exercice restauré",
+                                  description:
+                                    exercise.name,
+                                });
+                              }}
+                              className="rounded border border-border/50 px-2 py-1 text-xs text-muted-foreground transition-colors hover:border-white/30 hover:text-white"
+                            >
+                              Restaurer
+                            </button>
+                          </div>
+                        ),
                       )}
                     </div>
-                  );
-                })}
+                  )}
 
-                {/* Hidden exercises (collapsed) */}
-                {hiddenExs.length > 0 && (
-                  <div className="px-4 py-2">
-                    <p className="text-xs text-muted-foreground/50 mb-2">Masqués ({hiddenExs.length})</p>
-                    {hiddenExs.map(ex => (
-                      <div key={ex.id} className="flex items-center gap-2 py-1.5">
-                        <span className="flex-1 text-xs text-muted-foreground/50 line-through truncate">{ex.name}</span>
-                        <button
-                          onClick={() => { restoreExercise(ex.id); toast({ title: 'Exercice restauré', description: ex.name }); }}
-                          className="text-xs text-muted-foreground hover:text-white px-2 py-1 rounded border border-border/50 hover:border-white/30 transition-colors"
-                        >
-                          Restaurer
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                {/* Add exercise to this category */}
-                {editState?.id === null && editState.category === cat ? (
-                  <div className="px-4 pb-4 pt-1">
-                    <EditForm
-                      state={editState}
-                      setState={setEditState as React.Dispatch<React.SetStateAction<EditState>>}
-                      categories={categories}
-                      onSave={handleSave}
-                      onCancel={() => setEditState(null)}
-                    />
-                  </div>
-                ) : (
                   <button
-                    onClick={() => {
-                      setEditState(emptyEdit(cat));
-                    }}
-                    className="w-full flex items-center gap-2 px-4 py-3 text-sm text-muted-foreground hover:text-white hover:bg-white/5 transition-colors"
+                    type="button"
+                    onClick={() =>
+                      setEditState(
+                        emptyEdit(category),
+                      )
+                    }
+                    className="flex w-full items-center gap-2 px-4 py-3 text-sm text-muted-foreground transition-colors hover:bg-white/5 hover:text-white"
                   >
                     <Plus size={15} />
                     Ajouter un exercice
                   </button>
-                )}
-              </div>
-            )}
-          </div>
-        );
-      })}
-    </div>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Portal : la fenêtre est placée directement dans le body */}
+      {editState &&
+        createPortal(
+          <ExerciseEditSheet
+            state={editState}
+            setState={
+              setEditState as Dispatch<
+                SetStateAction<EditState>
+              >
+            }
+            categories={categories}
+            onSave={handleSave}
+            onCancel={() =>
+              setEditState(null)
+            }
+          />,
+          document.body,
+        )}
+    </>
   );
 }
