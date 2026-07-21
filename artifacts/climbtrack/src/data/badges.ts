@@ -60,7 +60,9 @@ export type BadgeMetric =
   | "assistance-min"
   | "sloper-duration"
   | "bilateral-jumps"
-  | "records";
+  | "records"
+  | "kilter-angle"
+  | "climbing-color";
 
 export interface BadgeLevelDef {
   level: BadgeLevel;
@@ -68,7 +70,29 @@ export interface BadgeLevelDef {
   threshold: number;
   minSets?: number;
   angle?: 30 | 45;
+
+  /**
+   * Cotation exacte utilisée pour les badges Kilter.
+   * Réussir une V5 ne débloque jamais V0 à V4.
+   */
+  grade?: number;
 }
+
+export type BadgeKind =
+  | "standard"
+  | "kilter"
+  | "climbing-color";
+
+export type ClimbingColor =
+  | "rose"
+  | "jaune"
+  | "vert"
+  | "turquoise"
+  | "bleu"
+  | "orange"
+  | "rouge"
+  | "noir"
+  | "blanc";
 
 export interface BadgeDef {
   id: string;
@@ -80,9 +104,31 @@ export interface BadgeDef {
   metric: BadgeMetric;
   unit: string;
   levels: BadgeLevelDef[];
+
+  /**
+   * Permet à la page des badges d’utiliser
+   * un affichage particulier.
+   */
+  kind?: BadgeKind;
+
+  /**
+   * Couleur visuelle du badge de bloc.
+   */
+  visualColor?: string;
+
+  /**
+   * Couleur de bloc exacte à réussir.
+   */
+  climbingColor?: ClimbingColor;
+
+  /**
+   * Les badges de couleurs ne doivent pas afficher
+   * Bronze, Argent, Or ou Diamant.
+   */
+  hideLevelLabel?: boolean;
 }
 
-export const BADGES: BadgeDef[] = [
+  const STANDARD_BADGES: BadgeDef[] = [
   {
     id: "suspension-20mm",
     name: "Suspension 20 mm",
@@ -700,7 +746,276 @@ export const BADGES: BadgeDef[] = [
     ],
   },
 ];
+const CLIMBING_COLOR_BADGES: BadgeDef[] = [
+  {
+    id: "bloc-rose",
+    name: "Bloc rose",
+    subtitle: "Réussir au moins un bloc rose",
+    icon: "climbing-hold",
+    category: "Couleurs de blocs",
+    metric: "climbing-color",
+    unit: "bloc",
+    kind: "climbing-color",
+    climbingColor: "rose",
+    visualColor: "#EC4899",
+    hideLevelLabel: true,
 
+    levels: [
+      {
+        level: "diamond",
+        description: "Réussir un bloc rose",
+        threshold: 1,
+      },
+    ],
+  },
+
+  {
+    id: "bloc-jaune",
+    name: "Bloc jaune",
+    subtitle: "Réussir au moins un bloc jaune",
+    icon: "climbing-hold",
+    category: "Couleurs de blocs",
+    metric: "climbing-color",
+    unit: "bloc",
+    kind: "climbing-color",
+    climbingColor: "jaune",
+    visualColor: "#FACC15",
+    hideLevelLabel: true,
+
+    levels: [
+      {
+        level: "diamond",
+        description: "Réussir un bloc jaune",
+        threshold: 1,
+      },
+    ],
+  },
+
+  {
+    id: "bloc-vert",
+    name: "Bloc vert",
+    subtitle: "Réussir au moins un bloc vert",
+    icon: "climbing-hold",
+    category: "Couleurs de blocs",
+    metric: "climbing-color",
+    unit: "bloc",
+    kind: "climbing-color",
+    climbingColor: "vert",
+    visualColor: "#22C55E",
+    hideLevelLabel: true,
+
+    levels: [
+      {
+        level: "diamond",
+        description: "Réussir un bloc vert",
+        threshold: 1,
+      },
+    ],
+  },
+
+  {
+    id: "bloc-turquoise",
+    name: "Bloc turquoise",
+    subtitle: "Réussir au moins un bloc turquoise",
+    icon: "climbing-hold",
+    category: "Couleurs de blocs",
+    metric: "climbing-color",
+    unit: "bloc",
+    kind: "climbing-color",
+    climbingColor: "turquoise",
+    visualColor: "#2DD4BF",
+    hideLevelLabel: true,
+
+    levels: [
+      {
+        level: "diamond",
+        description: "Réussir un bloc turquoise",
+        threshold: 1,
+      },
+    ],
+  },
+
+  {
+    id: "bloc-bleu",
+    name: "Bloc bleu",
+    subtitle: "Réussir au moins un bloc bleu",
+    icon: "climbing-hold",
+    category: "Couleurs de blocs",
+    metric: "climbing-color",
+    unit: "bloc",
+    kind: "climbing-color",
+    climbingColor: "bleu",
+    visualColor: "#3B82F6",
+    hideLevelLabel: true,
+
+    levels: [
+      {
+        level: "diamond",
+        description: "Réussir un bloc bleu",
+        threshold: 1,
+      },
+    ],
+  },
+
+  {
+    id: "bloc-orange",
+    name: "Bloc orange",
+    subtitle: "Réussir au moins un bloc orange",
+    icon: "climbing-hold",
+    category: "Couleurs de blocs",
+    metric: "climbing-color",
+    unit: "bloc",
+    kind: "climbing-color",
+    climbingColor: "orange",
+    visualColor: "#F97316",
+    hideLevelLabel: true,
+
+    levels: [
+      {
+        level: "diamond",
+        description: "Réussir un bloc orange",
+        threshold: 1,
+      },
+    ],
+  },
+
+  {
+    id: "bloc-rouge",
+    name: "Bloc rouge",
+    subtitle: "Réussir au moins un bloc rouge",
+    icon: "climbing-hold",
+    category: "Couleurs de blocs",
+    metric: "climbing-color",
+    unit: "bloc",
+    kind: "climbing-color",
+    climbingColor: "rouge",
+    visualColor: "#EF4444",
+    hideLevelLabel: true,
+
+    levels: [
+      {
+        level: "diamond",
+        description: "Réussir un bloc rouge",
+        threshold: 1,
+      },
+    ],
+  },
+
+  {
+    id: "bloc-noir",
+    name: "Bloc noir",
+    subtitle: "Réussir au moins un bloc noir",
+    icon: "climbing-hold",
+    category: "Couleurs de blocs",
+    metric: "climbing-color",
+    unit: "bloc",
+    kind: "climbing-color",
+    climbingColor: "noir",
+    visualColor: "#171717",
+    hideLevelLabel: true,
+
+    levels: [
+      {
+        level: "diamond",
+        description: "Réussir un bloc noir",
+        threshold: 1,
+      },
+    ],
+  },
+
+  {
+    id: "bloc-blanc",
+    name: "Bloc blanc",
+    subtitle: "Réussir au moins un bloc blanc",
+    icon: "climbing-hold",
+    category: "Couleurs de blocs",
+    metric: "climbing-color",
+    unit: "bloc",
+    kind: "climbing-color",
+    climbingColor: "blanc",
+    visualColor: "#F5F5F5",
+    hideLevelLabel: true,
+
+    levels: [
+      {
+        level: "diamond",
+        description: "Réussir un bloc blanc",
+        threshold: 1,
+      },
+    ],
+  },
+];
+
+const KILTER_BADGES: BadgeDef[] = Array.from(
+  {
+    length: 18,
+  },
+  (_, grade) => ({
+    id: `kilter-v${grade}`,
+
+    name: `Kilter V${grade}`,
+
+    subtitle: `Meilleure inclinaison réussie en V${grade}`,
+
+    icon: "kilter-hold",
+
+    category: "Kilterboard",
+
+    metric: "kilter-angle" as const,
+
+    unit: "°",
+
+    kind: "kilter" as const,
+
+    levels: [
+      {
+        level: "bronze" as const,
+
+        description: `Réussir une V${grade} à 30°`,
+
+        threshold: 30,
+
+        grade,
+      },
+
+      {
+        level: "silver" as const,
+
+        description: `Réussir une V${grade} à 35°`,
+
+        threshold: 35,
+
+        grade,
+      },
+
+      {
+        level: "gold" as const,
+
+        description: `Réussir une V${grade} à 40°`,
+
+        threshold: 40,
+
+        grade,
+      },
+
+      {
+        level: "diamond" as const,
+
+        description: `Réussir une V${grade} à 45°`,
+
+        threshold: 45,
+
+        grade,
+      },
+    ],
+  }),
+);
+
+export const BADGES: BadgeDef[] = [
+  ...STANDARD_BADGES,
+  ...CLIMBING_COLOR_BADGES,
+  ...KILTER_BADGES,
+];
 export const BADGE_BY_ID: Record<
   string,
   BadgeDef

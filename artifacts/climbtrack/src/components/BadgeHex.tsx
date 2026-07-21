@@ -8,6 +8,7 @@ import {
 } from "@/data/badges";
 
 import type {
+  BadgeKind,
   BadgeLevel,
 } from "@/data/badges";
 
@@ -140,18 +141,12 @@ function IllustrationSloper({
       />
 
       <path
-        d="M26 51
-           Q31 35 39 35
-           Q47 35 50 51
-           Z"
+        d="M26 51 Q31 35 39 35 Q47 35 50 51 Z"
         fill={c}
       />
 
       <path
-        d="M51 51
-           Q56 30 66 30
-           Q76 30 78 51
-           Z"
+        d="M51 51 Q56 30 66 30 Q76 30 78 51 Z"
         fill={c}
       />
 
@@ -337,50 +332,23 @@ function IllustrationJump({
 }: IllustrationProps) {
   return (
     <g>
-      <rect
-        x="23"
-        y="68"
-        width="34"
-        height="6"
-        rx="3"
-        fill={c}
-      />
-
-      <rect
-        x="34"
-        y="55"
-        width="34"
-        height="6"
-        rx="3"
-        fill={c}
-      />
-
-      <rect
-        x="23"
-        y="42"
-        width="34"
-        height="6"
-        rx="3"
-        fill={c}
-      />
-
-      <rect
-        x="34"
-        y="29"
-        width="34"
-        height="6"
-        rx="3"
-        fill={c}
-      />
-
-      <rect
-        x="23"
-        y="16"
-        width="34"
-        height="6"
-        rx="3"
-        fill={c}
-      />
+      {[68, 55, 42, 29, 16].map(
+        (y, index) => (
+          <rect
+            key={y}
+            x={
+              index % 2 === 0
+                ? 23
+                : 34
+            }
+            y={y}
+            width="34"
+            height="6"
+            rx="3"
+            fill={c}
+          />
+        ),
+      )}
 
       <path
         d="M77 70 V25"
@@ -437,13 +405,7 @@ function IllustrationHeavyLight({
       />
 
       <path
-        d="M56 17
-           L40 48
-           H49
-           L43 79
-           L64 43
-           H54
-           Z"
+        d="M56 17 L40 48 H49 L43 79 L64 43 H54 Z"
         fill={c}
       />
     </g>
@@ -965,12 +927,7 @@ function IllustrationCalf({
       />
 
       <path
-        d="M28 59
-           Q38 51 53 53
-           Q65 54 72 64
-           L55 66
-           Q43 62 28 64
-           Z"
+        d="M28 59 Q38 51 53 53 Q65 54 72 64 L55 66 Q43 62 28 64 Z"
         fill={c}
       />
 
@@ -1027,11 +984,7 @@ function IllustrationChart({
       />
 
       <path
-        d="M24 66
-           L37 59
-           L50 62
-           L63 45
-           L78 27"
+        d="M24 66 L37 59 L50 62 L63 45 L78 27"
         fill="none"
         stroke={c}
         strokeWidth="5"
@@ -1051,30 +1004,60 @@ function IllustrationChart({
 
 const ILLUSTRATIONS: Record<
   string,
-  (props: IllustrationProps) =>
-    ReactElement
+  (
+    props: IllustrationProps,
+  ) => ReactElement
 > = {
-  pullup: IllustrationPullup,
+  pullup:
+    IllustrationPullup,
+
   "fingerboard-20":
     IllustrationFingerboard20,
+
   "fingerboard-25":
     IllustrationFingerboard25,
-  sloper: IllustrationSloper,
-  pinch: IllustrationPinch,
-  repeaters: IllustrationRepeaters,
-  jump: IllustrationJump,
+
+  sloper:
+    IllustrationSloper,
+
+  pinch:
+    IllustrationPinch,
+
+  repeaters:
+    IllustrationRepeaters,
+
+  jump:
+    IllustrationJump,
+
   "heavy-light":
     IllustrationHeavyLight,
-  barbell: IllustrationBarbell,
-  dumbbell: IllustrationDumbbell,
-  pulley: IllustrationPulley,
-  plank: IllustrationPlank,
+
+  barbell:
+    IllustrationBarbell,
+
+  dumbbell:
+    IllustrationDumbbell,
+
+  pulley:
+    IllustrationPulley,
+
+  plank:
+    IllustrationPlank,
+
   "side-plank":
     IllustrationSidePlank,
-  squat: IllustrationSquat,
-  lunge: IllustrationLunge,
-  calf: IllustrationCalf,
-  chart: IllustrationChart,
+
+  squat:
+    IllustrationSquat,
+
+  lunge:
+    IllustrationLunge,
+
+  calf:
+    IllustrationCalf,
+
+  chart:
+    IllustrationChart,
 };
 
 function hexPoints(
@@ -1083,7 +1066,9 @@ function hexPoints(
   radius: number,
 ): string {
   return Array.from(
-    { length: 6 },
+    {
+      length: 6,
+    },
     (_, index) => {
       const angle =
         ((60 * index - 30) *
@@ -1092,10 +1077,12 @@ function hexPoints(
 
       return `${
         centerX +
-        radius * Math.cos(angle)
+        radius *
+          Math.cos(angle)
       },${
         centerY +
-        radius * Math.sin(angle)
+        radius *
+          Math.sin(angle)
       }`;
     },
   ).join(" ");
@@ -1168,12 +1155,534 @@ function getLevelPalette(
   }
 }
 
+function adjustHexColor(
+  color: string,
+  amount: number,
+): string {
+  const clean =
+    color.replace("#", "");
+
+  const number =
+    Number.parseInt(
+      clean,
+      16,
+    );
+
+  const red =
+    Math.max(
+      0,
+      Math.min(
+        255,
+        (
+          number >> 16
+        ) + amount,
+      ),
+    );
+
+  const green =
+    Math.max(
+      0,
+      Math.min(
+        255,
+        (
+          (
+            number >> 8
+          ) &
+          0x00ff
+        ) + amount,
+      ),
+    );
+
+  const blue =
+    Math.max(
+      0,
+      Math.min(
+        255,
+        (
+          number &
+          0x0000ff
+        ) + amount,
+      ),
+    );
+
+  return `#${[
+    red,
+    green,
+    blue,
+  ]
+    .map((value) =>
+      value
+        .toString(16)
+        .padStart(2, "0"),
+    )
+    .join("")}`;
+}
+
 interface BadgeHexProps {
   icon: string;
   level: BadgeLevel | null;
   size?: number;
   showLevelRing?: boolean;
   animate?: boolean;
+
+  kind?: BadgeKind;
+  visualColor?: string;
+  label?: string;
+}
+
+function ColorHoldBadge({
+  size,
+  visualColor,
+  locked,
+  uniqueId,
+  animate,
+}: {
+  size: number;
+  visualColor: string;
+  locked: boolean;
+  uniqueId: string;
+  animate: boolean;
+}) {
+  const baseColor =
+    locked
+      ? "#353535"
+      : visualColor;
+
+  const lightColor =
+    locked
+      ? "#555555"
+      : adjustHexColor(
+          visualColor,
+          55,
+        );
+
+  const darkColor =
+    locked
+      ? "#151515"
+      : adjustHexColor(
+          visualColor,
+          -65,
+        );
+
+  const gradientId =
+    `hold-${uniqueId}`;
+
+  const shadowId =
+    `hold-shadow-${uniqueId}`;
+
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 100 100"
+      role="img"
+      aria-label={
+        locked
+          ? "Badge couleur verrouillé"
+          : "Badge couleur débloqué"
+      }
+      className={
+        animate
+          ? "badge-unlock-animation"
+          : undefined
+      }
+      style={{
+        overflow: "visible",
+      }}
+    >
+      <defs>
+        <radialGradient
+          id={gradientId}
+          cx="32%"
+          cy="25%"
+          r="72%"
+        >
+          <stop
+            offset="0%"
+            stopColor={lightColor}
+          />
+
+          <stop
+            offset="42%"
+            stopColor={baseColor}
+          />
+
+          <stop
+            offset="100%"
+            stopColor={darkColor}
+          />
+        </radialGradient>
+
+        <filter
+          id={shadowId}
+          x="-40%"
+          y="-40%"
+          width="180%"
+          height="190%"
+        >
+          <feDropShadow
+            dx="0"
+            dy="7"
+            stdDeviation="4"
+            floodColor="#000000"
+            floodOpacity="0.75"
+          />
+        </filter>
+      </defs>
+
+      <ellipse
+        cx="50"
+        cy="84"
+        rx="32"
+        ry="8"
+        fill="#000000"
+        opacity="0.45"
+      />
+
+      <path
+        d="
+          M17 57
+          C17 35 32 18 52 17
+          C72 16 85 30 84 48
+          C83 67 69 81 48 83
+          C29 84 17 75 17 57
+          Z
+        "
+        fill={`url(#${gradientId})`}
+        stroke={
+          locked
+            ? "#505050"
+            : lightColor
+        }
+        strokeWidth="2"
+        filter={`url(#${shadowId})`}
+        opacity={
+          locked
+            ? 0.55
+            : 1
+        }
+      />
+
+      <ellipse
+        cx="43"
+        cy="38"
+        rx="15"
+        ry="10"
+        fill="#FFFFFF"
+        opacity={
+          locked
+            ? 0.06
+            : 0.22
+        }
+        transform="rotate(-18 43 38)"
+      />
+
+      <path
+        d="M26 66 C39 76 63 73 76 58"
+        fill="none"
+        stroke={darkColor}
+        strokeWidth="5"
+        strokeLinecap="round"
+        opacity="0.55"
+      />
+
+      <circle
+        cx="52"
+        cy="55"
+        r="7"
+        fill={darkColor}
+        opacity="0.85"
+      />
+
+      <circle
+        cx="50"
+        cy="53"
+        r="2.3"
+        fill={
+          locked
+            ? "#777777"
+            : lightColor
+        }
+      />
+
+      {locked && (
+        <g>
+          <circle
+            cx="50"
+            cy="55"
+            r="13"
+            fill="#101010"
+            opacity="0.88"
+          />
+
+          <path
+            d="M45 52 V48 C45 41 55 41 55 48 V52"
+            fill="none"
+            stroke="#858585"
+            strokeWidth="2.5"
+            strokeLinecap="round"
+          />
+
+          <rect
+            x="43"
+            y="51"
+            width="14"
+            height="11"
+            rx="3"
+            fill="#656565"
+          />
+        </g>
+      )}
+    </svg>
+  );
+}
+
+function KilterBadge({
+  size,
+  level,
+  label,
+  uniqueId,
+  animate,
+}: {
+  size: number;
+  level: BadgeLevel | null;
+  label: string;
+  uniqueId: string;
+  animate: boolean;
+}) {
+  const locked =
+    level === null;
+
+  const palette =
+    getLevelPalette(level);
+
+  const ringId =
+    `kilter-ring-${uniqueId}`;
+
+  const centerId =
+    `kilter-center-${uniqueId}`;
+
+  const shadowId =
+    `kilter-shadow-${uniqueId}`;
+
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 100 100"
+      role="img"
+      aria-label={
+        locked
+          ? `${label} verrouillé`
+          : `${label} ${
+              BADGE_LEVEL_META[
+                level
+              ].label
+            }`
+      }
+      className={
+        animate
+          ? "badge-unlock-animation"
+          : undefined
+      }
+      style={{
+        overflow: "visible",
+      }}
+    >
+      <defs>
+        <linearGradient
+          id={ringId}
+          x1="15%"
+          y1="5%"
+          x2="85%"
+          y2="95%"
+        >
+          <stop
+            offset="0%"
+            stopColor={
+              palette.light
+            }
+          />
+
+          <stop
+            offset="35%"
+            stopColor={
+              palette.middle
+            }
+          />
+
+          <stop
+            offset="70%"
+            stopColor={
+              palette.dark
+            }
+          />
+
+          <stop
+            offset="100%"
+            stopColor={
+              palette.shadow
+            }
+          />
+        </linearGradient>
+
+        <radialGradient
+          id={centerId}
+          cx="35%"
+          cy="25%"
+          r="75%"
+        >
+          <stop
+            offset="0%"
+            stopColor={
+              locked
+                ? "#343434"
+                : "#242424"
+            }
+          />
+
+          <stop
+            offset="100%"
+            stopColor="#070707"
+          />
+        </radialGradient>
+
+        <filter
+          id={shadowId}
+          x="-35%"
+          y="-35%"
+          width="170%"
+          height="180%"
+        >
+          <feDropShadow
+            dx="0"
+            dy="5"
+            stdDeviation="3"
+            floodColor="#000000"
+            floodOpacity="0.8"
+          />
+        </filter>
+      </defs>
+
+      <ellipse
+        cx="50"
+        cy="86"
+        rx="31"
+        ry="7"
+        fill="#000000"
+        opacity="0.5"
+      />
+
+      <circle
+        cx="50"
+        cy="48"
+        r="42"
+        fill={`url(#${ringId})`}
+        filter={`url(#${shadowId})`}
+        opacity={
+          locked
+            ? 0.45
+            : 1
+        }
+      />
+
+      <circle
+        cx="50"
+        cy="48"
+        r="35"
+        fill={`url(#${centerId})`}
+        stroke={
+          locked
+            ? "#3D3D3D"
+            : palette.middle
+        }
+        strokeWidth="1.3"
+      />
+
+      {!locked && (
+        <path
+          d="M24 33 C34 13 65 10 78 31"
+          fill="none"
+          stroke="#FFFFFF"
+          strokeWidth="4"
+          strokeLinecap="round"
+          opacity="0.22"
+        />
+      )}
+
+      <text
+        x="50"
+        y="58"
+        textAnchor="middle"
+        fill={
+          locked
+            ? "#666666"
+            : "#FFFFFF"
+        }
+        fontSize={
+          label.length > 2
+            ? "27"
+            : "31"
+        }
+        fontWeight="950"
+        fontFamily="ui-monospace, monospace"
+        letterSpacing="-2"
+      >
+        {label}
+      </text>
+
+      {locked && (
+        <g>
+          <circle
+            cx="50"
+            cy="73"
+            r="9"
+            fill="#101010"
+            stroke="#414141"
+          />
+
+          <path
+            d="M46 71 V68 C46 62.5 54 62.5 54 68 V71"
+            fill="none"
+            stroke="#757575"
+            strokeWidth="2"
+            strokeLinecap="round"
+          />
+
+          <rect
+            x="44.5"
+            y="70"
+            width="11"
+            height="8.5"
+            rx="2"
+            fill="#626262"
+          />
+        </g>
+      )}
+
+      {level ===
+        "diamond" && (
+        <path
+          d="M50 1 L56 8 L50 15 L44 8 Z"
+          fill="#F4FFFF"
+          stroke="#67E8F9"
+          strokeWidth="1"
+        />
+      )}
+    </svg>
+  );
+}
+
+interface BadgeHexProps {
+  icon: string;
+  level: BadgeLevel | null;
+  size?: number;
+  showLevelRing?: boolean;
+  animate?: boolean;
+
+  kind?: BadgeKind;
+  visualColor?: string;
+  label?: string;
 }
 
 export function BadgeHex({
@@ -1182,19 +1691,73 @@ export function BadgeHex({
   size = 90,
   showLevelRing = true,
   animate = false,
+  kind = "standard",
+  visualColor = "#808080",
+  label = "",
 }: BadgeHexProps) {
-  const rawId = useId();
+  const rawId =
+    useId();
 
   const uniqueId =
-    rawId.replace(/:/g, "");
+    rawId.replace(
+      /:/g,
+      "",
+    );
 
-  const locked = level === null;
+  const locked =
+    level === null;
+
+  if (
+    kind ===
+    "climbing-color"
+  ) {
+    return (
+      <ColorHoldBadge
+        size={size}
+        visualColor={
+          visualColor
+        }
+        locked={locked}
+        uniqueId={
+          uniqueId
+        }
+        animate={
+          animate
+        }
+      />
+    );
+  }
+
+  if (
+    kind ===
+    "kilter"
+  ) {
+    return (
+      <KilterBadge
+        size={size}
+        level={level}
+        label={
+          label || "V?"
+        }
+        uniqueId={
+          uniqueId
+        }
+        animate={
+          animate
+        }
+      />
+    );
+  }
 
   const Illustration =
-    ILLUSTRATIONS[icon];
+    ILLUSTRATIONS[
+      icon
+    ];
 
   const palette =
-    getLevelPalette(level);
+    getLevelPalette(
+      level,
+    );
 
   const borderGradientId =
     `border-${uniqueId}`;
@@ -1221,8 +1784,9 @@ export function BadgeHex({
       aria-label={
         level
           ? `Badge ${
-              BADGE_LEVEL_META[level]
-                .label
+              BADGE_LEVEL_META[
+                level
+              ].label
             }`
           : "Badge verrouillé"
       }
@@ -1232,12 +1796,15 @@ export function BadgeHex({
           : undefined
       }
       style={{
-        overflow: "visible",
+        overflow:
+          "visible",
       }}
     >
       <defs>
         <linearGradient
-          id={borderGradientId}
+          id={
+            borderGradientId
+          }
           x1="15%"
           y1="5%"
           x2="85%"
@@ -1245,32 +1812,44 @@ export function BadgeHex({
         >
           <stop
             offset="0%"
-            stopColor={palette.light}
+            stopColor={
+              palette.light
+            }
           />
 
           <stop
             offset="28%"
-            stopColor={palette.middle}
+            stopColor={
+              palette.middle
+            }
           />
 
           <stop
             offset="60%"
-            stopColor={palette.dark}
+            stopColor={
+              palette.dark
+            }
           />
 
           <stop
             offset="82%"
-            stopColor={palette.middle}
+            stopColor={
+              palette.middle
+            }
           />
 
           <stop
             offset="100%"
-            stopColor={palette.shadow}
+            stopColor={
+              palette.shadow
+            }
           />
         </linearGradient>
 
         <linearGradient
-          id={innerGradientId}
+          id={
+            innerGradientId
+          }
           x1="0%"
           y1="0%"
           x2="0%"
@@ -1292,7 +1871,9 @@ export function BadgeHex({
         </linearGradient>
 
         <linearGradient
-          id={shineGradientId}
+          id={
+            shineGradientId
+          }
           x1="0%"
           y1="0%"
           x2="100%"
@@ -1318,7 +1899,9 @@ export function BadgeHex({
         </linearGradient>
 
         <filter
-          id={shadowFilterId}
+          id={
+            shadowFilterId
+          }
           x="-25%"
           y="-25%"
           width="150%"
@@ -1334,7 +1917,9 @@ export function BadgeHex({
         </filter>
 
         <filter
-          id={glowFilterId}
+          id={
+            glowFilterId
+          }
           x="-40%"
           y="-40%"
           width="180%"
@@ -1344,14 +1929,20 @@ export function BadgeHex({
             dx="0"
             dy="0"
             stdDeviation="2.2"
-            floodColor={palette.glow}
+            floodColor={
+              palette.glow
+            }
             floodOpacity={
-              locked ? 0 : 0.45
+              locked
+                ? 0
+                : 0.45
             }
           />
         </filter>
 
-        <clipPath id={`clip-${uniqueId}`}>
+        <clipPath
+          id={`clip-${uniqueId}`}
+        >
           <polygon
             points={hexPoints(
               50,
@@ -1382,7 +1973,9 @@ export function BadgeHex({
           fill={`url(#${borderGradientId})`}
           filter={`url(#${shadowFilterId})`}
           opacity={
-            locked ? 0.5 : 1
+            locked
+              ? 0.5
+              : 1
           }
         />
       )}
@@ -1415,7 +2008,9 @@ export function BadgeHex({
         }
         strokeWidth="1"
         strokeOpacity={
-          locked ? 0.55 : 0.5
+          locked
+            ? 0.55
+            : 0.5
         }
       />
 
@@ -1430,7 +2025,9 @@ export function BadgeHex({
       <g
         clipPath={`url(#clip-${uniqueId})`}
         opacity={
-          locked ? 0.38 : 1
+          locked
+            ? 0.38
+            : 1
         }
         transform="translate(10 10) scale(0.8)"
         filter={
@@ -1442,7 +2039,9 @@ export function BadgeHex({
       >
         {Illustration ? (
           <Illustration
-            c={palette.illustration}
+            c={
+              palette.illustration
+            }
           />
         ) : (
           <text
@@ -1501,7 +2100,8 @@ export function BadgeHex({
         </g>
       )}
 
-      {level === "diamond" && (
+      {level ===
+        "diamond" && (
         <g pointerEvents="none">
           <path
             d="M50 3 L55 8 L50 13 L45 8 Z"

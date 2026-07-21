@@ -27,7 +27,9 @@ export function computeBest(
 ): number {
   if (
     !badge.exerciseId &&
-    badge.metric !== "records"
+    badge.metric !== "records" &&
+    badge.metric !== "kilter-angle" &&
+    badge.metric !== "climbing-color"
   ) {
     return -Infinity;
   }
@@ -194,6 +196,53 @@ export function computeBest(
         ),
       );
 
+      case "kilter-angle": {
+        const grade = badge.levels[0]?.grade;
+
+        if (grade === undefined) {
+          return -Infinity;
+        }
+
+        const successfulEntries = sessionLogs.flatMap(
+          (sessionLog) =>
+            (sessionLog.kilterEntries ?? []).filter(
+              (entry) =>
+                entry.result === "reussi" &&
+                entry.grade === grade,
+            ),
+        );
+
+        if (successfulEntries.length === 0) {
+          return -Infinity;
+        }
+
+        return Math.max(
+          ...successfulEntries.map(
+            (entry) => entry.angle,
+          ),
+        );
+      }
+
+      case "climbing-color": {
+        if (!badge.climbingColor) {
+          return -Infinity;
+        }
+
+        const succeeded = sessionLogs.some(
+          (sessionLog) =>
+            (
+              sessionLog.climbingColorsSucceeded ??
+              []
+            ).includes(
+              badge.climbingColor!,
+            ),
+        );
+
+        return succeeded
+          ? 1
+          : -Infinity;
+      }
+      
     case "records":
       return countAllTimeRecords(sessionLogs);
 
@@ -224,7 +273,34 @@ function isSloperLevelUnlocked(
     ),
   );
 }
+function isKilterLevelUnlocked(
+  badge: BadgeDef,
+  levelDefinition: BadgeLevelDef,
+  sessionLogs: SessionLog[],
+): boolean {
+  const grade =
+    levelDefinition.grade;
 
+  if (grade === undefined) {
+    return false;
+  }
+
+  return sessionLogs.some(
+    (sessionLog) =>
+      (
+        sessionLog.kilterEntries ??
+        []
+      ).some(
+        (entry) =>
+          entry.result ===
+            "reussi" &&
+          entry.grade ===
+            grade &&
+          entry.angle >=
+            levelDefinition.threshold,
+      ),
+  );
+}
 function isStandardLevelUnlocked(
   badge: BadgeDef,
   levelDefinition: BadgeLevelDef,
@@ -330,7 +406,51 @@ export function getUnlockedLevels(
 
     return unlocked;
   }
+  if (
+    badge.metric ===
+    "kilter-angle"
+  ) {
+    let highestUnlockedIndex =
+      -1;
 
+    badge.levels.forEach(
+      (
+        levelDefinition,
+        index,
+      ) => {
+        if (
+          isKilterLevelUnlocked(
+            badge,
+            levelDefinition,
+            sessionLogs,
+          )
+        ) {
+          highestUnlockedIndex =
+            Math.max(
+              highestUnlockedIndex,
+              index,
+            );
+        }
+      },
+    );
+
+    if (
+      highestUnlockedIndex ===
+      -1
+    ) {
+      return [];
+    }
+
+    return badge.levels
+      .slice(
+        0,
+        highestUnlockedIndex + 1,
+      )
+      .map(
+        (level) =>
+          level.level,
+      );
+  }
   /*
    * Tous les autres badges restent cumulatifs normalement.
    */

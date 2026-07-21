@@ -17,6 +17,7 @@ import type {
 
 import type {
   BadgeLevel,
+  ClimbingColor,
 } from "../data/badges";
 
 import {
@@ -125,7 +126,11 @@ export type SessionLog = {
    */
   climbingDurationMinutes?: number;
   climbingIntensity?: ClimbingIntensity;
-
+  /**
+   * Couleurs de blocs réellement réussies
+   * pendant cette séance de grimpe.
+   */
+  climbingColorsSucceeded?: ClimbingColor[];
   /**
    * Une séance Kilter peut contenir plusieurs
    * angles, cotations et résultats.
@@ -292,17 +297,40 @@ function normalizeSessionLog(
       "abs" ||
     log.finisherType ===
       "flexibility";
+  const validClimbingColors: ClimbingColor[] = [
+    "rose",
+    "jaune",
+    "vert",
+    "turquoise",
+    "bleu",
+    "orange",
+    "rouge",
+    "noir",
+    "blanc",
+  ];
 
+  const climbingColorsSucceeded =
+    Array.isArray(log.climbingColorsSucceeded)
+      ? log.climbingColorsSucceeded.filter(
+          (color): color is ClimbingColor =>
+            validClimbingColors.includes(
+              color as ClimbingColor,
+            ),
+        )
+      : undefined;
   return {
     id:
       log.id ??
       crypto.randomUUID(),
 
     date:
-      log.date ??
-      new Date()
-        .toISOString()
-        .split("T")[0],
+    log.date ??
+    new Date(
+      Date.now() -
+        new Date().getTimezoneOffset() * 60_000,
+    )
+      .toISOString()
+      .split("T")[0],
 
     sessionId:
       log.sessionId ?? "",
@@ -337,6 +365,8 @@ function normalizeSessionLog(
         ? log.climbingIntensity
         : undefined,
 
+    climbingColorsSucceeded,
+    
     kilterEntries: Array.isArray(
       log.kilterEntries,
     )

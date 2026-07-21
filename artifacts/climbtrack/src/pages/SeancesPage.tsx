@@ -25,6 +25,10 @@ import type {
   KilterResult,
   SessionLog,
 } from "@/context/ClimbTrackContext";
+
+import type {
+  ClimbingColor,
+} from "@/data/badges";
 import { cn } from "@/lib/utils";
 import {
   generateDailySuggestion,
@@ -40,7 +44,61 @@ type ManualType =
   | "session"
   | "climbing"
   | "kilter";
-
+const CLIMBING_COLORS: {
+  id: ClimbingColor;
+  label: string;
+  color: string;
+  textColor?: string;
+}[] = [
+  {
+    id: "rose",
+    label: "Rose",
+    color: "#EC4899",
+  },
+  {
+    id: "jaune",
+    label: "Jaune",
+    color: "#FACC15",
+    textColor: "#111111",
+  },
+  {
+    id: "vert",
+    label: "Vert",
+    color: "#22C55E",
+  },
+  {
+    id: "turquoise",
+    label: "Turquoise",
+    color: "#2DD4BF",
+    textColor: "#111111",
+  },
+  {
+    id: "bleu",
+    label: "Bleu",
+    color: "#3B82F6",
+  },
+  {
+    id: "orange",
+    label: "Orange",
+    color: "#F97316",
+  },
+  {
+    id: "rouge",
+    label: "Rouge",
+    color: "#EF4444",
+  },
+  {
+    id: "noir",
+    label: "Noir",
+    color: "#171717",
+  },
+  {
+    id: "blanc",
+    label: "Blanc",
+    color: "#F5F5F5",
+    textColor: "#111111",
+  },
+];
 type TodaySettings = {
   date: string;
   availableMinutes: number | null;
@@ -394,6 +452,11 @@ export function SeancesPage() {
     );
 
   const [
+    climbingColorsSucceeded,
+    setClimbingColorsSucceeded,
+  ] = useState<ClimbingColor[]>([]);
+
+  const [
     kilterEntries,
     setKilterEntries,
   ] = useState<KilterEntry[]>([
@@ -497,6 +560,7 @@ export function SeancesPage() {
     setClimbingIntensity(
       "moyen",
     );
+    setClimbingColorsSucceeded([]);
     setKilterEntries([
       createKilterEntry(),
     ]);
@@ -699,6 +763,10 @@ export function SeancesPage() {
 
       climbingIntensity:
         climbingIntensity,
+      climbingColorsSucceeded:
+      climbingColorsSucceeded.length > 0
+        ? climbingColorsSucceeded
+        : undefined,
     };
 
     addSessionLog(log);
@@ -1361,6 +1429,72 @@ export function SeancesPage() {
                     className="w-full rounded-xl border border-border bg-card px-4 py-3"
                   />
                 </label>
+                <div>
+                  <span className="mb-2 block text-xs font-bold uppercase text-muted-foreground">
+                    Couleurs réussies
+                  </span>
+
+                  <p className="mb-3 text-xs text-muted-foreground">
+                    Sélectionne uniquement les couleurs où tu as réussi au moins un bloc.
+                  </p>
+
+                  <div className="grid grid-cols-3 gap-2">
+                    {CLIMBING_COLORS.map(
+                      (color) => {
+                        const selected =
+                          climbingColorsSucceeded.includes(
+                            color.id,
+                          );
+
+                        return (
+                          <button
+                            key={color.id}
+                            type="button"
+                            onClick={() =>
+                              setClimbingColorsSucceeded(
+                                (previous) =>
+                                  selected
+                                    ? previous.filter(
+                                        (item) =>
+                                          item !== color.id,
+                                      )
+                                    : [
+                                        ...previous,
+                                        color.id,
+                                      ],
+                              )
+                            }
+                            className="rounded-xl border px-3 py-3 text-sm font-bold"
+                            style={{
+                              backgroundColor:
+                                selected
+                                  ? color.color
+                                  : "transparent",
+
+                              borderColor:
+                                selected
+                                  ? color.color
+                                  : "rgba(255,255,255,0.15)",
+
+                              color:
+                                selected
+                                  ? color.textColor ??
+                                    "#FFFFFF"
+                                  : "#FFFFFF",
+
+                              boxShadow:
+                                selected
+                                  ? `0 0 16px ${color.color}66`
+                                  : "none",
+                            }}
+                          >
+                            {color.label}
+                          </button>
+                        );
+                      },
+                    )}
+                  </div>
+                </div>
               </div>
             )}
 

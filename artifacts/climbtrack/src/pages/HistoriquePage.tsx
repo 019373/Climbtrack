@@ -6,6 +6,7 @@ import {
   Clock3,
   Dumbbell,
   Mountain,
+  Trash2,
   X,
 } from "lucide-react";
 
@@ -70,10 +71,7 @@ function getSessionName(sessionId: string): string {
   );
 }
 
-function getExerciseName(
-  sessionId: string,
-  exerciseId: string,
-): string {
+function getExerciseName(exerciseId: string): string {
   const exercise = SESSIONS.flatMap(
     (session) => session.exercises,
   ).find((item) => item.id === exerciseId);
@@ -134,7 +132,10 @@ function formatIntensity(intensity?: string): string {
 }
 
 export function HistoriquePage() {
-  const { data } = useClimbTrack();
+  const {
+    data,
+    deleteSessionLog,
+  } = useClimbTrack();
 
   const today = getTodayLocalDate();
   const todayDate = new Date(`${today}T12:00:00`);
@@ -149,9 +150,11 @@ export function HistoriquePage() {
 
   const [selectedDate, setSelectedDate] = useState(today);
 
-  const [selectedLog, setSelectedLog] = useState<SessionLog | null>(
-    null,
-  );
+  const [selectedLog, setSelectedLog] =
+    useState<SessionLog | null>(null);
+
+  const [showDeleteConfirmation, setShowDeleteConfirmation] =
+    useState(false);
 
   const calendarDays = useMemo(() => {
     const firstDay = new Date(
@@ -166,10 +169,6 @@ export function HistoriquePage() {
       0,
     ).getDate();
 
-    /*
-     * JavaScript : dimanche = 0.
-     * Ici, lundi doit être la première colonne.
-     */
     const emptyDaysBeforeMonth =
       (firstDay.getDay() + 6) % 7;
 
@@ -230,6 +229,20 @@ export function HistoriquePage() {
     }
 
     setDisplayedMonth((month) => month + 1);
+  }
+
+  function closeDetails() {
+    setSelectedLog(null);
+    setShowDeleteConfirmation(false);
+  }
+
+  function confirmDelete() {
+    if (!selectedLog) {
+      return;
+    }
+
+    deleteSessionLog(selectedLog.id);
+    closeDetails();
   }
 
   return (
@@ -360,7 +373,10 @@ export function HistoriquePage() {
                   <button
                     key={log.id}
                     type="button"
-                    onClick={() => setSelectedLog(log)}
+                    onClick={() => {
+                      setSelectedLog(log);
+                      setShowDeleteConfirmation(false);
+                    }}
                     className="flex w-full items-center gap-3 rounded-2xl border border-border bg-card p-4 text-left"
                   >
                     <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white/10">
@@ -398,7 +414,7 @@ export function HistoriquePage() {
           <button
             type="button"
             className="absolute inset-0"
-            onClick={() => setSelectedLog(null)}
+            onClick={closeDetails}
           />
 
           <div className="relative z-10 max-h-[92dvh] w-full overflow-y-auto rounded-t-3xl border-t border-border bg-background p-5 pb-10">
@@ -415,7 +431,7 @@ export function HistoriquePage() {
 
               <button
                 type="button"
-                onClick={() => setSelectedLog(null)}
+                onClick={closeDetails}
                 className="flex h-10 w-10 items-center justify-center rounded-full border border-border"
               >
                 <X size={20} />
@@ -527,10 +543,7 @@ export function HistoriquePage() {
                         <div className="flex items-start justify-between gap-3">
                           <div>
                             <h3 className="font-bold text-white">
-                              {getExerciseName(
-                                selectedLog.sessionId,
-                                exerciseLog.exerciseId,
-                              )}
+                              {getExerciseName(exerciseLog.exerciseId)}
                             </h3>
 
                             <p className="mt-1 text-xs text-muted-foreground">
@@ -656,7 +669,9 @@ export function HistoriquePage() {
               )}
 
             {selectedLog.pain &&
-              Object.keys(selectedLog.pain).length > 0 && (
+              Object.entries(selectedLog.pain).some(
+                ([, value]) => value > 0,
+              ) && (
                 <div className="mt-5 rounded-xl border border-border bg-card p-4">
                   <h3 className="font-bold text-white">
                     Douleurs et gênes
@@ -692,6 +707,45 @@ export function HistoriquePage() {
                 <p className="mt-2 whitespace-pre-wrap text-sm text-white">
                   {selectedLog.note}
                 </p>
+              </div>
+            )}
+
+            {!showDeleteConfirmation ? (
+              <button
+                type="button"
+                onClick={() => setShowDeleteConfirmation(true)}
+                className="mt-6 flex w-full items-center justify-center gap-2 rounded-xl border border-red-500/50 bg-red-500/10 py-4 font-bold text-red-300"
+              >
+                <Trash2 size={18} />
+                Supprimer la séance
+              </button>
+            ) : (
+              <div className="mt-6 rounded-xl border border-red-500/50 bg-red-500/10 p-4">
+                <p className="font-bold text-red-200">
+                  Supprimer définitivement cette séance ?
+                </p>
+
+                <p className="mt-1 text-sm text-red-200/70">
+                  Cette action ne pourra pas être annulée.
+                </p>
+
+                <div className="mt-4 grid grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setShowDeleteConfirmation(false)}
+                    className="rounded-xl border border-border py-3 font-bold text-white"
+                  >
+                    Annuler
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={confirmDelete}
+                    className="rounded-xl bg-red-500 py-3 font-bold text-white"
+                  >
+                    Supprimer
+                  </button>
+                </div>
               </div>
             )}
           </div>
