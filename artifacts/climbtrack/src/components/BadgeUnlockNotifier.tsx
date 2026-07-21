@@ -1,19 +1,57 @@
-import { useEffect, useRef, useState } from "react";
-import { createPortal } from "react-dom";
-import { X } from "lucide-react";
+import {
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 
-import { useClimbTrack } from "@/context/ClimbTrackContext";
+import {
+  createPortal,
+} from "react-dom";
+
+import {
+  X,
+} from "lucide-react";
+
+import {
+  useClimbTrack,
+} from "@/context/ClimbTrackContext";
+
 import {
   BADGE_BY_ID,
   BADGE_LEVEL_META,
+} from "@/data/badges";
+
+import type {
   BadgeLevel,
 } from "@/data/badges";
-import { BadgeHex } from "@/components/BadgeHex";
+
+import {
+  BadgeHex,
+} from "@/components/BadgeHex";
 
 type ActiveNotification = {
   badgeId: string;
   level: BadgeLevel;
 };
+
+function getBadgeLabel(
+  badgeId: string,
+): string {
+  if (
+    badgeId.startsWith(
+      "kilter-v",
+    )
+  ) {
+    return badgeId
+      .replace(
+        "kilter-",
+        "",
+      )
+      .toUpperCase();
+  }
+
+  return "";
+}
 
 export function BadgeUnlockNotifier() {
   const {
@@ -21,60 +59,112 @@ export function BadgeUnlockNotifier() {
     clearBadgeNotification,
   } = useClimbTrack();
 
-  const [activeNotification, setActiveNotification] =
-    useState<ActiveNotification | null>(null);
+  const [
+    activeNotification,
+    setActiveNotification,
+  ] =
+    useState<ActiveNotification | null>(
+      null,
+    );
 
-  const [isVisible, setIsVisible] = useState(false);
+  const [
+    isVisible,
+    setIsVisible,
+  ] =
+    useState(false);
 
-  const shownRef = useRef(new Set<string>());
+  const shownRef =
+    useRef(
+      new Set<string>(),
+    );
+
   const closeTimeoutRef =
-    useRef<ReturnType<typeof setTimeout> | null>(null);
+    useRef<
+      ReturnType<typeof setTimeout> | null
+    >(null);
 
   const removeTimeoutRef =
-    useRef<ReturnType<typeof setTimeout> | null>(null);
+    useRef<
+      ReturnType<typeof setTimeout> | null
+    >(null);
 
-  const closeNotification = () => {
-    if (!activeNotification) return;
+  function closeNotification() {
+    if (
+      !activeNotification
+    ) {
+      return;
+    }
 
     setIsVisible(false);
 
-    if (closeTimeoutRef.current) {
-      clearTimeout(closeTimeoutRef.current);
-      closeTimeoutRef.current = null;
-    }
-
-    if (removeTimeoutRef.current) {
-      clearTimeout(removeTimeoutRef.current);
-    }
-
-    removeTimeoutRef.current = setTimeout(() => {
-      clearBadgeNotification(
-        activeNotification.badgeId,
-        activeNotification.level,
+    if (
+      closeTimeoutRef.current
+    ) {
+      clearTimeout(
+        closeTimeoutRef.current,
       );
 
-      setActiveNotification(null);
-    }, 350);
-  };
+      closeTimeoutRef.current =
+        null;
+    }
+
+    if (
+      removeTimeoutRef.current
+    ) {
+      clearTimeout(
+        removeTimeoutRef.current,
+      );
+    }
+
+    removeTimeoutRef.current =
+      setTimeout(() => {
+        clearBadgeNotification(
+          activeNotification.badgeId,
+          activeNotification.level,
+        );
+
+        setActiveNotification(
+          null,
+        );
+      }, 350);
+  }
 
   useEffect(() => {
-    if (activeNotification) return;
+    if (
+      activeNotification
+    ) {
+      return;
+    }
 
     const pending =
-      data.pendingBadgeNotifications ?? [];
+      data.pendingBadgeNotifications ??
+      [];
 
-    const nextNotification = pending.find(
-      ({ badgeId, level }) => {
-        const key = `${badgeId}-${level}`;
+    const nextNotification =
+      pending.find(
+        ({
+          badgeId,
+          level,
+        }) => {
+          const key =
+            `${badgeId}-${level}`;
 
-        return !shownRef.current.has(key);
-      },
-    );
+          return !shownRef.current.has(
+            key,
+          );
+        },
+      );
 
-    if (!nextNotification) return;
+    if (
+      !nextNotification
+    ) {
+      return;
+    }
 
     const badge =
-      BADGE_BY_ID[nextNotification.badgeId];
+      BADGE_BY_ID[
+        nextNotification.badgeId
+      ];
 
     if (!badge) {
       clearBadgeNotification(
@@ -85,32 +175,49 @@ export function BadgeUnlockNotifier() {
       return;
     }
 
-    const key = `${nextNotification.badgeId}-${nextNotification.level}`;
+    const key =
+      `${nextNotification.badgeId}-${nextNotification.level}`;
 
-    shownRef.current.add(key);
+    shownRef.current.add(
+      key,
+    );
 
-    setActiveNotification(nextNotification);
+    setActiveNotification(
+      nextNotification,
+    );
 
-    requestAnimationFrame(() => {
-      setIsVisible(true);
-    });
+    requestAnimationFrame(
+      () => {
+        setIsVisible(true);
+      },
+    );
 
-    if ("vibrate" in navigator) {
-      navigator.vibrate([100, 50, 160]);
+    if (
+      "vibrate" in navigator
+    ) {
+      navigator.vibrate([
+        100,
+        50,
+        160,
+      ]);
     }
 
-    closeTimeoutRef.current = setTimeout(() => {
-      setIsVisible(false);
+    closeTimeoutRef.current =
+      setTimeout(() => {
+        setIsVisible(false);
 
-      removeTimeoutRef.current = setTimeout(() => {
-        clearBadgeNotification(
-          nextNotification.badgeId,
-          nextNotification.level,
-        );
+        removeTimeoutRef.current =
+          setTimeout(() => {
+            clearBadgeNotification(
+              nextNotification.badgeId,
+              nextNotification.level,
+            );
 
-        setActiveNotification(null);
-      }, 350);
-    }, 5000);
+            setActiveNotification(
+              null,
+            );
+          }, 350);
+      }, 5000);
   }, [
     activeNotification,
     data.pendingBadgeNotifications,
@@ -119,32 +226,73 @@ export function BadgeUnlockNotifier() {
 
   useEffect(() => {
     return () => {
-      if (closeTimeoutRef.current) {
-        clearTimeout(closeTimeoutRef.current);
+      if (
+        closeTimeoutRef.current
+      ) {
+        clearTimeout(
+          closeTimeoutRef.current,
+        );
       }
 
-      if (removeTimeoutRef.current) {
-        clearTimeout(removeTimeoutRef.current);
+      if (
+        removeTimeoutRef.current
+      ) {
+        clearTimeout(
+          removeTimeoutRef.current,
+        );
       }
     };
   }, []);
 
-  if (!activeNotification) return null;
+  if (
+    !activeNotification
+  ) {
+    return null;
+  }
 
   const badge =
-    BADGE_BY_ID[activeNotification.badgeId];
+    BADGE_BY_ID[
+      activeNotification.badgeId
+    ];
 
-  if (!badge) return null;
+  if (!badge) {
+    return null;
+  }
+
+  const isColorBadge =
+    badge.kind ===
+    "climbing-color";
+
+  const isKilterBadge =
+    badge.kind ===
+    "kilter";
 
   const levelMeta =
-    BADGE_LEVEL_META[activeNotification.level];
+    BADGE_LEVEL_META[
+      activeNotification.level
+    ];
+
+  const badgeLabel =
+    getBadgeLabel(
+      badge.id,
+    );
+
+  const glowColor =
+    isColorBadge
+      ? badge.visualColor ??
+        "#FFFFFF"
+      : levelMeta.glow;
 
   return createPortal(
     <div
       className={`fixed inset-0 z-[200000] flex items-center justify-center overflow-hidden bg-black/90 px-6 transition-opacity duration-300 ${
-        isVisible ? "opacity-100" : "opacity-0"
+        isVisible
+          ? "opacity-100"
+          : "opacity-0"
       }`}
-      onClick={closeNotification}
+      onClick={
+        closeNotification
+      }
     >
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(255,255,255,0.12),transparent_60%)]" />
 
@@ -154,11 +302,17 @@ export function BadgeUnlockNotifier() {
             ? "translate-y-0 scale-100 opacity-100"
             : "translate-y-8 scale-90 opacity-0"
         }`}
-        onClick={(event) => event.stopPropagation()}
+        onClick={(
+          event,
+        ) =>
+          event.stopPropagation()
+        }
       >
         <button
           type="button"
-          onClick={closeNotification}
+          onClick={
+            closeNotification
+          }
           className="absolute -right-2 -top-10 rounded-full p-2 text-white/60 transition-colors hover:bg-white/10 hover:text-white"
           aria-label="Fermer"
         >
@@ -172,37 +326,113 @@ export function BadgeUnlockNotifier() {
         <div
           className="relative mb-6 rounded-full p-5"
           style={{
-            boxShadow: `0 0 70px ${levelMeta.glow}`,
+            boxShadow:
+              `0 0 70px ${glowColor}`,
           }}
         >
           <BadgeHex
-            icon={badge.icon}
-            level={activeNotification.level}
+            icon={
+              badge.icon
+            }
+            level={
+              activeNotification.level
+            }
             size={180}
+            kind={
+              badge.kind
+            }
+            visualColor={
+              badge.visualColor
+            }
+            label={
+              badgeLabel
+            }
+            animate
           />
         </div>
 
         <h2 className="text-3xl font-black tracking-tight text-white">
-          {badge.name}
+          {
+            badge.name
+          }
         </h2>
 
         <p className="mt-2 text-base text-white/60">
-          {badge.subtitle}
+          {
+            badge.subtitle
+          }
         </p>
 
-        <div
-          className="mt-6 rounded-full px-5 py-2 text-sm font-black uppercase tracking-wider"
-          style={{
-            backgroundColor: levelMeta.border,
-            color: "#000000",
-            boxShadow: `0 0 30px ${levelMeta.glow}`,
-          }}
-        >
-          {levelMeta.label}
-        </div>
+        {!isColorBadge && (
+          <div
+            className="mt-6 rounded-full px-5 py-2 text-sm font-black uppercase tracking-wider"
+            style={{
+              backgroundColor:
+                levelMeta.border,
+
+              color:
+                "#000000",
+
+              boxShadow:
+                `0 0 30px ${levelMeta.glow}`,
+            }}
+          >
+            {
+              levelMeta.label
+            }
+          </div>
+        )}
+
+        {isColorBadge && (
+          <div
+            className="mt-6 rounded-full border px-5 py-2 text-sm font-black uppercase tracking-wider"
+            style={{
+              backgroundColor:
+                badge.visualColor ??
+                "#FFFFFF",
+
+              borderColor:
+                badge.visualColor ??
+                "#FFFFFF",
+
+              color:
+                badge.climbingColor ===
+                  "jaune" ||
+                badge.climbingColor ===
+                  "blanc" ||
+                badge.climbingColor ===
+                  "turquoise"
+                  ? "#111111"
+                  : "#FFFFFF",
+
+              boxShadow:
+                `0 0 30px ${
+                  badge.visualColor ??
+                  "#FFFFFF"
+                }`,
+            }}
+          >
+            {
+              badge.climbingColor ??
+              "Bloc réussi"
+            }
+          </div>
+        )}
+
+        {isKilterBadge && (
+          <p className="mt-3 text-xs font-bold text-white/45">
+            {
+              badgeLabel
+            } · niveau{" "}
+            {
+              levelMeta.label
+            }
+          </p>
+        )}
 
         <p className="mt-8 text-xs text-white/35">
-          Appuie sur l’écran pour fermer
+          Appuie sur l’écran
+          pour fermer
         </p>
       </div>
     </div>,
