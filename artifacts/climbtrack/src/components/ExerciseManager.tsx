@@ -1,173 +1,673 @@
 import {
+  useMemo,
   useState,
-  type Dispatch,
   type ReactNode,
-  type SetStateAction,
 } from "react";
-import { createPortal } from "react-dom";
+
 import {
+  createPortal,
+} from "react-dom";
+
+import {
+  ArrowDown,
+  ArrowUp,
+  Check,
   ChevronDown,
   ChevronRight,
-  Plus,
-  Pencil,
-  Trash2,
-  ArrowUp,
-  ArrowDown,
-  RotateCcw,
-  Check,
-  X,
   FolderPlus,
+  Pencil,
+  Plus,
+  RotateCcw,
+  Trash2,
+  X,
 } from "lucide-react";
-import { useClimbTrack } from "@/context/ClimbTrackContext";
+
 import {
-  ExerciseDef,
-  SESSIONS,
-  TrackingType,
+  useClimbTrack,
+} from "@/context/ClimbTrackContext";
+
+import type {
+  ExerciseDefaults,
+  ResistanceBandColor,
+} from "@/context/ClimbTrackContext";
+
+import {
   ASSISTANCE_OPTIONS,
+  RESISTANCE_BAND_OPTIONS,
+  SESSIONS,
 } from "@/data/sessions";
+
+import type {
+  ExerciseDef,
+  TrackingType,
+} from "@/data/sessions";
+
 import {
+  BUILTIN_CATEGORIES,
+  TRACKING_LABELS,
+  TRACKING_TYPES,
   getAllCategories,
   getAllManagedExercises,
   getExerciseSessionIds,
   isExerciseHidden,
-  BUILTIN_CATEGORIES,
-  TRACKING_LABELS,
-  TRACKING_TYPES,
 } from "@/utils/exercises";
-import { useToast } from "@/hooks/use-toast";
 
-/* ── Helpers ─────────────────────────────────────────────────────────────── */
+import {
+  useToast,
+} from "@/hooks/use-toast";
 
-const BUILTIN_IDS = new Set(
-  SESSIONS.flatMap((session) =>
-    session.exercises.map((exercise) => exercise.id),
-  ),
-);
+import {
+  cn,
+} from "@/lib/utils";
 
-const isBuiltin = (id: string) => BUILTIN_IDS.has(id);
+// ─────────────────────────────────────────────────────────────────────────────
+// Exercices de base
+// ─────────────────────────────────────────────────────────────────────────────
+
+const BUILTIN_IDS =
+  new Set(
+    SESSIONS.flatMap(
+      (session) =>
+        session.exercises.map(
+          (exercise) =>
+            exercise.id,
+        ),
+    ),
+  );
+
+function isBuiltin(
+  exerciseId: string,
+): boolean {
+  return BUILTIN_IDS.has(
+    exerciseId,
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Assistance
+// ─────────────────────────────────────────────────────────────────────────────
+
+const DEFAULT_ASSISTANCE =
+  ASSISTANCE_OPTIONS[5] ??
+  ASSISTANCE_OPTIONS[0] ??
+  "Sans assistance";
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Champs selon le type de suivi
+// ─────────────────────────────────────────────────────────────────────────────
+
+type TrackingFields = {
+  reps: boolean;
+  secondaryReps: boolean;
+  duration: boolean;
+  weight: boolean;
+  secondaryWeight: boolean;
+  assistance: boolean;
+  band: boolean;
+  variant: boolean;
+};
+
+const TRACKING_HAS: Record<
+  TrackingType,
+  TrackingFields
+> = {
+  "duration+assistance": {
+    reps: false,
+    secondaryReps: false,
+    duration: true,
+    weight: false,
+    secondaryWeight: false,
+    assistance: true,
+    band: false,
+    variant: false,
+  },
+
+  reps: {
+    reps: true,
+    secondaryReps: false,
+    duration: false,
+    weight: false,
+    secondaryWeight: false,
+    assistance: false,
+    band: false,
+    variant: false,
+  },
+
+  weight: {
+    reps: false,
+    secondaryReps: false,
+    duration: false,
+    weight: true,
+    secondaryWeight: false,
+    assistance: false,
+    band: false,
+    variant: false,
+  },
+
+  "weight+duration": {
+    reps: false,
+    secondaryReps: false,
+    duration: true,
+    weight: true,
+    secondaryWeight: false,
+    assistance: false,
+    band: false,
+    variant: false,
+  },
+
+  assistance: {
+    reps: true,
+    secondaryReps: false,
+    duration: true,
+    weight: false,
+    secondaryWeight: false,
+    assistance: true,
+    band: false,
+    variant: false,
+  },
+
+  "weight+reps": {
+    reps: true,
+    secondaryReps: false,
+    duration: false,
+    weight: true,
+    secondaryWeight: false,
+    assistance: false,
+    band: false,
+    variant: false,
+  },
+
+  duration: {
+    reps: false,
+    secondaryReps: false,
+    duration: true,
+    weight: false,
+    secondaryWeight: false,
+    assistance: false,
+    band: false,
+    variant: false,
+  },
+
+  none: {
+    reps: false,
+    secondaryReps: false,
+    duration: false,
+    weight: false,
+    secondaryWeight: false,
+    assistance: false,
+    band: false,
+    variant: false,
+  },
+
+  "dual-reps+dual-weight": {
+    reps: true,
+    secondaryReps: true,
+    duration: false,
+    weight: true,
+    secondaryWeight: true,
+    assistance: false,
+    band: false,
+    variant: false,
+  },
+
+  "dual-reps+weight": {
+    reps: true,
+    secondaryReps: true,
+    duration: false,
+    weight: true,
+    secondaryWeight: false,
+    assistance: false,
+    band: false,
+    variant: false,
+  },
+
+  "duration+band": {
+    reps: false,
+    secondaryReps: false,
+    duration: true,
+    weight: false,
+    secondaryWeight: false,
+    assistance: false,
+    band: true,
+    variant: false,
+  },
+
+  "reps+duration": {
+    reps: true,
+    secondaryReps: false,
+    duration: true,
+    weight: false,
+    secondaryWeight: false,
+    assistance: false,
+    band: false,
+    variant: false,
+  },
+
+  "weight+reps+duration": {
+    reps: true,
+    secondaryReps: false,
+    duration: true,
+    weight: true,
+    secondaryWeight: false,
+    assistance: false,
+    band: false,
+    variant: false,
+  },
+
+  "variant+weight+duration": {
+    reps: false,
+    secondaryReps: false,
+    duration: true,
+    weight: true,
+    secondaryWeight: false,
+    assistance: false,
+    band: false,
+    variant: true,
+  },
+
+  "variant+reps": {
+    reps: true,
+    secondaryReps: false,
+    duration: false,
+    weight: false,
+    secondaryWeight: false,
+    assistance: false,
+    band: false,
+    variant: true,
+  },
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// État d'édition
+// ─────────────────────────────────────────────────────────────────────────────
 
 type EditState = {
   id: string | null;
+
   name: string;
   description: string;
   category: string;
   tracking: TrackingType;
   sessionIds: string[];
+
   sets: number;
   reps: number;
+  secondaryReps: number;
   duration: number;
   weight: number;
+  secondaryWeight: number;
   restSeconds: number;
+
   assistance: string;
+
+  progressionValue: number;
+
+  bandColor: ResistanceBandColor;
+  bandStretch: number;
+
+  variantOptionsText: string;
+
   isHangboard: boolean;
+  totalWeight: boolean;
+  perSide: boolean;
+
+  primaryRepsLabel: string;
+  secondaryRepsLabel: string;
+  primaryWeightLabel: string;
+  secondaryWeightLabel: string;
 };
 
-const TRACKING_HAS: Record<
-  TrackingType,
-  {
-    reps: boolean;
-    duration: boolean;
-    weight: boolean;
-    assistance: boolean;
-  }
-> = {
-  "duration+assistance": {
-    reps: false,
-    duration: true,
-    weight: false,
-    assistance: true,
-  },
-  reps: {
-    reps: true,
-    duration: false,
-    weight: false,
-    assistance: false,
-  },
-  weight: {
-    reps: false,
-    duration: false,
-    weight: true,
-    assistance: false,
-  },
-  "weight+duration": {
-    reps: false,
-    duration: true,
-    weight: true,
-    assistance: false,
-  },
-  assistance: {
-    reps: true,
-    duration: true,
-    weight: false,
-    assistance: true,
-  },
-  "weight+reps": {
-    reps: true,
-    duration: false,
-    weight: true,
-    assistance: false,
-  },
-  duration: {
-    reps: false,
-    duration: true,
-    weight: false,
-    assistance: false,
-  },
-  none: {
-    reps: false,
-    duration: false,
-    weight: false,
-    assistance: false,
-  },
-};
-
-function emptyEdit(category = ""): EditState {
+function createEmptyEdit(
+  category = "",
+): EditState {
   return {
     id: null,
+
     name: "",
     description: "",
     category,
     tracking: "reps",
     sessionIds: [],
+
     sets: 3,
     reps: 8,
+    secondaryReps: 8,
     duration: 30,
     weight: 0,
+    secondaryWeight: 0,
     restSeconds: 90,
-    assistance: ASSISTANCE_OPTIONS[5],
+
+    assistance:
+      DEFAULT_ASSISTANCE,
+
+    progressionValue: 0,
+
+    bandColor: "orange",
+    bandStretch: 0,
+
+    variantOptionsText: "",
+
     isHangboard: false,
+    totalWeight: false,
+    perSide: false,
+
+    primaryRepsLabel: "",
+    secondaryRepsLabel: "",
+    primaryWeightLabel: "",
+    secondaryWeightLabel: "",
   };
 }
 
-function exerciseToEdit(
+function exerciseToEditState(
   exercise: ExerciseDef,
-  data: ReturnType<typeof useClimbTrack>["data"],
+  data: ReturnType<
+    typeof useClimbTrack
+  >["data"],
 ): EditState {
-  const sessionIds = getExerciseSessionIds(exercise.id, data);
-
   const defaults =
-    data.exerciseDefaults[exercise.id] ??
+    data.exerciseDefaults[
+      exercise.id
+    ] ??
     exercise.defaultValues;
 
   return {
-    id: exercise.id,
-    name: exercise.name,
-    description: exercise.description,
-    category: exercise.category,
-    tracking: exercise.tracking,
-    sessionIds,
-    sets: defaults.sets ?? 3,
-    reps: defaults.reps ?? 8,
-    duration: defaults.duration ?? 30,
-    weight: defaults.weight ?? 0,
-    restSeconds: defaults.restSeconds ?? 90,
+    id:
+      exercise.id,
+
+    name:
+      exercise.name,
+
+    description:
+      exercise.description,
+
+    category:
+      exercise.category,
+
+    tracking:
+      exercise.tracking,
+
+    sessionIds:
+      getExerciseSessionIds(
+        exercise.id,
+        data,
+      ),
+
+    sets:
+      defaults.sets ??
+      3,
+
+    reps:
+      defaults.reps ??
+      8,
+
+    secondaryReps:
+      defaults.secondaryReps ??
+      8,
+
+    duration:
+      defaults.duration ??
+      30,
+
+    weight:
+      defaults.weight ??
+      0,
+
+    secondaryWeight:
+      defaults.secondaryWeight ??
+      0,
+
+    restSeconds:
+      defaults.restSeconds ??
+      90,
+
     assistance:
-      defaults.assistance ?? ASSISTANCE_OPTIONS[5],
-    isHangboard: exercise.isHangboard ?? false,
+      defaults.assistance ??
+      DEFAULT_ASSISTANCE,
+
+    progressionValue:
+      defaults.progressionValue ??
+      0,
+
+    bandColor:
+      defaults.bandColor ??
+      "orange",
+
+    bandStretch:
+      defaults.bandStretch ??
+      0,
+
+    variantOptionsText:
+      (
+        exercise.variantOptions ??
+        []
+      ).join("\n"),
+
+    isHangboard:
+      exercise.isHangboard ??
+      false,
+
+    totalWeight:
+      exercise.totalWeight ??
+      false,
+
+    perSide:
+      exercise.perSide ??
+      false,
+
+    primaryRepsLabel:
+      exercise.primaryRepsLabel ??
+      "",
+
+    secondaryRepsLabel:
+      exercise.secondaryRepsLabel ??
+      "",
+
+    primaryWeightLabel:
+      exercise.primaryWeightLabel ??
+      "",
+
+    secondaryWeightLabel:
+      exercise.secondaryWeightLabel ??
+      "",
   };
 }
 
-/* ── Champs ──────────────────────────────────────────────────────────────── */
+// ─────────────────────────────────────────────────────────────────────────────
+// Helpers
+// ─────────────────────────────────────────────────────────────────────────────
+
+function parseNumber(
+  value: string,
+): number {
+  if (
+    value.trim() ===
+    ""
+  ) {
+    return 0;
+  }
+
+  const parsed =
+    Number.parseFloat(
+      value.replace(
+        ",",
+        ".",
+      ),
+    );
+
+  return Number.isFinite(
+    parsed,
+  )
+    ? Math.max(
+        0,
+        parsed,
+      )
+    : 0;
+}
+
+function formatNumber(
+  value: number,
+): string {
+  return Number.isInteger(
+    value,
+  )
+    ? String(
+        value,
+      )
+    : String(
+        Math.round(
+          value * 100,
+        ) / 100,
+      ).replace(
+        ".",
+        ",",
+      );
+}
+
+function getDefaultsSummary(
+  exercise: ExerciseDef,
+  data: ReturnType<
+    typeof useClimbTrack
+  >["data"],
+): string {
+  const defaults =
+    data.exerciseDefaults[
+      exercise.id
+    ] ??
+    exercise.defaultValues;
+
+  const parts:
+    string[] = [];
+
+  parts.push(
+    `${defaults.sets} série${
+      defaults.sets >
+      1
+        ? "s"
+        : ""
+    }`,
+  );
+
+  if (
+    typeof defaults.reps ===
+    "number"
+  ) {
+    if (
+      typeof defaults.secondaryReps ===
+      "number"
+    ) {
+      parts.push(
+        `${defaults.reps} + ${defaults.secondaryReps} reps`,
+      );
+    } else {
+      parts.push(
+        `${defaults.reps} reps`,
+      );
+    }
+  }
+
+  if (
+    typeof defaults.duration ===
+    "number"
+  ) {
+    parts.push(
+      `${formatNumber(
+        defaults.duration,
+      )} s`,
+    );
+  }
+
+  if (
+    typeof defaults.weight ===
+    "number"
+  ) {
+    if (
+      typeof defaults.secondaryWeight ===
+      "number"
+    ) {
+      parts.push(
+        `${formatNumber(
+          defaults.weight,
+        )} + ${formatNumber(
+          defaults.secondaryWeight,
+        )} kg`,
+      );
+    } else {
+      parts.push(
+        `${formatNumber(
+          defaults.weight,
+        )} kg`,
+      );
+    }
+  }
+
+  if (
+    typeof defaults.progressionValue ===
+    "number"
+  ) {
+    if (
+      exercise.id ===
+      "suspension-slopers"
+    ) {
+      parts.push(
+        `${formatNumber(
+          defaults.progressionValue,
+        )}°`,
+      );
+    } else {
+      parts.push(
+        `progression ${formatNumber(
+          defaults.progressionValue,
+        )}`,
+      );
+    }
+  }
+
+  if (
+    defaults.assistance
+  ) {
+    parts.push(
+      defaults.assistance,
+    );
+  }
+
+  if (
+    defaults.bandColor
+  ) {
+    parts.push(
+      `élastique ${defaults.bandColor}`,
+    );
+  }
+
+  if (
+    defaults.restSeconds >
+    0
+  ) {
+    parts.push(
+      `repos ${defaults.restSeconds} s`,
+    );
+  }
+
+  return parts.join(
+    " · ",
+  );
+}
+
+function shouldShowProgressionValue(
+  state: EditState,
+): boolean {
+  return (
+    state.progressionValue >
+      0 ||
+    state.id ===
+      "suspension-slopers" ||
+    state.id ===
+      "croise-dynamique-19-30"
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Shared fields
+// ─────────────────────────────────────────────────────────────────────────────
 
 function Field({
   label,
@@ -178,7 +678,7 @@ function Field({
 }) {
   return (
     <div className="space-y-1.5">
-      <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+      <label className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
         {label}
       </label>
 
@@ -187,20 +687,24 @@ function Field({
   );
 }
 
-function Input({
+function TextInput({
   value,
   onChange,
   type = "text",
-  placeholder = "",
   min,
   step,
+  placeholder,
 }: {
   value: string | number;
-  onChange: (value: string) => void;
+
+  onChange: (
+    value: string,
+  ) => void;
+
   type?: string;
-  placeholder?: string;
   min?: number;
   step?: number;
+  placeholder?: string;
 }) {
   return (
     <input
@@ -208,563 +712,1239 @@ function Input({
       value={value}
       min={min}
       step={step}
-      onChange={(event) =>
-        onChange(event.target.value)
-      }
       placeholder={placeholder}
-      className="w-full rounded-lg border border-border bg-card px-3 py-3 text-sm text-white placeholder:text-muted-foreground/50 focus:border-white/40 focus:outline-none"
+      onChange={(
+        event,
+      ) =>
+        onChange(
+          event.target.value,
+        )
+      }
+      className="w-full rounded-xl border border-border bg-card px-3 py-3 text-sm text-white outline-none placeholder:text-muted-foreground/50 focus:border-white/40"
     />
   );
 }
 
-function Select({
-  value,
-  onChange,
-  options,
+function ToggleRow({
+  selected,
+  label,
+  onClick,
 }: {
-  value: string;
-  onChange: (value: string) => void;
-  options: {
-    value: string;
-    label: string;
-  }[];
+  selected: boolean;
+  label: string;
+  onClick: () => void;
 }) {
   return (
-    <select
-      value={value}
-      onChange={(event) =>
-        onChange(event.target.value)
+    <button
+      type="button"
+      onClick={
+        onClick
       }
-      className="w-full rounded-lg border border-border bg-card px-3 py-3 text-sm text-white focus:border-white/40 focus:outline-none"
+      className={cn(
+        "flex w-full items-center gap-3 rounded-xl border px-3 py-3 text-left",
+
+        selected
+          ? "border-white bg-white text-black"
+          : "border-border bg-card text-white",
+      )}
     >
-      {options.map((option) => (
-        <option
-          key={option.value}
-          value={option.value}
-        >
-          {option.label}
-        </option>
-      ))}
-    </select>
+      <span
+        className={cn(
+          "flex h-5 w-5 flex-shrink-0 items-center justify-center rounded border",
+
+          selected
+            ? "border-black bg-black"
+            : "border-border",
+        )}
+      >
+        {selected && (
+          <Check
+            size={12}
+            className="text-white"
+          />
+        )}
+      </span>
+
+      <span className="text-sm font-bold">
+        {label}
+      </span>
+    </button>
   );
 }
 
-/* ── Fenêtre de création/modification ────────────────────────────────────── */
+// ─────────────────────────────────────────────────────────────────────────────
+// Modal
+// ─────────────────────────────────────────────────────────────────────────────
 
-function ExerciseEditSheet({
+function ExerciseEditModal({
   state,
-  setState,
   categories,
+  onChange,
   onSave,
-  onCancel,
+  onClose,
 }: {
   state: EditState;
-  setState: Dispatch<SetStateAction<EditState>>;
   categories: string[];
+
+  onChange: (
+    state: EditState,
+  ) => void;
+
   onSave: () => void;
-  onCancel: () => void;
+  onClose: () => void;
 }) {
-  const trackingFields = TRACKING_HAS[state.tracking];
+  const fields =
+    TRACKING_HAS[
+      state.tracking
+    ];
 
-  const setText =
-    (key: keyof EditState) => (value: string) => {
-      setState((previous) => ({
-        ...previous,
-        [key]: value,
-      }));
-    };
+  function update<
+    K extends keyof EditState,
+  >(
+    key: K,
+    value: EditState[K],
+  ) {
+    onChange({
+      ...state,
+      [key]:
+        value,
+    });
+  }
 
-  const setNumber =
-    (key: keyof EditState) => (value: string) => {
-      const parsedValue = Number(value);
+  function toggleSession(
+    sessionId: string,
+  ) {
+    update(
+      "sessionIds",
 
-      setState((previous) => ({
-        ...previous,
-        [key]: Number.isFinite(parsedValue)
-          ? parsedValue
-          : 0,
-      }));
-    };
-
-  const toggleSession = (sessionId: string) => {
-    setState((previous) => ({
-      ...previous,
-      sessionIds: previous.sessionIds.includes(
+      state.sessionIds.includes(
         sessionId,
       )
-        ? previous.sessionIds.filter(
-            (id) => id !== sessionId,
+        ? state.sessionIds.filter(
+            (id) =>
+              id !==
+              sessionId,
           )
-        : [...previous.sessionIds, sessionId],
-    }));
-  };
+        : [
+            ...state.sessionIds,
+            sessionId,
+          ],
+    );
+  }
 
-  return (
-    <div
-      className="fixed inset-0 z-[99999] bg-background"
-      onClick={onCancel}
-    >
-      <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" />
+  return createPortal(
+    <div className="fixed inset-0 z-[100000] bg-black/80 backdrop-blur-sm">
+      <div className="flex h-[100dvh] flex-col bg-background pt-safe">
+        <header className="flex items-start justify-between gap-4 border-b border-border px-5 py-4">
+          <div>
+            <h2 className="text-xl font-black text-white">
+              {state.id
+                ? "Modifier l’exercice"
+                : "Ajouter un exercice"}
+            </h2>
 
-      <div
-        className="relative z-[100000] flex h-[100dvh] w-full flex-col overflow-hidden bg-background pt-safe"
-        onClick={(event) =>
-          event.stopPropagation()
-        }
-      >
-        {/* En-tête fixe */}
-        <div className="flex flex-shrink-0 items-center justify-between gap-3 border-b border-border px-5 py-4">
-          <div className="min-w-0">
-            <h3 className="text-lg font-extrabold text-white">
-              {state.id === null
-                ? "Nouvel exercice"
-                : "Modifier l’exercice"}
-            </h3>
-
-            <p className="mt-0.5 text-xs text-muted-foreground">
-              Configure le suivi et les séances de
-              l’exercice.
+            <p className="mt-1 text-xs text-muted-foreground">
+              Modifier les propriétés et les valeurs proposées par défaut.
             </p>
           </div>
 
           <button
             type="button"
-            onClick={onCancel}
-            className="flex-shrink-0 rounded-full p-2 hover:bg-white/10"
+            onClick={
+              onClose
+            }
+            className="rounded-full border border-border p-2 text-muted-foreground"
             aria-label="Fermer"
           >
             <X
-              size={20}
-              className="text-muted-foreground"
+              size={18}
             />
           </button>
-        </div>
+        </header>
 
-        {/* Contenu défilable */}
-        <div className="flex-1 space-y-5 overflow-y-auto px-5 py-5 pb-32">
+        <div className="flex-1 space-y-5 overflow-y-auto p-5 pb-32">
+          {state.id && (
+            <div className="rounded-xl border border-border bg-card/50 px-3 py-2">
+              <p className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">
+                Identifiant conservé
+              </p>
+
+              <p className="mt-1 break-all font-mono text-xs text-white">
+                {state.id}
+              </p>
+
+              <p className="mt-1 text-[10px] leading-relaxed text-muted-foreground">
+                Modifier l’exercice ne change jamais cet identifiant afin de conserver tout l’historique.
+              </p>
+            </div>
+          )}
+
           <Field label="Nom">
-            <Input
-              value={state.name}
-              onChange={setText("name")}
-              placeholder="Nom de l’exercice"
+            <TextInput
+              value={
+                state.name
+              }
+              onChange={(
+                value,
+              ) =>
+                update(
+                  "name",
+                  value,
+                )
+              }
             />
           </Field>
 
-          <Field label="Description facultative">
-            <Input
-              value={state.description}
-              onChange={setText("description")}
-              placeholder="Courte description"
+          <Field label="Description">
+            <textarea
+              value={
+                state.description
+              }
+              onChange={(
+                event,
+              ) =>
+                update(
+                  "description",
+                  event.target.value,
+                )
+              }
+              className="min-h-24 w-full resize-none rounded-xl border border-border bg-card px-3 py-3 text-sm text-white outline-none focus:border-white/40"
             />
           </Field>
 
           <div className="grid grid-cols-2 gap-3">
             <Field label="Catégorie">
-              <Select
-                value={state.category}
-                onChange={setText("category")}
-                options={categories.map(
-                  (category) => ({
-                    value: category,
-                    label: category,
-                  }),
+              <select
+                value={
+                  state.category
+                }
+                onChange={(
+                  event,
+                ) =>
+                  update(
+                    "category",
+                    event.target.value,
+                  )
+                }
+                className="w-full rounded-xl border border-border bg-card px-3 py-3 text-sm text-white"
+              >
+                {categories.map(
+                  (
+                    category,
+                  ) => (
+                    <option
+                      key={
+                        category
+                      }
+                      value={
+                        category
+                      }
+                    >
+                      {
+                        category
+                      }
+                    </option>
+                  ),
                 )}
-              />
+              </select>
             </Field>
 
             <Field label="Type de suivi">
-              <Select
-                value={state.tracking}
-                onChange={(value) =>
-                  setState((previous) => ({
-                    ...previous,
-                    tracking:
-                      value as TrackingType,
-                  }))
+              <select
+                value={
+                  state.tracking
                 }
-                options={TRACKING_TYPES.map(
-                  (trackingType) => ({
-                    value: trackingType,
-                    label:
-                      TRACKING_LABELS[
-                        trackingType
-                      ],
-                  }),
+                onChange={(
+                  event,
+                ) =>
+                  update(
+                    "tracking",
+                    event.target
+                      .value as TrackingType,
+                  )
+                }
+                className="w-full rounded-xl border border-border bg-card px-3 py-3 text-sm text-white"
+              >
+                {TRACKING_TYPES.map(
+                  (
+                    tracking,
+                  ) => (
+                    <option
+                      key={
+                        tracking
+                      }
+                      value={
+                        tracking
+                      }
+                    >
+                      {
+                        TRACKING_LABELS[
+                          tracking
+                        ]
+                      }
+                    </option>
+                  ),
                 )}
-              />
+              </select>
             </Field>
           </div>
 
-          <div className="rounded-xl border border-border bg-card/40 p-4">
-            <h4 className="mb-4 text-xs font-bold uppercase tracking-wider text-muted-foreground">
+          <section className="space-y-4 rounded-2xl border border-border bg-card/40 p-4">
+            <h3 className="text-xs font-black uppercase tracking-wider text-muted-foreground">
               Valeurs par défaut
-            </h4>
+            </h3>
 
             <div className="grid grid-cols-2 gap-3">
               <Field label="Séries">
-                <Input
-                  type="number"
-                  min={1}
-                  value={state.sets}
-                  onChange={setNumber("sets")}
-                />
-              </Field>
-
-              <Field label="Repos (secondes)">
-                <Input
+                <TextInput
                   type="number"
                   min={0}
-                  value={state.restSeconds}
-                  onChange={setNumber(
-                    "restSeconds",
-                  )}
+                  step={1}
+                  value={
+                    state.sets
+                  }
+                  onChange={(
+                    value,
+                  ) =>
+                    update(
+                      "sets",
+                      parseNumber(
+                        value,
+                      ),
+                    )
+                  }
                 />
               </Field>
 
-              {trackingFields.reps && (
+              <Field label="Repos (s)">
+                <TextInput
+                  type="number"
+                  min={0}
+                  step={1}
+                  value={
+                    state.restSeconds
+                  }
+                  onChange={(
+                    value,
+                  ) =>
+                    update(
+                      "restSeconds",
+                      parseNumber(
+                        value,
+                      ),
+                    )
+                  }
+                />
+              </Field>
+
+              {fields.reps && (
                 <Field label="Répétitions">
-                  <Input
+                  <TextInput
                     type="number"
                     min={0}
-                    value={state.reps}
-                    onChange={setNumber("reps")}
+                    step={1}
+                    value={
+                      state.reps
+                    }
+                    onChange={(
+                      value,
+                    ) =>
+                      update(
+                        "reps",
+                        parseNumber(
+                          value,
+                        ),
+                      )
+                    }
                   />
                 </Field>
               )}
 
-              {trackingFields.duration && (
-                <Field label="Durée (secondes)">
-                  <Input
+              {fields.secondaryReps && (
+                <Field label="Deuxièmes répétitions">
+                  <TextInput
                     type="number"
                     min={0}
-                    value={state.duration}
-                    onChange={setNumber(
-                      "duration",
-                    )}
+                    step={1}
+                    value={
+                      state.secondaryReps
+                    }
+                    onChange={(
+                      value,
+                    ) =>
+                      update(
+                        "secondaryReps",
+                        parseNumber(
+                          value,
+                        ),
+                      )
+                    }
                   />
                 </Field>
               )}
 
-              {trackingFields.weight && (
+              {fields.duration && (
+                <Field label="Durée (s)">
+                  <TextInput
+                    type="number"
+                    min={0}
+                    step={1}
+                    value={
+                      state.duration
+                    }
+                    onChange={(
+                      value,
+                    ) =>
+                      update(
+                        "duration",
+                        parseNumber(
+                          value,
+                        ),
+                      )
+                    }
+                  />
+                </Field>
+              )}
+
+              {fields.weight && (
                 <Field label="Charge (kg)">
-                  <Input
+                  <TextInput
                     type="number"
                     min={0}
-                    step={0.5}
-                    value={state.weight}
-                    onChange={setNumber(
-                      "weight",
-                    )}
+                    step={0.25}
+                    value={
+                      state.weight
+                    }
+                    onChange={(
+                      value,
+                    ) =>
+                      update(
+                        "weight",
+                        parseNumber(
+                          value,
+                        ),
+                      )
+                    }
                   />
                 </Field>
               )}
 
-              {trackingFields.assistance && (
-                <div className="col-span-2">
-                  <Field label="Assistance par défaut">
-                    <Select
-                      value={state.assistance}
-                      onChange={setText(
-                        "assistance",
-                      )}
-                      options={ASSISTANCE_OPTIONS.map(
-                        (assistance) => ({
-                          value: assistance,
-                          label: assistance,
-                        }),
-                      )}
-                    />
-                  </Field>
-                </div>
+              {fields.secondaryWeight && (
+                <Field label="Deuxième charge (kg)">
+                  <TextInput
+                    type="number"
+                    min={0}
+                    step={0.25}
+                    value={
+                      state.secondaryWeight
+                    }
+                    onChange={(
+                      value,
+                    ) =>
+                      update(
+                        "secondaryWeight",
+                        parseNumber(
+                          value,
+                        ),
+                      )
+                    }
+                  />
+                </Field>
+              )}
+
+              {shouldShowProgressionValue(
+                state,
+              ) && (
+                <Field
+                  label={
+                    state.id ===
+                    "suspension-slopers"
+                      ? "Angle par défaut (°)"
+                      : "Valeur de progression"
+                  }
+                >
+                  <TextInput
+                    type="number"
+                    min={0}
+                    step={1}
+                    value={
+                      state.progressionValue
+                    }
+                    onChange={(
+                      value,
+                    ) =>
+                      update(
+                        "progressionValue",
+                        parseNumber(
+                          value,
+                        ),
+                      )
+                    }
+                  />
+                </Field>
               )}
             </div>
-          </div>
 
-          <Field label="Apparaît dans les séances">
-            <div className="space-y-2 pt-1">
-              {SESSIONS.map((session) => {
-                const selected =
-                  state.sessionIds.includes(
-                    session.id,
-                  );
+            {fields.assistance && (
+              <Field label="Assistance">
+                <select
+                  value={
+                    state.assistance
+                  }
+                  onChange={(
+                    event,
+                  ) =>
+                    update(
+                      "assistance",
+                      event.target.value,
+                    )
+                  }
+                  className="w-full rounded-xl border border-border bg-card px-3 py-3 text-sm text-white"
+                >
+                  {ASSISTANCE_OPTIONS.map(
+                    (
+                      option,
+                    ) => (
+                      <option
+                        key={
+                          option
+                        }
+                        value={
+                          option
+                        }
+                      >
+                        {
+                          option
+                        }
+                      </option>
+                    ),
+                  )}
+                </select>
+              </Field>
+            )}
 
-                return (
-                  <button
-                    key={session.id}
-                    type="button"
-                    onClick={() =>
-                      toggleSession(session.id)
+            {fields.band && (
+              <div className="grid grid-cols-2 gap-3">
+                <Field label="Élastique">
+                  <select
+                    value={
+                      state.bandColor
                     }
-                    className="flex w-full items-center gap-3 rounded-xl border border-border bg-card px-3 py-3 text-left"
+                    onChange={(
+                      event,
+                    ) =>
+                      update(
+                        "bandColor",
+                        event.target
+                          .value as ResistanceBandColor,
+                      )
+                    }
+                    className="w-full rounded-xl border border-border bg-card px-3 py-3 text-sm text-white"
                   >
-                    <div
-                      className={`flex h-5 w-5 flex-shrink-0 items-center justify-center rounded border transition-colors ${
-                        selected
-                          ? "border-white bg-white"
-                          : "border-border bg-transparent"
-                      }`}
-                    >
-                      {selected && (
-                        <Check
-                          size={12}
-                          className="text-black"
-                        />
-                      )}
-                    </div>
+                    {RESISTANCE_BAND_OPTIONS.map(
+                      (
+                        band,
+                      ) => (
+                        <option
+                          key={
+                            band.id
+                          }
+                          value={
+                            band.id
+                          }
+                        >
+                          {
+                            band.label
+                          }
+                        </option>
+                      ),
+                    )}
+                  </select>
+                </Field>
 
-                    <span className="text-sm text-white">
-                      {session.name}
-                    </span>
-                  </button>
-                );
-              })}
+                <Field label="Étirement">
+                  <TextInput
+                    type="number"
+                    min={0}
+                    step={0.25}
+                    value={
+                      state.bandStretch
+                    }
+                    onChange={(
+                      value,
+                    ) =>
+                      update(
+                        "bandStretch",
+                        parseNumber(
+                          value,
+                        ),
+                      )
+                    }
+                  />
+                </Field>
+              </div>
+            )}
+          </section>
+
+          {fields.variant && (
+            <Field label="Variantes — une par ligne">
+              <textarea
+                value={
+                  state.variantOptionsText
+                }
+                onChange={(
+                  event,
+                ) =>
+                  update(
+                    "variantOptionsText",
+                    event.target.value,
+                  )
+                }
+                className="min-h-28 w-full resize-none rounded-xl border border-border bg-card px-3 py-3 text-sm text-white"
+              />
+            </Field>
+          )}
+
+          {fields.secondaryReps && (
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Nom reps 1">
+                <TextInput
+                  value={
+                    state.primaryRepsLabel
+                  }
+                  onChange={(
+                    value,
+                  ) =>
+                    update(
+                      "primaryRepsLabel",
+                      value,
+                    )
+                  }
+                />
+              </Field>
+
+              <Field label="Nom reps 2">
+                <TextInput
+                  value={
+                    state.secondaryRepsLabel
+                  }
+                  onChange={(
+                    value,
+                  ) =>
+                    update(
+                      "secondaryRepsLabel",
+                      value,
+                    )
+                  }
+                />
+              </Field>
+            </div>
+          )}
+
+          {fields.weight && (
+            <Field label="Nom du champ de charge">
+              <TextInput
+                value={
+                  state.primaryWeightLabel
+                }
+                onChange={(
+                  value,
+                ) =>
+                  update(
+                    "primaryWeightLabel",
+                    value,
+                  )
+                }
+              />
+            </Field>
+          )}
+
+          {fields.secondaryWeight && (
+            <Field label="Nom de la deuxième charge">
+              <TextInput
+                value={
+                  state.secondaryWeightLabel
+                }
+                onChange={(
+                  value,
+                ) =>
+                  update(
+                    "secondaryWeightLabel",
+                    value,
+                  )
+                }
+              />
+            </Field>
+          )}
+
+          <section className="space-y-2">
+            <ToggleRow
+              selected={
+                state.totalWeight
+              }
+              label="Utiliser une charge totale"
+              onClick={() =>
+                update(
+                  "totalWeight",
+                  !state.totalWeight,
+                )
+              }
+            />
+
+            <ToggleRow
+              selected={
+                state.perSide
+              }
+              label="Réaliser de chaque côté"
+              onClick={() =>
+                update(
+                  "perSide",
+                  !state.perSide,
+                )
+              }
+            />
+
+            <ToggleRow
+              selected={
+                state.isHangboard
+              }
+              label="Utiliser le hangboard"
+              onClick={() =>
+                update(
+                  "isHangboard",
+                  !state.isHangboard,
+                )
+              }
+            />
+          </section>
+
+          <Field label="Afficher dans les séances">
+            <div className="space-y-2">
+              {SESSIONS.filter(
+                (session) =>
+                  session.id !==
+                  "grimpe-libre",
+              ).map(
+                (
+                  session,
+                ) => {
+                  const selected =
+                    state.sessionIds.includes(
+                      session.id,
+                    );
+
+                  return (
+                    <button
+                      key={
+                        session.id
+                      }
+                      type="button"
+                      onClick={() =>
+                        toggleSession(
+                          session.id,
+                        )
+                      }
+                      className="flex w-full items-center gap-3 rounded-xl border border-border bg-card px-3 py-3 text-left"
+                    >
+                      <span
+                        className={cn(
+                          "flex h-5 w-5 items-center justify-center rounded border",
+
+                          selected
+                            ? "border-white bg-white"
+                            : "border-border",
+                        )}
+                      >
+                        {selected && (
+                          <Check
+                            size={12}
+                            className="text-black"
+                          />
+                        )}
+                      </span>
+
+                      <span className="text-sm text-white">
+                        {
+                          session.name
+                        }
+                      </span>
+                    </button>
+                  );
+                },
+              )}
             </div>
           </Field>
         </div>
 
-        {/* Boutons fixes au-dessus du bas d’écran */}
-        <div className="flex flex-shrink-0 gap-3 border-t border-border bg-background px-5 py-4 pb-[calc(env(safe-area-inset-bottom)+16px)]">
+        <footer className="flex gap-3 border-t border-border bg-background px-5 py-4 pb-[calc(env(safe-area-inset-bottom)+16px)]">
           <button
             type="button"
-            onClick={onCancel}
-            className="flex-1 rounded-xl border border-border py-3 text-sm font-medium text-muted-foreground transition-colors hover:bg-white/5"
+            onClick={
+              onClose
+            }
+            className="flex-1 rounded-xl border border-border py-3 text-sm font-bold text-muted-foreground"
           >
             Annuler
           </button>
 
           <button
             type="button"
-            onClick={onSave}
+            onClick={
+              onSave
+            }
             disabled={
               !state.name.trim() ||
               !state.category.trim()
             }
-            className="flex-1 rounded-xl bg-white py-3 text-sm font-bold text-black transition-colors hover:bg-white/90 disabled:opacity-40"
+            className="flex-1 rounded-xl bg-white py-3 text-sm font-black text-black disabled:opacity-40"
           >
             Enregistrer
           </button>
-        </div>
+        </footer>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 
-/* ── Gestionnaire principal ──────────────────────────────────────────────── */
+// ─────────────────────────────────────────────────────────────────────────────
+// Main component
+// ─────────────────────────────────────────────────────────────────────────────
 
 export function ExerciseManager() {
   const {
     data,
+
     addExercise,
     deleteExercise,
     restoreExercise,
+
     updateExerciseOverride,
     updateExerciseDefault,
+
     setExerciseCategoryOrder,
+
     addCategory,
     renameCategory,
     deleteCategory,
-  } = useClimbTrack();
+  } =
+    useClimbTrack();
 
-  const { toast } = useToast();
+  const {
+    toast,
+  } =
+    useToast();
 
-  const categories = getAllCategories(data);
-  const allExercises =
-    getAllManagedExercises(data);
-  const overrides =
-    data.exerciseOverrides ?? {};
-
-  const [collapsed, setCollapsed] = useState<
-    Record<string, boolean>
-  >({});
-
-  const [editState, setEditState] =
-    useState<EditState | null>(null);
-
-  const [
-    editingCategory,
-    setEditingCategory,
-  ] = useState<string | null>(null);
-
-  const [
-    newCategoryInput,
-    setNewCategoryInput,
-  ] = useState("");
-
-  const [
-    renameCategoryInput,
-    setRenameCategoryInput,
-  ] = useState("");
-
-  const [
-    showNewCategoryInput,
-    setShowNewCategoryInput,
-  ] = useState(false);
-
-  const toggleCollapse = (category: string) => {
-    setCollapsed((previous) => ({
-      ...previous,
-      [category]: !previous[category],
-    }));
-  };
-
-  const exercisesByCategory = (
-    category: string,
-  ) => {
-    const orderedIds =
-      data.exerciseCategoryOrder?.[category];
-
-    const exercises = allExercises.filter(
-      (exercise) =>
-        exercise.category === category,
+  const categories =
+    useMemo(
+      () =>
+        getAllCategories(
+          data,
+        ),
+      [
+        data,
+      ],
     );
 
+  const allExercises =
+    useMemo(
+      () =>
+        getAllManagedExercises(
+          data,
+        ),
+      [
+        data,
+      ],
+    );
+
+  const [
+    collapsedCategories,
+    setCollapsedCategories,
+  ] =
+    useState<
+      Record<
+        string,
+        boolean
+      >
+    >({});
+
+  const [
+    editState,
+    setEditState,
+  ] =
+    useState<EditState | null>(
+      null,
+    );
+
+  const [
+    addingCategory,
+    setAddingCategory,
+  ] =
+    useState(
+      false,
+    );
+
+  const [
+    newCategoryName,
+    setNewCategoryName,
+  ] =
+    useState("");
+
+  function getExercisesByCategory(
+    category: string,
+  ): ExerciseDef[] {
+    const exercises =
+      allExercises.filter(
+        (exercise) =>
+          exercise.category ===
+          category,
+      );
+
+    const savedOrder =
+      data.exerciseCategoryOrder[
+        category
+      ];
+
     if (
-      !orderedIds ||
-      orderedIds.length === 0
+      !savedOrder ||
+      savedOrder.length ===
+        0
     ) {
       return exercises;
     }
 
-    const orderedExercises = orderedIds
-      .map((id) =>
-        exercises.find(
-          (exercise) =>
-            exercise.id === id,
-        ),
-      )
-      .filter(
-        (
-          exercise,
-        ): exercise is ExerciseDef =>
-          exercise !== undefined,
-      );
+    const ordered =
+      savedOrder
+        .map(
+          (
+            exerciseId,
+          ) =>
+            exercises.find(
+              (
+                exercise,
+              ) =>
+                exercise.id ===
+                exerciseId,
+            ),
+        )
+        .filter(
+          (
+            exercise,
+          ): exercise is ExerciseDef =>
+            Boolean(
+              exercise,
+            ),
+        );
 
-    const remainingExercises =
+    const remaining =
       exercises.filter(
         (exercise) =>
-          !orderedIds.includes(exercise.id),
+          !savedOrder.includes(
+            exercise.id,
+          ),
       );
 
     return [
-      ...orderedExercises,
-      ...remainingExercises,
+      ...ordered,
+      ...remaining,
     ];
-  };
+  }
 
-  const moveExercise = (
+  function moveExercise(
     category: string,
     exerciseId: string,
     direction: -1 | 1,
-  ) => {
+  ) {
     const exercises =
-      exercisesByCategory(category);
+      getExercisesByCategory(
+        category,
+      ).filter(
+        (exercise) =>
+          !isExerciseHidden(
+            exercise.id,
+            data,
+          ),
+      );
 
     const currentIndex =
       exercises.findIndex(
         (exercise) =>
-          exercise.id === exerciseId,
+          exercise.id ===
+          exerciseId,
       );
 
-    if (currentIndex === -1) return;
-
-    const newIndex =
-      currentIndex + direction;
+    const nextIndex =
+      currentIndex +
+      direction;
 
     if (
-      newIndex < 0 ||
-      newIndex >= exercises.length
+      currentIndex < 0 ||
+      nextIndex < 0 ||
+      nextIndex >=
+        exercises.length
     ) {
       return;
     }
 
-    const newOrder = exercises.map(
-      (exercise) => exercise.id,
-    );
+    const orderedIds =
+      exercises.map(
+        (exercise) =>
+          exercise.id,
+      );
 
     [
-      newOrder[currentIndex],
-      newOrder[newIndex],
+      orderedIds[
+        currentIndex
+      ],
+      orderedIds[
+        nextIndex
+      ],
     ] = [
-      newOrder[newIndex],
-      newOrder[currentIndex],
+      orderedIds[
+        nextIndex
+      ],
+      orderedIds[
+        currentIndex
+      ],
     ];
 
     setExerciseCategoryOrder(
       category,
-      newOrder,
+      orderedIds,
     );
-  };
+  }
 
-  const handleSave = () => {
+  function saveExercise() {
     if (
-      !editState ||
-      !editState.name.trim()
+      !editState
     ) {
       return;
     }
 
-    const trackingFields =
-      TRACKING_HAS[editState.tracking];
+    const fields =
+      TRACKING_HAS[
+        editState.tracking
+      ];
 
-    const defaults = {
-      sets: editState.sets,
-      restSeconds:
-        editState.restSeconds,
+    const defaults: ExerciseDefaults =
+      {
+        sets:
+          editState.sets,
 
-      ...(trackingFields.reps && {
-        reps: editState.reps,
-      }),
+        restSeconds:
+          editState.restSeconds,
 
-      ...(trackingFields.duration && {
-        duration: editState.duration,
-      }),
+        ...(fields.reps
+          ? {
+              reps:
+                editState.reps,
+            }
+          : {}),
 
-      ...(trackingFields.weight && {
-        weight: editState.weight,
-      }),
+        ...(fields.secondaryReps
+          ? {
+              secondaryReps:
+                editState.secondaryReps,
+            }
+          : {}),
 
-      ...(trackingFields.assistance && {
-        assistance:
-          editState.assistance,
-      }),
+        ...(fields.duration
+          ? {
+              duration:
+                editState.duration,
+            }
+          : {}),
+
+        ...(fields.weight
+          ? {
+              weight:
+                editState.weight,
+            }
+          : {}),
+
+        ...(fields.secondaryWeight
+          ? {
+              secondaryWeight:
+                editState.secondaryWeight,
+            }
+          : {}),
+
+        ...(fields.assistance
+          ? {
+              assistance:
+                editState.assistance,
+            }
+          : {}),
+
+        ...(fields.band
+          ? {
+              bandColor:
+                editState.bandColor,
+
+              bandStretch:
+                editState.bandStretch,
+            }
+          : {}),
+
+        ...(shouldShowProgressionValue(
+          editState,
+        )
+          ? {
+              progressionValue:
+                editState.progressionValue,
+            }
+          : {}),
+      };
+
+    const variantOptions =
+      editState.variantOptionsText
+        .split("\n")
+        .map(
+          (variant) =>
+            variant.trim(),
+        )
+        .filter(
+          Boolean,
+        );
+
+    /*
+     * Un exercice de hangboard doit conserver ses options
+     * d'assistance même si le type de tracking lui-même
+     * n'est pas "assistance".
+     */
+    const shouldKeepAssistanceOptions =
+      fields.assistance ||
+      editState.isHangboard;
+
+    const commonDefinition = {
+      name:
+        editState.name.trim(),
+
+      description:
+        editState.description.trim(),
+
+      category:
+        editState.category,
+
+      tracking:
+        editState.tracking,
+
+      sessionIds:
+        editState.sessionIds,
+
+      isHangboard:
+        editState.isHangboard,
+
+      totalWeight:
+        editState.totalWeight,
+
+      perSide:
+        editState.perSide,
+
+      variantOptions:
+        fields.variant
+          ? variantOptions
+          : undefined,
+
+      bandOptions:
+        fields.band
+          ? RESISTANCE_BAND_OPTIONS.map(
+              (band) =>
+                band.id,
+            )
+          : undefined,
+
+      primaryRepsLabel:
+        editState.primaryRepsLabel.trim() ||
+        undefined,
+
+      secondaryRepsLabel:
+        editState.secondaryRepsLabel.trim() ||
+        undefined,
+
+      primaryWeightLabel:
+        editState.primaryWeightLabel.trim() ||
+        undefined,
+
+      secondaryWeightLabel:
+        editState.secondaryWeightLabel.trim() ||
+        undefined,
+
+      assistanceOptions:
+        shouldKeepAssistanceOptions
+          ? ASSISTANCE_OPTIONS
+          : undefined,
     };
 
-    if (editState.id === null) {
+    if (
+      editState.id ===
+      null
+    ) {
       addExercise({
-        name: editState.name.trim(),
-        description:
-          editState.description.trim(),
-        category: editState.category,
-        tracking: editState.tracking,
-        defaultValues: defaults,
-        sessionIds: editState.sessionIds,
-        isHangboard:
-          editState.isHangboard,
+        ...commonDefinition,
 
-        ...(editState.isHangboard && {
-          assistanceOptions:
-            ASSISTANCE_OPTIONS,
-        }),
+        defaultValues:
+          defaults,
       });
 
       toast({
-        title: "Exercice ajouté",
-        description:
-          editState.name.trim(),
+        title:
+          "Exercice ajouté",
       });
     } else {
+      /*
+       * Modifier directement l'exercice existant.
+       *
+       * L'ID ne change jamais :
+       * l'historique associé reste donc intact.
+       */
       updateExerciseOverride(
         editState.id,
         {
-          name: editState.name.trim(),
+          name:
+            commonDefinition.name,
+
           description:
-            editState.description.trim(),
+            commonDefinition.description,
+
           category:
-            editState.category,
+            commonDefinition.category,
+
           tracking:
-            editState.tracking,
+            commonDefinition.tracking,
+
           sessionIds:
-            editState.sessionIds,
+            commonDefinition.sessionIds,
+
+          isHangboard:
+            commonDefinition.isHangboard,
+
+          totalWeight:
+            commonDefinition.totalWeight,
+
+          perSide:
+            commonDefinition.perSide,
+
+          variantOptions:
+            commonDefinition.variantOptions,
+
+          bandOptions:
+            commonDefinition.bandOptions,
+
+          primaryRepsLabel:
+            commonDefinition.primaryRepsLabel,
+
+          secondaryRepsLabel:
+            commonDefinition.secondaryRepsLabel,
+
+          primaryWeightLabel:
+            commonDefinition.primaryWeightLabel,
+
+          secondaryWeightLabel:
+            commonDefinition.secondaryWeightLabel,
+
+          assistanceOptions:
+            commonDefinition.assistanceOptions,
         },
       );
 
@@ -774,563 +1954,526 @@ export function ExerciseManager() {
       );
 
       toast({
-        title: "Exercice mis à jour",
-        description:
-          editState.name.trim(),
+        title:
+          "Exercice modifié",
       });
     }
 
-    setEditState(null);
-  };
+    setEditState(
+      null,
+    );
+  }
 
-  const handleDelete = (
+  function hideExercise(
     exercise: ExerciseDef,
-  ) => {
-    const message = isBuiltin(exercise.id)
-      ? `Masquer « ${exercise.name} » de toutes les séances ? L’historique sera conservé.`
-      : `Supprimer « ${exercise.name} » de toutes les séances ? L’historique sera conservé.`;
-
-    if (!window.confirm(message)) return;
-
-    deleteExercise(exercise.id);
-
-    toast({
-      title: "Exercice masqué",
-      description:
-        "Les données historiques sont conservées.",
-    });
+  ) {
+    const confirmed =
+      window.confirm(
+        isBuiltin(
+          exercise.id,
+        )
+          ? `Masquer « ${exercise.name} » ?`
+          : `Masquer « ${exercise.name} » ? L’historique sera conservé.`,
+      );
 
     if (
-      editState?.id === exercise.id
+      !confirmed
     ) {
-      setEditState(null);
+      return;
     }
-  };
 
-  const handleAddCategory = () => {
+    deleteExercise(
+      exercise.id,
+    );
+  }
+
+  function createCategory() {
     const name =
-      newCategoryInput.trim();
+      newCategoryName.trim();
 
     if (
       !name ||
-      categories.includes(name)
+      categories.includes(
+        name,
+      )
     ) {
       return;
     }
 
-    addCategory(name);
-    setNewCategoryInput("");
-    setShowNewCategoryInput(false);
-
-    toast({
-      title: "Catégorie créée",
-      description: name,
-    });
-  };
-
-  const handleRenameCategory = (
-    oldName: string,
-  ) => {
-    const newName =
-      renameCategoryInput.trim();
-
-    if (
-      !newName ||
-      newName === oldName ||
-      categories.includes(newName)
-    ) {
-      return;
-    }
-
-    renameCategory(oldName, newName);
-    setEditingCategory(null);
-    setRenameCategoryInput("");
-
-    toast({
-      title: "Catégorie renommée",
-    });
-  };
-
-  const handleDeleteCategory = (
-    categoryName: string,
-  ) => {
-    const customCategory =
-      !BUILTIN_CATEGORIES.includes(
-        categoryName,
-      );
-
-    const exercisesInCategory =
-      allExercises.filter(
-        (exercise) =>
-          exercise.category ===
-            categoryName &&
-          !isExerciseHidden(
-            exercise.id,
-            data,
-          ),
-      );
-
-    if (
-      exercisesInCategory.length > 0 &&
-      !customCategory
-    ) {
-      toast({
-        variant: "destructive",
-        title: "Impossible",
-        description:
-          "Réassigne d’abord les exercices de cette catégorie.",
-      });
-
-      return;
-    }
-
-    const fallbackCategory =
-      categories.find(
-        (category) =>
-          category !== categoryName,
-      ) ?? "Musculation";
-
-    const message =
-      exercisesInCategory.length > 0
-        ? `Supprimer « ${categoryName} » ? Les ${exercisesInCategory.length} exercice(s) seront déplacés vers « ${fallbackCategory} ».`
-        : `Supprimer la catégorie « ${categoryName} » ?`;
-
-    if (!window.confirm(message)) {
-      return;
-    }
-
-    deleteCategory(
-      categoryName,
-      fallbackCategory,
+    addCategory(
+      name,
     );
 
-    setEditingCategory(null);
+    setNewCategoryName(
+      "",
+    );
 
-    toast({
-      title: "Catégorie supprimée",
-    });
-  };
+    setAddingCategory(
+      false,
+    );
+  }
 
   return (
     <>
       <div className="space-y-4">
-        {/* Nouvelle catégorie */}
-        {showNewCategoryInput ? (
+        {addingCategory ? (
           <div className="flex gap-2">
             <input
               autoFocus
-              value={newCategoryInput}
-              onChange={(event) =>
-                setNewCategoryInput(
+              value={
+                newCategoryName
+              }
+              onChange={(
+                event,
+              ) =>
+                setNewCategoryName(
                   event.target.value,
                 )
               }
-              onKeyDown={(event) => {
-                if (event.key === "Enter") {
-                  handleAddCategory();
-                }
-
-                if (
-                  event.key === "Escape"
-                ) {
-                  setShowNewCategoryInput(
-                    false,
-                  );
-                }
-              }}
               placeholder="Nom de la catégorie"
-              className="min-w-0 flex-1 rounded-lg border border-border bg-card px-3 py-2.5 text-sm text-white placeholder:text-muted-foreground/50 focus:border-white/40 focus:outline-none"
+              className="min-w-0 flex-1 rounded-xl border border-border bg-card px-3 py-3 text-sm text-white"
             />
 
             <button
               type="button"
-              onClick={handleAddCategory}
-              className="rounded-lg bg-white p-2.5 text-black hover:bg-white/90"
+              onClick={
+                createCategory
+              }
+              className="rounded-xl bg-white p-3 text-black"
+              aria-label="Ajouter la catégorie"
             >
-              <Check size={18} />
+              <Check
+                size={18}
+              />
             </button>
 
             <button
               type="button"
-              onClick={() =>
-                setShowNewCategoryInput(
+              onClick={() => {
+                setAddingCategory(
                   false,
-                )
-              }
-              className="rounded-lg border border-border p-2.5 text-muted-foreground hover:bg-white/5"
+                );
+
+                setNewCategoryName(
+                  "",
+                );
+              }}
+              className="rounded-xl border border-border p-3 text-muted-foreground"
+              aria-label="Annuler"
             >
-              <X size={18} />
+              <X
+                size={18}
+              />
             </button>
           </div>
         ) : (
           <button
             type="button"
             onClick={() =>
-              setShowNewCategoryInput(true)
+              setAddingCategory(
+                true,
+              )
             }
-            className="flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-border py-3 text-sm text-muted-foreground transition-colors hover:border-white/30 hover:text-white"
+            className="flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-border py-3 text-sm text-muted-foreground"
           >
-            <FolderPlus size={16} />
-            Nouvelle catégorie
+            <FolderPlus
+              size={16}
+            />
+
+            Ajouter une catégorie
           </button>
         )}
 
-        {/* Catégories */}
-        {categories.map((category) => {
-          const exercises =
-            exercisesByCategory(category);
+        {categories.map(
+          (
+            category,
+          ) => {
+            const exercises =
+              getExercisesByCategory(
+                category,
+              );
 
-          const visibleExercises =
-            exercises.filter(
-              (exercise) =>
-                !isExerciseHidden(
-                  exercise.id,
-                  data,
-                ),
-            );
+            const visibleExercises =
+              exercises.filter(
+                (exercise) =>
+                  !isExerciseHidden(
+                    exercise.id,
+                    data,
+                  ),
+              );
 
-          const hiddenExercises =
-            exercises.filter((exercise) =>
-              isExerciseHidden(
-                exercise.id,
-                data,
-              ),
-            );
+            const hiddenExercises =
+              exercises.filter(
+                (exercise) =>
+                  isExerciseHidden(
+                    exercise.id,
+                    data,
+                  ),
+              );
 
-          const isOpen =
-            !collapsed[category];
+            const isCollapsed =
+              collapsedCategories[
+                category
+              ] ??
+              false;
 
-          const isCustomCategory =
-            !BUILTIN_CATEGORIES.includes(
-              category,
-            );
+            const isCustomCategory =
+              !BUILTIN_CATEGORIES.includes(
+                category,
+              );
 
-          return (
-            <div
-              key={category}
-              className="overflow-hidden rounded-xl border border-border bg-card"
-            >
-              {/* En-tête catégorie */}
-              <div className="flex items-center gap-2 px-4 py-3">
-                <button
-                  type="button"
-                  onClick={() =>
-                    toggleCollapse(category)
-                  }
-                  className="flex min-w-0 flex-1 items-center gap-2 text-left"
-                >
-                  {isOpen ? (
-                    <ChevronDown
-                      size={16}
-                      className="flex-shrink-0 text-muted-foreground"
-                    />
-                  ) : (
-                    <ChevronRight
-                      size={16}
-                      className="flex-shrink-0 text-muted-foreground"
-                    />
-                  )}
+            return (
+              <section
+                key={
+                  category
+                }
+                className="overflow-hidden rounded-xl border border-border bg-card"
+              >
+                <div className="flex items-center gap-2 px-4 py-3">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setCollapsedCategories(
+                        (
+                          previous,
+                        ) => ({
+                          ...previous,
 
-                  {editingCategory ===
-                  category ? (
-                    <input
-                      autoFocus
-                      value={
-                        renameCategoryInput
+                          [category]:
+                            !isCollapsed,
+                        }),
+                      )
+                    }
+                    className="flex min-w-0 flex-1 items-center gap-2 text-left"
+                  >
+                    {isCollapsed ? (
+                      <ChevronRight
+                        size={16}
+                      />
+                    ) : (
+                      <ChevronDown
+                        size={16}
+                      />
+                    )}
+
+                    <span className="truncate text-sm font-black uppercase text-white">
+                      {
+                        category
                       }
-                      onChange={(event) =>
-                        setRenameCategoryInput(
-                          event.target.value,
-                        )
-                      }
-                      onKeyDown={(event) => {
-                        event.stopPropagation();
+                    </span>
 
-                        if (
-                          event.key ===
-                          "Enter"
-                        ) {
-                          handleRenameCategory(
+                    <span className="text-xs text-muted-foreground">
+                      (
+                      {
+                        visibleExercises.length
+                      }
+                      )
+                    </span>
+                  </button>
+
+                  {isCustomCategory && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const newName =
+                          window.prompt(
+                            "Nouveau nom de la catégorie",
                             category,
-                          );
-                        }
+                          )?.trim();
 
                         if (
-                          event.key ===
-                          "Escape"
+                          newName &&
+                          newName !==
+                            category
                         ) {
-                          setEditingCategory(
-                            null,
+                          renameCategory(
+                            category,
+                            newName,
                           );
                         }
                       }}
-                      onClick={(event) =>
-                        event.stopPropagation()
-                      }
-                      className="min-w-0 flex-1 border-b border-white/40 bg-transparent text-sm font-bold text-white focus:outline-none"
-                    />
-                  ) : (
-                    <span className="truncate text-sm font-bold uppercase tracking-wide text-white">
-                      {category}
-                    </span>
+                      className="rounded-lg p-2 text-muted-foreground"
+                      aria-label="Modifier la catégorie"
+                    >
+                      <Pencil
+                        size={14}
+                      />
+                    </button>
                   )}
 
-                  <span className="ml-1 flex-shrink-0 text-xs text-muted-foreground">
-                    ({visibleExercises.length})
-                  </span>
-                </button>
-
-                <div className="flex flex-shrink-0 gap-1">
-                  {editingCategory ===
-                  category ? (
-                    <>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          handleRenameCategory(
-                            category,
-                          )
-                        }
-                        className="rounded-lg p-1.5 text-white hover:bg-white/10"
-                      >
-                        <Check size={14} />
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setEditingCategory(
-                            null,
-                          )
-                        }
-                        className="rounded-lg p-1.5 text-muted-foreground hover:bg-white/10"
-                      >
-                        <X size={14} />
-                      </button>
-                    </>
-                  ) : (
-                    <>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setEditingCategory(
-                            category,
-                          );
-
-                          setRenameCategoryInput(
-                            category,
-                          );
-                        }}
-                        className="rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-white/10 hover:text-white"
-                      >
-                        <Pencil size={14} />
-                      </button>
-
-                      {isCustomCategory && (
-                        <button
-                          type="button"
-                          onClick={() =>
-                            handleDeleteCategory(
+                  {isCustomCategory && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const fallback =
+                          categories.find(
+                            (
+                              current,
+                            ) =>
+                              current !==
                               category,
-                            )
-                          }
-                          className="rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-destructive/20 hover:text-destructive"
-                        >
-                          <Trash2 size={14} />
-                        </button>
-                      )}
-                    </>
+                          ) ??
+                          "Musculation";
+
+                        const confirmed =
+                          window.confirm(
+                            `Supprimer « ${category} » ? Ses exercices iront dans « ${fallback} ».`,
+                          );
+
+                        if (
+                          confirmed
+                        ) {
+                          deleteCategory(
+                            category,
+                            fallback,
+                          );
+                        }
+                      }}
+                      className="rounded-lg p-2 text-muted-foreground"
+                      aria-label="Supprimer la catégorie"
+                    >
+                      <Trash2
+                        size={14}
+                      />
+                    </button>
                   )}
                 </div>
-              </div>
 
-              {/* Liste des exercices */}
-              {isOpen && (
-                <div className="divide-y divide-border/50 border-t border-border">
-                  {visibleExercises.map(
-                    (exercise, index) => (
-                      <div
-                        key={exercise.id}
-                        className="flex items-center gap-2 px-4 py-3"
-                      >
-                        <div className="flex flex-shrink-0 flex-col gap-0.5">
-                          <button
-                            type="button"
-                            onClick={() =>
-                              moveExercise(
-                                category,
-                                exercise.id,
-                                -1,
-                              )
-                            }
-                            disabled={index === 0}
-                            className="rounded p-0.5 text-muted-foreground transition-colors hover:text-white disabled:pointer-events-none disabled:opacity-20"
-                          >
-                            <ArrowUp size={14} />
-                          </button>
-
-                          <button
-                            type="button"
-                            onClick={() =>
-                              moveExercise(
-                                category,
-                                exercise.id,
-                                1,
-                              )
-                            }
-                            disabled={
-                              index ===
-                              visibleExercises.length -
-                                1
-                            }
-                            className="rounded p-0.5 text-muted-foreground transition-colors hover:text-white disabled:pointer-events-none disabled:opacity-20"
-                          >
-                            <ArrowDown
-                              size={14}
-                            />
-                          </button>
-                        </div>
-
-                        <span className="min-w-0 flex-1 truncate text-sm text-white">
-                          {exercise.name}
-                        </span>
-
-                        <div className="flex flex-shrink-0 gap-1">
-                          {overrides[
+                {!isCollapsed && (
+                  <div className="divide-y divide-border/50 border-t border-border">
+                    {visibleExercises.map(
+                      (
+                        exercise,
+                        index,
+                      ) => (
+                        <div
+                          key={
                             exercise.id
-                          ] && (
+                          }
+                          className="flex items-center gap-2 px-3 py-3"
+                        >
+                          <div className="flex flex-col">
                             <button
                               type="button"
-                              onClick={() =>
-                                toast({
-                                  title:
-                                    "Exercice modifié",
-                                  description:
-                                    "Les valeurs d’origine peuvent être restaurées depuis les réglages.",
-                                })
+                              disabled={
+                                index ===
+                                0
                               }
-                              className="rounded-lg p-1.5 text-muted-foreground/50 transition-colors hover:bg-white/10 hover:text-muted-foreground"
-                              title="Modifié"
+                              onClick={() =>
+                                moveExercise(
+                                  category,
+                                  exercise.id,
+                                  -1,
+                                )
+                              }
+                              className="p-0.5 text-muted-foreground disabled:opacity-20"
+                              aria-label="Monter"
                             >
-                              <RotateCcw
-                                size={13}
+                              <ArrowUp
+                                size={14}
                               />
                             </button>
+
+                            <button
+                              type="button"
+                              disabled={
+                                index ===
+                                visibleExercises.length -
+                                  1
+                              }
+                              onClick={() =>
+                                moveExercise(
+                                  category,
+                                  exercise.id,
+                                  1,
+                                )
+                              }
+                              className="p-0.5 text-muted-foreground disabled:opacity-20"
+                              aria-label="Descendre"
+                            >
+                              <ArrowDown
+                                size={14}
+                              />
+                            </button>
+                          </div>
+
+                          <div className="min-w-0 flex-1">
+                            <div className="flex flex-wrap items-center gap-1.5">
+                              <p className="truncate text-sm font-bold text-white">
+                                {
+                                  exercise.name
+                                }
+                              </p>
+
+                              <span
+                                className={cn(
+                                  "rounded-full border px-1.5 py-0.5 text-[8px] font-black uppercase tracking-wide",
+
+                                  isBuiltin(
+                                    exercise.id,
+                                  )
+                                    ? "border-white/15 bg-white/5 text-muted-foreground"
+                                    : "border-blue-400/30 bg-blue-400/10 text-blue-300",
+                                )}
+                              >
+                                {isBuiltin(
+                                  exercise.id,
+                                )
+                                  ? "De base"
+                                  : "Personnalisé"}
+                              </span>
+                            </div>
+
+                            <p className="mt-1 line-clamp-2 text-[10px] leading-relaxed text-muted-foreground">
+                              {getDefaultsSummary(
+                                exercise,
+                                data,
+                              )}
+                            </p>
+                          </div>
+
+                          {data.exerciseOverrides[
+                            exercise.id
+                          ] && (
+                            <RotateCcw
+                              size={13}
+                              className="flex-shrink-0 text-muted-foreground"
+                              aria-label="Modifié"
+                            />
                           )}
 
                           <button
                             type="button"
                             onClick={() =>
                               setEditState(
-                                exerciseToEdit(
+                                exerciseToEditState(
                                   exercise,
                                   data,
                                 ),
                               )
                             }
-                            className="rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-white/10 hover:text-white"
-                            aria-label={`Modifier ${exercise.name}`}
+                            className="rounded-lg p-2 text-muted-foreground"
+                            aria-label="Modifier"
                           >
-                            <Pencil size={15} />
+                            <Pencil
+                              size={15}
+                            />
                           </button>
 
                           <button
                             type="button"
                             onClick={() =>
-                              handleDelete(
+                              hideExercise(
                                 exercise,
                               )
                             }
-                            className="rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-destructive/20 hover:text-destructive"
-                            aria-label={`Supprimer ${exercise.name}`}
+                            className="rounded-lg p-2 text-muted-foreground"
+                            aria-label="Masquer"
                           >
-                            <Trash2 size={15} />
+                            <Trash2
+                              size={15}
+                            />
                           </button>
                         </div>
-                      </div>
-                    ),
-                  )}
+                      ),
+                    )}
 
-                  {/* Exercices masqués */}
-                  {hiddenExercises.length >
-                    0 && (
-                    <div className="px-4 py-3">
-                      <p className="mb-2 text-xs text-muted-foreground/50">
-                        Masqués (
-                        {hiddenExercises.length})
-                      </p>
+                    {hiddenExercises.length >
+                      0 && (
+                      <div className="space-y-2 px-4 py-3">
+                        <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
+                          Masqués
+                        </p>
 
-                      {hiddenExercises.map(
-                        (exercise) => (
-                          <div
-                            key={exercise.id}
-                            className="flex items-center gap-2 py-1.5"
-                          >
-                            <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground/50 line-through">
-                              {exercise.name}
-                            </span>
-
-                            <button
-                              type="button"
-                              onClick={() => {
-                                restoreExercise(
-                                  exercise.id,
-                                );
-
-                                toast({
-                                  title:
-                                    "Exercice restauré",
-                                  description:
-                                    exercise.name,
-                                });
-                              }}
-                              className="rounded border border-border/50 px-2 py-1 text-xs text-muted-foreground transition-colors hover:border-white/30 hover:text-white"
+                        {hiddenExercises.map(
+                          (
+                            exercise,
+                          ) => (
+                            <div
+                              key={
+                                exercise.id
+                              }
+                              className="flex items-center gap-2"
                             >
-                              Restaurer
-                            </button>
-                          </div>
-                        ),
-                      )}
-                    </div>
-                  )}
+                              <div className="min-w-0 flex-1">
+                                <span className="block truncate text-xs text-muted-foreground line-through">
+                                  {
+                                    exercise.name
+                                  }
+                                </span>
 
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setEditState(
-                        emptyEdit(category),
-                      )
-                    }
-                    className="flex w-full items-center gap-2 px-4 py-3 text-sm text-muted-foreground transition-colors hover:bg-white/5 hover:text-white"
-                  >
-                    <Plus size={15} />
-                    Ajouter un exercice
-                  </button>
-                </div>
-              )}
-            </div>
-          );
-        })}
+                                <span className="text-[9px] font-bold uppercase tracking-wide text-muted-foreground/60">
+                                  {isBuiltin(
+                                    exercise.id,
+                                  )
+                                    ? "De base"
+                                    : "Personnalisé"}
+                                </span>
+                              </div>
+
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  restoreExercise(
+                                    exercise.id,
+                                  )
+                                }
+                                className="rounded-lg border border-border px-2 py-1 text-xs text-white"
+                              >
+                                Restaurer
+                              </button>
+                            </div>
+                          ),
+                        )}
+                      </div>
+                    )}
+
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setEditState(
+                          createEmptyEdit(
+                            category,
+                          ),
+                        )
+                      }
+                      className="flex w-full items-center gap-2 px-4 py-3 text-left text-sm text-muted-foreground"
+                    >
+                      <Plus
+                        size={15}
+                      />
+
+                      Ajouter un exercice
+                    </button>
+                  </div>
+                )}
+              </section>
+            );
+          },
+        )}
       </div>
 
-      {/* Portal : la fenêtre est placée directement dans le body */}
-      {editState &&
-        createPortal(
-          <ExerciseEditSheet
-            state={editState}
-            setState={
-              setEditState as Dispatch<
-                SetStateAction<EditState>
-              >
-            }
-            categories={categories}
-            onSave={handleSave}
-            onCancel={() =>
-              setEditState(null)
-            }
-          />,
-          document.body,
-        )}
+      {editState && (
+        <ExerciseEditModal
+          state={
+            editState
+          }
+          categories={
+            categories
+          }
+          onChange={
+            setEditState
+          }
+          onSave={
+            saveExercise
+          }
+          onClose={() =>
+            setEditState(
+              null,
+            )
+          }
+        />
+      )}
     </>
   );
 }

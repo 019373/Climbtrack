@@ -1,57 +1,25 @@
 import {
   useEffect,
-  useRef,
   useState,
 } from "react";
 
 import {
-  createPortal,
-} from "react-dom";
-
-import {
+  Sparkles,
   X,
 } from "lucide-react";
-
-import {
-  useClimbTrack,
-} from "@/context/ClimbTrackContext";
 
 import {
   BADGE_BY_ID,
   BADGE_LEVEL_META,
 } from "@/data/badges";
 
-import type {
-  BadgeLevel,
-} from "@/data/badges";
+import {
+  useClimbTrack,
+} from "@/context/ClimbTrackContext";
 
 import {
   BadgeHex,
 } from "@/components/BadgeHex";
-
-type ActiveNotification = {
-  badgeId: string;
-  level: BadgeLevel;
-};
-
-function getBadgeLabel(
-  badgeId: string,
-): string {
-  if (
-    badgeId.startsWith(
-      "kilter-v",
-    )
-  ) {
-    return badgeId
-      .replace(
-        "kilter-",
-        "",
-      )
-      .toUpperCase();
-  }
-
-  return "";
-}
 
 export function BadgeUnlockNotifier() {
   const {
@@ -60,247 +28,112 @@ export function BadgeUnlockNotifier() {
   } = useClimbTrack();
 
   const [
-    activeNotification,
-    setActiveNotification,
-  ] =
-    useState<ActiveNotification | null>(
-      null,
-    );
-
-  const [
     isVisible,
     setIsVisible,
-  ] =
-    useState(false);
+  ] = useState(false);
 
-  const shownRef =
-    useRef(
-      new Set<string>(),
-    );
+  const notification =
+    data.pendingBadgeNotifications[0];
 
-  const closeTimeoutRef =
-    useRef<
-      ReturnType<typeof setTimeout> | null
-    >(null);
+  const badge =
+    notification
+      ? BADGE_BY_ID[
+          notification.badgeId
+        ]
+      : undefined;
 
-  const removeTimeoutRef =
-    useRef<
-      ReturnType<typeof setTimeout> | null
-    >(null);
-
-  function closeNotification() {
-    if (
-      !activeNotification
-    ) {
-      return;
-    }
-
-    setIsVisible(false);
-
-    if (
-      closeTimeoutRef.current
-    ) {
-      clearTimeout(
-        closeTimeoutRef.current,
-      );
-
-      closeTimeoutRef.current =
-        null;
-    }
-
-    if (
-      removeTimeoutRef.current
-    ) {
-      clearTimeout(
-        removeTimeoutRef.current,
-      );
-    }
-
-    removeTimeoutRef.current =
-      setTimeout(() => {
-        clearBadgeNotification(
-          activeNotification.badgeId,
-          activeNotification.level,
-        );
-
-        setActiveNotification(
-          null,
-        );
-      }, 350);
-  }
+  const levelMeta =
+    notification
+      ? BADGE_LEVEL_META[
+          notification.level
+        ]
+      : undefined;
 
   useEffect(() => {
     if (
-      activeNotification
+      notification &&
+      badge
     ) {
-      return;
-    }
-
-    const pending =
-      data.pendingBadgeNotifications ??
-      [];
-
-    const nextNotification =
-      pending.find(
-        ({
-          badgeId,
-          level,
-        }) => {
-          const key =
-            `${badgeId}-${level}`;
-
-          return !shownRef.current.has(
-            key,
-          );
-        },
-      );
-
-    if (
-      !nextNotification
-    ) {
-      return;
-    }
-
-    const badge =
-      BADGE_BY_ID[
-        nextNotification.badgeId
-      ];
-
-    if (!badge) {
-      clearBadgeNotification(
-        nextNotification.badgeId,
-        nextNotification.level,
-      );
-
-      return;
-    }
-
-    const key =
-      `${nextNotification.badgeId}-${nextNotification.level}`;
-
-    shownRef.current.add(
-      key,
-    );
-
-    setActiveNotification(
-      nextNotification,
-    );
-
-    requestAnimationFrame(
-      () => {
-        setIsVisible(true);
-      },
-    );
-
-    if (
-      "vibrate" in navigator
-    ) {
-      navigator.vibrate([
-        100,
-        50,
-        160,
-      ]);
-    }
-
-    closeTimeoutRef.current =
-      setTimeout(() => {
-        setIsVisible(false);
-
-        removeTimeoutRef.current =
-          setTimeout(() => {
-            clearBadgeNotification(
-              nextNotification.badgeId,
-              nextNotification.level,
+      const timer =
+        window.setTimeout(
+          () => {
+            setIsVisible(
+              true,
             );
+          },
+          150,
+        );
 
-            setActiveNotification(
-              null,
-            );
-          }, 350);
-      }, 5000);
+      return () =>
+        window.clearTimeout(
+          timer,
+        );
+    }
+
+    setIsVisible(
+      false,
+    );
   }, [
-    activeNotification,
-    data.pendingBadgeNotifications,
-    clearBadgeNotification,
+    notification?.badgeId,
+    notification?.level,
+    badge,
   ]);
 
-  useEffect(() => {
-    return () => {
-      if (
-        closeTimeoutRef.current
-      ) {
-        clearTimeout(
-          closeTimeoutRef.current,
-        );
-      }
-
-      if (
-        removeTimeoutRef.current
-      ) {
-        clearTimeout(
-          removeTimeoutRef.current,
-        );
-      }
-    };
-  }, []);
-
   if (
-    !activeNotification
+    !notification ||
+    !badge ||
+    !levelMeta
   ) {
     return null;
   }
 
-  const badge =
-    BADGE_BY_ID[
-      activeNotification.badgeId
-    ];
-
-  if (!badge) {
-    return null;
-  }
-
-  const isColorBadge =
-    badge.kind ===
-    "climbing-color";
-
-  const isKilterBadge =
-    badge.kind ===
-    "kilter";
-
-  const levelMeta =
-    BADGE_LEVEL_META[
-      activeNotification.level
-    ];
-
-  const badgeLabel =
-    getBadgeLabel(
-      badge.id,
+  const levelDefinition =
+    badge.levels.find(
+      (definition) =>
+        definition.level ===
+        notification.level,
     );
 
-  const glowColor =
-    isColorBadge
-      ? badge.visualColor ??
-        "#FFFFFF"
-      : levelMeta.glow;
+  const routeLabel =
+    badge.kind === "route"
+      ? notification.level ===
+        "diamond"
+        ? "Réussie en tête"
+        : "Réussie en moulinette ou en tête"
+      : null;
 
-  return createPortal(
+  function closeNotification() {
+    setIsVisible(
+      false,
+    );
+
+    window.setTimeout(
+      () => {
+        clearBadgeNotification(
+          notification.badgeId,
+          notification.level,
+        );
+      },
+      220,
+    );
+  }
+
+  return (
     <div
-      className={`fixed inset-0 z-[200000] flex items-center justify-center overflow-hidden bg-black/90 px-6 transition-opacity duration-300 ${
+      className={`fixed inset-0 z-[100000] flex items-center justify-center bg-black/80 px-5 backdrop-blur-sm transition-opacity duration-200 ${
         isVisible
           ? "opacity-100"
-          : "opacity-0"
+          : "pointer-events-none opacity-0"
       }`}
       onClick={
         closeNotification
       }
     >
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(255,255,255,0.12),transparent_60%)]" />
-
       <div
-        className={`relative z-10 flex w-full max-w-sm flex-col items-center text-center transition-all duration-500 ${
+        className={`relative w-full max-w-sm overflow-hidden rounded-3xl border border-white/15 bg-[#101010] p-6 text-center shadow-2xl transition-all duration-300 ${
           isVisible
-            ? "translate-y-0 scale-100 opacity-100"
-            : "translate-y-8 scale-90 opacity-0"
+            ? "translate-y-0 scale-100"
+            : "translate-y-5 scale-95"
         }`}
         onClick={(
           event,
@@ -313,129 +146,79 @@ export function BadgeUnlockNotifier() {
           onClick={
             closeNotification
           }
-          className="absolute -right-2 -top-10 rounded-full p-2 text-white/60 transition-colors hover:bg-white/10 hover:text-white"
+          className="absolute right-4 top-4 z-10 rounded-full border border-border bg-background/70 p-2 text-muted-foreground transition-colors hover:text-white"
           aria-label="Fermer"
         >
-          <X size={24} />
+          <X
+            size={18}
+          />
         </button>
 
-        <p className="mb-4 text-sm font-extrabold uppercase tracking-[0.25em] text-white/60">
-          Nouveau succès
-        </p>
+        <div className="pointer-events-none absolute -left-12 -top-12 h-36 w-36 rounded-full bg-white/5 blur-2xl" />
 
-        <div
-          className="relative mb-6 rounded-full p-5"
-          style={{
-            boxShadow:
-              `0 0 70px ${glowColor}`,
-          }}
-        >
-          <BadgeHex
-            icon={
-              badge.icon
-            }
-            level={
-              activeNotification.level
-            }
-            size={180}
-            kind={
-              badge.kind
-            }
-            visualColor={
-              badge.visualColor
-            }
-            label={
-              badgeLabel
-            }
-            animate
-          />
-        </div>
+        <div className="pointer-events-none absolute -bottom-14 -right-12 h-40 w-40 rounded-full bg-white/5 blur-3xl" />
 
-        <h2 className="text-3xl font-black tracking-tight text-white">
-          {
-            badge.name
-          }
-        </h2>
+        <div className="relative">
+          <div className="mb-3 flex items-center justify-center gap-2 text-xs font-black uppercase tracking-[0.22em] text-white">
+            <Sparkles
+              size={15}
+            />
 
-        <p className="mt-2 text-base text-white/60">
-          {
-            badge.subtitle
-          }
-        </p>
+            Nouveau badge
+          </div>
 
-        {!isColorBadge && (
-          <div
-            className="mt-6 rounded-full px-5 py-2 text-sm font-black uppercase tracking-wider"
+          <div className="flex justify-center py-3">
+            <BadgeHex
+              badge={
+                badge
+              }
+              level={
+                notification.level
+              }
+              unlocked
+              size="large"
+            />
+          </div>
+
+          <h2 className="mt-2 text-2xl font-black tracking-tight text-white">
+            {badge.name}
+          </h2>
+
+          <p
+            className="mt-1 text-sm font-black uppercase tracking-[0.16em]"
             style={{
-              backgroundColor:
+              color:
                 levelMeta.border,
-
-              color:
-                "#000000",
-
-              boxShadow:
-                `0 0 30px ${levelMeta.glow}`,
             }}
           >
-            {
-              levelMeta.label
-            }
-          </div>
-        )}
-
-        {isColorBadge && (
-          <div
-            className="mt-6 rounded-full border px-5 py-2 text-sm font-black uppercase tracking-wider"
-            style={{
-              backgroundColor:
-                badge.visualColor ??
-                "#FFFFFF",
-
-              borderColor:
-                badge.visualColor ??
-                "#FFFFFF",
-
-              color:
-                badge.climbingColor ===
-                  "jaune" ||
-                badge.climbingColor ===
-                  "blanc" ||
-                badge.climbingColor ===
-                  "turquoise"
-                  ? "#111111"
-                  : "#FFFFFF",
-
-              boxShadow:
-                `0 0 30px ${
-                  badge.visualColor ??
-                  "#FFFFFF"
-                }`,
-            }}
-          >
-            {
-              badge.climbingColor ??
-              "Bloc réussi"
-            }
-          </div>
-        )}
-
-        {isKilterBadge && (
-          <p className="mt-3 text-xs font-bold text-white/45">
-            {
-              badgeLabel
-            } · niveau{" "}
-            {
-              levelMeta.label
-            }
+            {badge.kind ===
+            "route"
+              ? notification.level ===
+                "diamond"
+                ? "En tête"
+                : "Moulinette"
+              : badge.hideLevelLabel
+                ? "Débloqué"
+                : levelMeta.label}
           </p>
-        )}
 
-        <p className="mt-8 text-xs text-white/35">
-          Appuie sur l’écran
-          pour fermer
-        </p>
+          <p className="mx-auto mt-4 max-w-xs text-sm leading-relaxed text-muted-foreground">
+            {routeLabel ??
+              levelDefinition?.description ??
+              badge.subtitle}
+          </p>
+
+          <button
+            type="button"
+            onClick={
+              closeNotification
+            }
+            className="mt-6 w-full rounded-xl bg-white py-3.5 text-sm font-black text-black transition-transform active:scale-[0.98]"
+          >
+            Continuer
+          </button>
+        </div>
       </div>
-    </div>,
-    document.body,
+    </div>
   );
 }

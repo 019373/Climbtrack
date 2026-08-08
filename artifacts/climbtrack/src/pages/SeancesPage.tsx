@@ -1,447 +1,452 @@
-import { useMemo, useState } from "react";
 import {
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
+
+import {
+  Activity,
   Check,
   ChevronDown,
-  ChevronRight,
+  ChevronUp,
   Clock3,
-  Dumbbell,
-  Flame,
   Mountain,
   Plus,
   RefreshCw,
+  Route,
   Sparkles,
-  Timer,
   Trash2,
-  X,
 } from "lucide-react";
-import { useLocation } from "wouter";
 
-import { SESSIONS } from "@/data/sessions";
-import { SessionCard } from "@/components/SessionCard";
-import { useClimbTrack } from "@/context/ClimbTrackContext";
+import {
+  useNavigate,
+} from "react-router-dom";
+
+import {
+  ROUTE_GRADES,
+  useClimbTrack,
+} from "@/context/ClimbTrackContext";
+
 import type {
   ClimbingIntensity,
   KilterEntry,
   KilterResult,
+  RouteClimbingEntry,
+  RouteClimbingMode,
+  RouteClimbingResult,
+  RouteGrade,
   SessionLog,
 } from "@/context/ClimbTrackContext";
 
 import type {
   ClimbingColor,
 } from "@/data/badges";
-import { cn } from "@/lib/utils";
+
+import {
+  SESSIONS,
+} from "@/data/sessions";
+
+import {
+  SessionCard,
+} from "@/components/SessionCard";
+
 import {
   generateDailySuggestion,
   getTodayLocalDate,
-} from "@/utils/dailySuggestion";
-import type {
-  DailyPreference,
-  KilterPreset,
-  SuggestedStep,
+  type DailyPreference,
+  type SuggestedStep,
 } from "@/utils/dailySuggestion";
 
+import {
+  cn,
+} from "@/lib/utils";
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Types
+// ─────────────────────────────────────────────────────────────────────────────
+
 type ManualType =
-  | "session"
   | "climbing"
-  | "kilter";
+  | "kilter"
+  | "route";
+
+type ManualLogSheetProps = {
+  initialType?: ManualType;
+  onClose: () => void;
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Constants
+// ─────────────────────────────────────────────────────────────────────────────
+
 const CLIMBING_COLORS: {
   id: ClimbingColor;
   label: string;
-  color: string;
-  textColor?: string;
+  className: string;
 }[] = [
   {
     id: "rose",
     label: "Rose",
-    color: "#EC4899",
+    className:
+      "border-pink-500 bg-pink-500 text-black",
   },
+
   {
     id: "jaune",
     label: "Jaune",
-    color: "#FACC15",
-    textColor: "#111111",
+    className:
+      "border-yellow-400 bg-yellow-400 text-black",
   },
+
   {
     id: "vert",
     label: "Vert",
-    color: "#22C55E",
+    className:
+      "border-green-500 bg-green-500 text-black",
   },
+
   {
     id: "turquoise",
     label: "Turquoise",
-    color: "#2DD4BF",
-    textColor: "#111111",
+    className:
+      "border-teal-400 bg-teal-400 text-black",
   },
+
   {
     id: "bleu",
     label: "Bleu",
-    color: "#3B82F6",
+    className:
+      "border-blue-500 bg-blue-500 text-white",
   },
+
   {
     id: "orange",
     label: "Orange",
-    color: "#F97316",
+    className:
+      "border-orange-500 bg-orange-500 text-black",
   },
+
   {
     id: "rouge",
     label: "Rouge",
-    color: "#EF4444",
+    className:
+      "border-red-500 bg-red-500 text-white",
   },
+
   {
     id: "noir",
     label: "Noir",
-    color: "#171717",
+    className:
+      "border-white/30 bg-black text-white",
   },
+
   {
     id: "blanc",
     label: "Blanc",
-    color: "#F5F5F5",
-    textColor: "#111111",
+    className:
+      "border-white bg-white text-black",
   },
 ];
-type TodaySettings = {
-  date: string;
-  availableMinutes: number | null;
-  preference: DailyPreference;
-  variation: number;
-};
 
-const TODAY_SETTINGS_KEY =
-  "climbtrack_today_settings";
+const KILTER_ANGLES = [
+  20,
+  25,
+  30,
+  35,
+  40,
+  45,
+  50,
+  55,
+  60,
+  65,
+  70,
+];
 
-const SUGGESTION_HISTORY_KEY =
-  "climbtrack_suggestion_history";
+const PREFERENCE_OPTIONS: {
+  value: DailyPreference;
+  label: string;
+}[] = [
+  {
+    value: "unknown",
+    label: "Aucune",
+  },
 
-function getLocalDate(): string {
-  return getTodayLocalDate();
-}
+  {
+    value: "climbing",
+    label: "Grimper",
+  },
 
-function getInitialTodaySettings(): TodaySettings {
-  const today = getLocalDate();
+  {
+    value: "kilter",
+    label: "Faire du Kilter",
+  },
 
-  try {
-    const saved =
-      localStorage.getItem(
-        TODAY_SETTINGS_KEY,
-      );
+  {
+    value: "climbing+kilter",
+    label: "Grimper + Kilter",
+  },
 
-    if (saved) {
-      const parsed =
-        JSON.parse(
-          saved,
-        ) as Partial<TodaySettings>;
+  {
+    value: "rest",
+    label: "Récupérer",
+  },
+];
 
-      if (parsed.date === today) {
-        return {
-          date: today,
+// ─────────────────────────────────────────────────────────────────────────────
+// Helpers
+// ─────────────────────────────────────────────────────────────────────────────
 
-          availableMinutes:
-            typeof parsed.availableMinutes ===
-            "number"
-              ? parsed.availableMinutes
-              : null,
-
-          preference:
-            parsed.preference ??
-            "unknown",
-
-          variation:
-            parsed.variation ??
-            0,
-        };
-      }
-    }
-  } catch {
-    // Valeurs par défaut.
+function generateId(): string {
+  if (
+    typeof crypto !==
+      "undefined" &&
+    typeof crypto.randomUUID ===
+      "function"
+  ) {
+    return crypto.randomUUID();
   }
 
-  return {
-    date: today,
-    availableMinutes: null,
-    preference: "unknown",
-    variation: 0,
-  };
+  return `${Date.now()}-${Math.random()
+    .toString(36)
+    .slice(2, 9)}`;
 }
 
-function getInitialSuggestionHistory(): string[] {
-  try {
-    const saved =
-      localStorage.getItem(
-        SUGGESTION_HISTORY_KEY,
-      );
+function getLocalDateString(): string {
+  const now =
+    new Date();
 
-    if (!saved) {
-      return [];
-    }
+  const offset =
+    now.getTimezoneOffset() *
+    60_000;
 
-    const parsed =
-      JSON.parse(saved);
-
-    if (!Array.isArray(parsed)) {
-      return [];
-    }
-
-    return parsed
-      .filter(
-        (value) =>
-          typeof value ===
-          "string",
-      )
-      .slice(-3);
-  } catch {
-    return [];
-  }
+  return new Date(
+    now.getTime() -
+      offset,
+  )
+    .toISOString()
+    .split("T")[0];
 }
 
-function formatDuration(
-  minutes: number,
-): string {
-  if (minutes <= 0) {
-    return "Repos";
-  }
-
-  if (minutes < 60) {
-    return `${minutes} min`;
-  }
-
-  const hours =
-    Math.floor(
-      minutes / 60,
-    );
-
-  const remaining =
-    minutes % 60;
-
-  return remaining === 0
-    ? `${hours} h`
-    : `${hours} h ${remaining}`;
-}
-
-function createKilterEntry(
-  values?: Partial<KilterEntry>,
-): KilterEntry {
-  return {
-    id:
-      crypto.randomUUID(),
-
-    angle:
-      values?.angle ??
-      30,
-
-    grade:
-      values?.grade ??
-      1,
-
-    result:
-      values?.result ??
-      "travaille",
-
-    attempts:
-      values?.attempts,
-
-    durationMinutes:
-      values?.durationMinutes ??
+function parsePositiveInteger(
+  value: string,
+): number {
+  const parsed =
+    Number.parseInt(
+      value,
       10,
-  };
-}
-
-function createEntriesFromPreset(
-  preset?: KilterPreset,
-): KilterEntry[] {
-  if (!preset) {
-    return [
-      createKilterEntry(),
-    ];
-  }
-
-  if (
-    preset.minGrade ===
-    preset.maxGrade
-  ) {
-    return [
-      createKilterEntry({
-        angle:
-          preset.angle,
-
-        grade:
-          preset.minGrade,
-
-        result:
-          "travaille",
-
-        durationMinutes:
-          preset.durationMinutes,
-      }),
-    ];
-  }
-
-  const firstDuration =
-    Math.max(
-      5,
-      Math.floor(
-        preset.durationMinutes *
-          0.6,
-      ),
     );
 
-  const secondDuration =
-    Math.max(
-      5,
-      preset.durationMinutes -
-        firstDuration,
+  if (
+    !Number.isFinite(
+      parsed,
+    )
+  ) {
+    return 0;
+  }
+
+  return Math.max(
+    0,
+    parsed,
+  );
+}
+
+function parseOptionalMinutes(
+  value: string,
+): number | null {
+  if (
+    value.trim() ===
+    ""
+  ) {
+    return null;
+  }
+
+  const parsed =
+    Number.parseInt(
+      value,
+      10,
     );
 
-  return [
-    createKilterEntry({
-      angle:
-        preset.angle,
+  if (
+    !Number.isFinite(
+      parsed,
+    )
+  ) {
+    return null;
+  }
 
-      grade:
-        preset.minGrade,
-
-      result:
-        "travaille",
-
-      durationMinutes:
-        firstDuration,
-    }),
-
-    createKilterEntry({
-      angle:
-        preset.angle,
-
-      grade:
-        preset.maxGrade,
-
-      result:
-        "travaille",
-
-      durationMinutes:
-        secondDuration,
-    }),
-  ];
+  return Math.max(
+    0,
+    parsed,
+  );
 }
 
-function getStepIcon(
-  step: SuggestedStep,
-) {
-  if (
-    step.type ===
-    "warmup"
-  ) {
-    return Flame;
-  }
+// ─────────────────────────────────────────────────────────────────────────────
+// Shared UI
+// ─────────────────────────────────────────────────────────────────────────────
 
-  if (
-    step.type ===
-      "kilter" ||
-    step.type ===
-      "climbing"
-  ) {
-    return Mountain;
-  }
+function Field({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="min-w-0 space-y-1.5">
+      <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+        {label}
+      </label>
 
-  if (
-    step.type ===
-    "full-session"
-  ) {
-    return Dumbbell;
-  }
-
-  if (
-    step.type ===
-    "abs"
-  ) {
-    return Timer;
-  }
-
-  if (
-    step.type ===
-    "flexibility"
-  ) {
-    return Sparkles;
-  }
-
-  return Check;
+      {children}
+    </div>
+  );
 }
 
-export function SeancesPage() {
-  const [, setLocation] =
-    useLocation();
+function NumberInput({
+  value,
+  onChange,
+  min = 0,
+  step = 1,
+  placeholder,
+}: {
+  value: number | "";
+  onChange: (
+    value: string,
+  ) => void;
+  min?: number;
+  step?: number;
+  placeholder?: string;
+}) {
+  return (
+    <input
+      type="number"
+      value={value}
+      min={min}
+      step={step}
+      inputMode="numeric"
+      placeholder={placeholder}
+      onChange={(
+        event,
+      ) =>
+        onChange(
+          event.target.value,
+        )
+      }
+      className="w-full min-w-0 rounded-xl border border-border bg-card px-3 py-3 font-mono text-white outline-none focus:border-white/40"
+    />
+  );
+}
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Manual log sheet
+// ─────────────────────────────────────────────────────────────────────────────
+
+function ManualLogSheet({
+  initialType = "climbing",
+  onClose,
+}: ManualLogSheetProps) {
   const {
-    data,
     addSessionLog,
-  } = useClimbTrack();
+  } =
+    useClimbTrack();
 
-  const visibleSessions =
-    SESSIONS.filter(
-      (session) =>
-        session.id !==
-        "grimpe-libre",
+  /*
+   * Le bouton apparaît d'abord comme un +,
+   * puis tourne vers × juste après l'ouverture.
+   *
+   * Cela rend enfin visible la transition
+   * dans le sens + → ×.
+   */
+  const [
+    closeIconActive,
+    setCloseIconActive,
+  ] =
+    useState(false);
+
+  const [
+    closing,
+    setClosing,
+  ] =
+    useState(false);
+
+  useEffect(
+    () => {
+      const frame =
+        window.requestAnimationFrame(
+          () => {
+            setCloseIconActive(
+              true,
+            );
+          },
+        );
+
+      return () => {
+        window.cancelAnimationFrame(
+          frame,
+        );
+      };
+    },
+    [],
+  );
+
+  function requestClose() {
+    if (
+      closing
+    ) {
+      return;
+    }
+
+    setClosing(
+      true,
     );
 
-  const [
-    todaySettings,
-    setTodaySettings,
-  ] = useState<TodaySettings>(
-    getInitialTodaySettings,
-  );
+    /*
+     * Faire d'abord × → +,
+     * puis fermer le panneau.
+     */
+    setCloseIconActive(
+      false,
+    );
+
+    window.setTimeout(
+      () => {
+        onClose();
+      },
+      200,
+    );
+  }
 
   const [
-    recentSuggestionSignatures,
-    setRecentSuggestionSignatures,
-  ] = useState<string[]>(
-    getInitialSuggestionHistory,
-  );
-
-  const [
-    showTodayOptions,
-    setShowTodayOptions,
-  ] = useState(false);
-
-  const [
-    showAddSheet,
-    setShowAddSheet,
-  ] = useState(false);
-
-  const [
-    manualType,
-    setManualType,
+    choice,
+    setChoice,
   ] =
     useState<ManualType>(
-      "session",
+      initialType,
     );
 
   const [
-    selectedSessionId,
-    setSelectedSessionId,
-  ] = useState(
-    visibleSessions[0]?.id ??
-      "",
-  );
-
-  const [
-    selectedDate,
-    setSelectedDate,
-  ] = useState(
-    getLocalDate(),
-  );
+    date,
+    setDate,
+  ] =
+    useState(
+      getLocalDateString(),
+    );
 
   const [
     note,
     setNote,
-  ] = useState("");
+  ] =
+    useState("");
 
-  const [
-    formError,
-    setFormError,
-  ] = useState("");
+  // ── Bloc libre ─────────────────────────────────────────────────────────────
 
   const [
     climbingDuration,
     setClimbingDuration,
-  ] = useState(90);
+  ] =
+    useState<number | "">(
+      "",
+    );
 
   const [
     climbingIntensity,
@@ -452,164 +457,111 @@ export function SeancesPage() {
     );
 
   const [
-    climbingColorsSucceeded,
-    setClimbingColorsSucceeded,
-  ] = useState<ClimbingColor[]>([]);
+    climbingColors,
+    setClimbingColors,
+  ] =
+    useState<
+      ClimbingColor[]
+    >([]);
+
+  // ── Kilter ─────────────────────────────────────────────────────────────────
+
+  const [
+    kilterDuration,
+    setKilterDuration,
+  ] =
+    useState<number | "">(
+      "",
+    );
 
   const [
     kilterEntries,
     setKilterEntries,
-  ] = useState<KilterEntry[]>([
-    createKilterEntry(),
-  ]);
+  ] =
+    useState<KilterEntry[]>([
+      {
+        id:
+          generateId(),
 
-  const suggestion =
-    useMemo(
-      () =>
-        generateDailySuggestion({
-          logs:
-            data.sessionLogs,
+        angle:
+          30,
 
-          date:
-            getLocalDate(),
+        grade:
+          0,
 
-          availableMinutes:
-            todaySettings.availableMinutes,
+        result:
+          "travaille",
 
-          preference:
-            todaySettings.preference,
-
-          variation:
-            todaySettings.variation,
-
-          recentSuggestionSignatures,
-        }),
-      [
-        data.sessionLogs,
-        todaySettings,
-        recentSuggestionSignatures,
-      ],
-    );
-
-  function updateTodaySettings(
-    update: Partial<TodaySettings>,
-  ) {
-    setTodaySettings(
-      (previous) => {
-        const next = {
-          ...previous,
-          ...update,
-          date:
-            getLocalDate(),
-        };
-
-        localStorage.setItem(
-          TODAY_SETTINGS_KEY,
-          JSON.stringify(next),
-        );
-
-        return next;
+        attempts:
+          1,
       },
-    );
-  }
-
-  function rememberSuggestion(
-    signature: string,
-  ) {
-    setRecentSuggestionSignatures(
-      (previous) => {
-        const next = [
-          ...previous.filter(
-            (item) =>
-              item !== signature,
-          ),
-          signature,
-        ].slice(-3);
-
-        localStorage.setItem(
-          SUGGESTION_HISTORY_KEY,
-          JSON.stringify(next),
-        );
-
-        return next;
-      },
-    );
-  }
-
-  function refreshSuggestion() {
-    rememberSuggestion(
-      suggestion.signature,
-    );
-
-    updateTodaySettings({
-      variation:
-        todaySettings.variation +
-        1,
-    });
-  }
-
-  function closeSheet() {
-    setShowAddSheet(false);
-    setManualType("session");
-    setSelectedDate(
-      getLocalDate(),
-    );
-    setNote("");
-    setFormError("");
-    setClimbingDuration(90);
-    setClimbingIntensity(
-      "moyen",
-    );
-    setClimbingColorsSucceeded([]);
-    setKilterEntries([
-      createKilterEntry(),
     ]);
-  }
 
-  function openManual(
-    type: ManualType,
+  // ── Voie ───────────────────────────────────────────────────────────────────
+
+  const [
+    routeDuration,
+    setRouteDuration,
+  ] =
+    useState<number | "">(
+      "",
+    );
+
+  const [
+    routeEntries,
+    setRouteEntries,
+  ] =
+    useState<
+      RouteClimbingEntry[]
+    >([
+      {
+        id:
+          generateId(),
+
+        grade:
+          "5a",
+
+        mode:
+          "moulinette",
+
+        result:
+          "travaille",
+
+        attempts:
+          1,
+      },
+    ]);
+
+  function toggleClimbingColor(
+    color: ClimbingColor,
   ) {
-    setManualType(type);
-    setSelectedDate(
-      getLocalDate(),
+    setClimbingColors(
+      (previous) =>
+        previous.includes(
+          color,
+        )
+          ? previous.filter(
+              (current) =>
+                current !==
+                color,
+            )
+          : [
+              ...previous,
+              color,
+            ],
     );
-    setFormError("");
-    setShowAddSheet(true);
-  }
-
-  function openKilterPreset(
-    preset?: KilterPreset,
-  ) {
-    setManualType(
-      "kilter",
-    );
-
-    setSelectedDate(
-      getLocalDate(),
-    );
-
-    setFormError("");
-
-    setKilterEntries(
-      createEntriesFromPreset(
-        preset,
-      ),
-    );
-
-    setShowAddSheet(true);
   }
 
   function updateKilterEntry(
     id: string,
     update: Partial<KilterEntry>,
   ) {
-    setFormError("");
-
     setKilterEntries(
       (previous) =>
         previous.map(
           (entry) =>
-            entry.id === id
+            entry.id ===
+            id
               ? {
                   ...entry,
                   ...update,
@@ -619,137 +571,141 @@ export function SeancesPage() {
     );
   }
 
-  function handleManualAdd() {
-    setFormError("");
+  function addKilterEntry() {
+    setKilterEntries(
+      (previous) => [
+        ...previous,
 
-    if (
-      manualType ===
-      "session"
-    ) {
-      const params =
-        new URLSearchParams({
-          date:
-            selectedDate,
+        {
+          id:
+            generateId(),
 
-          manual:
-            "true",
-        });
+          angle:
+            previous[
+              previous.length -
+                1
+            ]?.angle ??
+            30,
 
-      setShowAddSheet(
-        false,
-      );
+          grade:
+            previous[
+              previous.length -
+                1
+            ]?.grade ??
+            0,
 
-      setLocation(
-        `/seance/${selectedSessionId}?${params.toString()}`,
-      );
+          result:
+            "travaille",
 
-      return;
-    }
+          attempts:
+            1,
+        },
+      ],
+    );
+  }
 
-    if (
-      manualType ===
-      "climbing"
-    ) {
-      if (
-        !Number.isFinite(
-          climbingDuration,
-        ) ||
-        climbingDuration <
-          15
-      ) {
-        setFormError(
-          "Entre une durée d’au moins 15 minutes.",
-        );
-
-        return;
-      }
-    }
-
-    if (
-      manualType ===
-      "kilter"
-    ) {
-      const validEntries =
-        kilterEntries.filter(
-          (entry) =>
-            Number.isFinite(
-              entry.angle,
-            ) &&
-            entry.angle >= 0 &&
-            entry.angle <= 70 &&
-            Number.isFinite(
-              entry.grade,
-            ) &&
-            entry.grade >= 0 &&
-            entry.grade <= 10 &&
-            typeof entry.durationMinutes ===
-              "number" &&
-            entry.durationMinutes >
-              0,
-        );
-
-      const totalDuration =
-        validEntries.reduce(
-          (
-            total,
-            entry,
-          ) =>
-            total +
-            (
-              entry.durationMinutes ??
-              0
+  function deleteKilterEntry(
+    id: string,
+  ) {
+    setKilterEntries(
+      (previous) =>
+        previous.length <=
+        1
+          ? previous
+          : previous.filter(
+              (entry) =>
+                entry.id !==
+                id,
             ),
-          0,
-        );
+    );
+  }
 
-      if (
-        validEntries.length ===
-          0 ||
-        totalDuration <= 0
-      ) {
-        setFormError(
-          "Aucune Kilter n’a été enregistrée. Ajoute au moins une partie avec une durée supérieure à 0 minute.",
-        );
+  function updateRouteEntry(
+    id: string,
+    update: Partial<RouteClimbingEntry>,
+  ) {
+    setRouteEntries(
+      (previous) =>
+        previous.map(
+          (entry) =>
+            entry.id ===
+            id
+              ? {
+                  ...entry,
+                  ...update,
+                }
+              : entry,
+        ),
+    );
+  }
 
-        return;
-      }
+  function addRouteEntry() {
+    setRouteEntries(
+      (previous) => [
+        ...previous,
 
-      const log: SessionLog = {
-        id:
-          crypto.randomUUID(),
+        {
+          id:
+            generateId(),
 
-        date:
-          selectedDate,
+          grade:
+            previous[
+              previous.length -
+                1
+            ]?.grade ??
+            "5a",
 
-        sessionId:
-          "kilter",
+          mode:
+            previous[
+              previous.length -
+                1
+            ]?.mode ??
+            "moulinette",
 
-        exerciseLogs:
-          [],
+          result:
+            "travaille",
 
-        note:
-          note.trim() ||
-          undefined,
+          attempts:
+            1,
+        },
+      ],
+    );
+  }
 
-        kilterEntries:
-          validEntries,
-      };
+  function deleteRouteEntry(
+    id: string,
+  ) {
+    setRouteEntries(
+      (previous) =>
+        previous.length <=
+        1
+          ? previous
+          : previous.filter(
+              (entry) =>
+                entry.id !==
+                id,
+            ),
+    );
+  }
 
-      addSessionLog(log);
-      closeSheet();
-
-      return;
-    }
-
-    const log: SessionLog = {
+  function saveManualLog() {
+    const baseLog: SessionLog = {
       id:
-        crypto.randomUUID(),
+        generateId(),
 
-      date:
-        selectedDate,
+      date,
+
+      completedAt:
+        new Date().toISOString(),
 
       sessionId:
-        "grimpe-libre",
+        choice ===
+        "climbing"
+          ? "grimpe-libre"
+          : choice ===
+              "kilter"
+            ? "kilter"
+            : "route",
 
       exerciseLogs:
         [],
@@ -757,750 +713,373 @@ export function SeancesPage() {
       note:
         note.trim() ||
         undefined,
-
-      climbingDurationMinutes:
-        climbingDuration,
-
-      climbingIntensity:
-        climbingIntensity,
-      climbingColorsSucceeded:
-      climbingColorsSucceeded.length > 0
-        ? climbingColorsSucceeded
-        : undefined,
     };
 
-    addSessionLog(log);
-    closeSheet();
-  }
-
-  function openSuggestedStep(
-    step: SuggestedStep,
-  ) {
     if (
-      step.type ===
+      choice ===
       "climbing"
     ) {
-      openManual(
-        "climbing",
-      );
+      addSessionLog({
+        ...baseLog,
 
-      setClimbingDuration(
-        step.durationMinutes,
-      );
+        climbingDurationMinutes:
+          typeof climbingDuration ===
+          "number"
+            ? climbingDuration
+            : undefined,
 
-      return;
+        climbingIntensity,
+
+        climbingColorsSucceeded:
+          climbingColors,
+      });
     }
 
     if (
-      step.type ===
+      choice ===
       "kilter"
     ) {
-      openKilterPreset(
-        step.kilterPreset,
-      );
+      addSessionLog({
+        ...baseLog,
 
-      return;
-    }
+        kilterEntries,
 
-    if (
-      !step.sessionId
-    ) {
-      return;
-    }
-
-    const exerciseIds =
-      step.exercises
-        ?.map(
-          (name) =>
-            SESSIONS.flatMap(
-              (session) =>
-                session.exercises,
-            ).find(
-              (exercise) =>
-                exercise.name ===
-                name,
-            ),
-        )
-        .filter(Boolean)
-        .map(
-          (exercise) =>
-            exercise!.id,
-        );
-
-    const params =
-      new URLSearchParams({
-        date:
-          getLocalDate(),
-
-        suggested:
-          "true",
+        climbingDurationMinutes:
+          typeof kilterDuration ===
+          "number"
+            ? kilterDuration
+            : undefined,
       });
-
-    if (
-      step.finisherType
-    ) {
-      params.set(
-        "finisherType",
-        step.finisherType,
-      );
     }
 
     if (
-      exerciseIds?.length
+      choice ===
+      "route"
     ) {
-      params.set(
-        "exerciseIds",
-        exerciseIds.join(
-          ",",
-        ),
-      );
+      addSessionLog({
+        ...baseLog,
+
+        routeClimbingDurationMinutes:
+          typeof routeDuration ===
+          "number"
+            ? routeDuration
+            : undefined,
+
+        routeClimbingEntries:
+          routeEntries,
+      });
     }
 
-    setLocation(
-      `/seance/${step.sessionId}?${params.toString()}`,
-    );
+    requestClose();
   }
 
   return (
-    <div className="min-h-screen bg-background pb-24 pt-safe">
-      <header className="sticky top-0 z-10 border-b border-border bg-background/95 px-5 py-6 backdrop-blur-md">
-        <div className="flex items-start justify-between">
-          <div>
-            <h1 className="text-3xl font-extrabold text-white">
-              Accueil
-            </h1>
+    <div
+      className="fixed inset-0 z-[100000] overflow-x-hidden bg-black/80 backdrop-blur-sm"
+      onClick={
+        requestClose
+      }
+    >
+      <div
+        className={cn(
+          "absolute inset-x-0 bottom-0 max-h-[94dvh] overflow-x-hidden overflow-y-auto rounded-t-3xl border border-border bg-background pb-[calc(env(safe-area-inset-bottom)+24px)] transition-transform duration-200",
 
-            <p className="mt-1 text-sm text-muted-foreground">
-              Programme d’entraînement
+          closing &&
+            "translate-y-1",
+        )}
+        onClick={(
+          event,
+        ) =>
+          event.stopPropagation()
+        }
+      >
+        <div className="sticky top-0 z-10 flex items-start justify-between gap-4 border-b border-border bg-background/95 px-5 py-4 backdrop-blur-md">
+          <div className="min-w-0">
+            <h2 className="text-xl font-black text-white">
+              Ajouter une séance
+            </h2>
+
+            <p className="mt-1 text-xs text-muted-foreground">
+              Choisir le type de grimpe à enregistrer.
             </p>
           </div>
 
           <button
             type="button"
-            onClick={() =>
-              setShowAddSheet(
-                true,
-              )
+            onClick={
+              requestClose
             }
-            className="flex h-11 w-11 items-center justify-center rounded-full border border-border bg-card text-white"
+            disabled={
+              closing
+            }
+            className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-white text-black active:scale-90 disabled:pointer-events-none"
+            aria-label="Fermer"
           >
-            <Plus size={24} />
+            <Plus
+              size={20}
+              strokeWidth={3}
+              className={cn(
+                "transition-transform duration-200 ease-out",
+
+                closeIconActive &&
+                  "rotate-45",
+              )}
+            />
           </button>
         </div>
-      </header>
 
-      <main className="space-y-5 p-5">
-        <section className="overflow-hidden rounded-2xl border border-white/15 bg-white/[0.04]">
-          <div className="border-b border-white/10 p-4">
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <p className="text-[10px] font-extrabold uppercase tracking-[0.18em] text-muted-foreground">
-                  Aujourd’hui
-                </p>
+        <div className="w-full space-y-6 overflow-x-hidden p-5">
+          <div className="grid grid-cols-3 gap-2">
+            {[
+              {
+                id:
+                  "climbing" as const,
 
-                <h2 className="mt-1 text-xl font-extrabold text-white">
-                  {
-                    suggestion.title
-                  }
-                </h2>
+                label:
+                  "Bloc libre",
 
-                <p className="mt-1 text-xs text-muted-foreground">
-                  {
-                    suggestion.explanation
-                  }
-                </p>
-              </div>
+                icon:
+                  Mountain,
+              },
 
-              <button
-                type="button"
-                onClick={
-                  refreshSuggestion
-                }
-                className="flex h-10 w-10 items-center justify-center rounded-full border border-white/10"
-              >
-                <RefreshCw
-                  size={18}
-                />
-              </button>
-            </div>
+              {
+                id:
+                  "kilter" as const,
 
-            <div className="mt-4 flex flex-wrap gap-2">
-              <div className="flex items-center gap-1.5 rounded-full border border-white/10 px-3 py-1.5">
-                <Clock3
-                  size={13}
-                />
+                label:
+                  "Kilter",
 
-                <span className="text-xs font-bold">
-                  Prévu :{" "}
-                  {formatDuration(
-                    suggestion.plannedMinutes,
-                  )}
-                </span>
-              </div>
+                icon:
+                  Activity,
+              },
 
-              <button
-                type="button"
-                onClick={() =>
-                  setShowTodayOptions(
-                    (
-                      current,
-                    ) =>
-                      !current,
-                  )
-                }
-                className="flex items-center gap-1.5 rounded-full border border-white/10 px-3 py-1.5 text-xs font-bold"
-              >
-                {todaySettings.availableMinutes
-                  ? `${todaySettings.availableMinutes} min disponibles`
-                  : "Temps inconnu · 1 h 45"}
+              {
+                id:
+                  "route" as const,
 
-                <ChevronDown
-                  size={14}
-                />
-              </button>
-            </div>
-          </div>
+                label:
+                  "Voie",
 
-          {showTodayOptions && (
-            <div className="space-y-4 border-b border-white/10 bg-black/20 p-4">
-              <div>
-                <label className="mb-2 block text-xs font-bold uppercase text-muted-foreground">
-                  Temps disponible
-                </label>
-
-                <div className="grid grid-cols-[1fr_auto] gap-2">
-                  <input
-                    type="number"
-                    min="20"
-                    max="360"
-                    step="5"
-                    value={
-                      todaySettings.availableMinutes ??
-                      ""
-                    }
-                    onChange={(
-                      event,
-                    ) =>
-                      updateTodaySettings(
-                        {
-                          availableMinutes:
-                            event
-                              .target
-                              .value ===
-                            ""
-                              ? null
-                              : Math.max(
-                                  20,
-                                  Number(
-                                    event
-                                      .target
-                                      .value,
-                                  ),
-                                ),
-                        },
-                      )
-                    }
-                    placeholder="1 h 45 par défaut"
-                    className="rounded-xl border border-border bg-card px-4 py-3 text-white"
-                  />
-
-                  <button
-                    type="button"
-                    onClick={() =>
-                      updateTodaySettings(
-                        {
-                          availableMinutes:
-                            null,
-                        },
-                      )
-                    }
-                    className="rounded-xl border border-border px-3 text-xs font-bold"
-                  >
-                    Inconnu
-                  </button>
-                </div>
-              </div>
-
-              <select
-                value={
-                  todaySettings.preference
-                }
-                onChange={(
-                  event,
-                ) =>
-                  updateTodaySettings(
-                    {
-                      preference:
-                        event
-                          .target
-                          .value as DailyPreference,
-                    },
-                  )
-                }
-                className="w-full rounded-xl border border-border bg-card px-4 py-3 text-white"
-              >
-                <option value="unknown">
-                  Je ne sais pas
-                </option>
-
-                <option value="climbing">
-                  Grimpe
-                </option>
-
-                <option value="kilter">
-                  Kilterboard
-                </option>
-
-                <option value="climbing+kilter">
-                  Grimpe + Kilter
-                </option>
-
-                <option value="s1-force-doigts">
-                  Force doigts
-                </option>
-
-                <option value="s2-resistance">
-                  Résistance
-                </option>
-
-                <option value="s3-dos-epaules">
-                  Dos / épaules
-                </option>
-
-                <option value="s6-jambes">
-                  Jambes
-                </option>
-
-                <option value="s7-prevention">
-                  Prévention
-                </option>
-
-                <option value="rest">
-                  Repos
-                </option>
-              </select>
-            </div>
-          )}
-
-          <div className="divide-y divide-white/10">
-            {suggestion.steps.map(
-              (
-                step,
-                index,
-              ) => {
+                icon:
+                  Route,
+              },
+            ].map(
+              (option) => {
                 const Icon =
-                  getStepIcon(
-                    step,
-                  );
+                  option.icon;
 
-                const clickable =
-                  Boolean(
-                    step.sessionId,
-                  ) ||
-                  step.type ===
-                    "climbing" ||
-                  step.type ===
-                    "kilter";
+                const selected =
+                  choice ===
+                  option.id;
 
                 return (
                   <button
                     key={
-                      step.id
+                      option.id
                     }
                     type="button"
-                    disabled={
-                      !clickable
-                    }
                     onClick={() =>
-                      openSuggestedStep(
-                        step,
+                      setChoice(
+                        option.id,
                       )
                     }
                     className={cn(
-                      "flex w-full gap-3 p-4 text-left",
-                      clickable &&
-                        "hover:bg-white/[0.05]",
+                      "flex min-w-0 flex-col items-center justify-center gap-2 rounded-xl border px-2 py-4 text-center transition-all active:scale-[0.98]",
+
+                      selected
+                        ? "border-white bg-white text-black"
+                        : "border-border bg-card text-white",
                     )}
                   >
-                    <div className="flex h-8 w-8 items-center justify-center rounded-full border border-white/15 text-xs font-bold">
-                      {index +
-                        1}
-                    </div>
+                    <Icon
+                      size={20}
+                    />
 
-                    <div className="min-w-0 flex-1">
-                      <div className="flex gap-2">
-                        <Icon
-                          size={16}
-                        />
-
-                        <div>
-                          <h3 className="font-bold text-white">
-                            {
-                              step.title
-                            }
-                          </h3>
-
-                          {step.subtitle && (
-                            <p className="text-xs text-white/65">
-                              {
-                                step.subtitle
-                              }
-                            </p>
-                          )}
-                        </div>
-                      </div>
-
-                      {step.description && (
-                        <p className="mt-2 text-xs text-muted-foreground">
-                          {
-                            step.description
-                          }
-                        </p>
-                      )}
-
-                      {step.exercises && (
-                        <div className="mt-2 space-y-1">
-                          {step.exercises.map(
-                            (
-                              exercise,
-                            ) => (
-                              <p
-                                key={
-                                  exercise
-                                }
-                                className="text-xs text-white/75"
-                              >
-                                •{" "}
-                                {
-                                  exercise
-                                }
-                              </p>
-                            ),
-                          )}
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="flex items-center gap-1 text-xs font-bold text-muted-foreground">
-                      {formatDuration(
-                        step.durationMinutes,
-                      )}
-
-                      {clickable && (
-                        <ChevronRight
-                          size={16}
-                        />
-                      )}
-                    </div>
+                    <span className="text-xs font-black">
+                      {
+                        option.label
+                      }
+                    </span>
                   </button>
                 );
               },
             )}
           </div>
-        </section>
 
-        <h2 className="text-lg font-extrabold text-white">
-          Toutes les séances
-        </h2>
-
-        {visibleSessions.map(
-          (session) => (
-            <SessionCard
-              key={
-                session.id
+          <Field label="Date">
+            <input
+              type="date"
+              value={
+                date
               }
-              session={
-                session
-              }
-              onClick={() =>
-                setLocation(
-                  `/seance/${session.id}`,
+              onChange={(
+                event,
+              ) =>
+                setDate(
+                  event.target
+                    .value,
                 )
               }
+              className="w-full min-w-0 rounded-xl border border-border bg-card px-3 py-3 text-white outline-none focus:border-white/40"
             />
-          ),
-        )}
-      </main>
+          </Field>
 
-      {showAddSheet && (
-        <div className="fixed inset-0 z-[9999] flex items-end bg-black/75">
-          <button
-            type="button"
-            className="absolute inset-0"
-            onClick={
-              closeSheet
-            }
-          />
-
-          <div className="relative z-10 max-h-[95dvh] w-full overflow-y-auto rounded-t-3xl border-t border-border bg-background p-5 pb-10">
-            <div className="mb-5 flex items-center justify-between">
-              <h2 className="text-xl font-extrabold">
-                Ajouter une activité
-              </h2>
-
-              <button
-                type="button"
-                onClick={
-                  closeSheet
-                }
-              >
-                <X
-                  size={22}
+          {choice ===
+            "climbing" && (
+            <>
+              <Field label="Durée totale en minutes">
+                <NumberInput
+                  value={
+                    climbingDuration
+                  }
+                  placeholder="Laisser vide"
+                  onChange={(
+                    value,
+                  ) =>
+                    setClimbingDuration(
+                      value ===
+                      ""
+                        ? ""
+                        : parsePositiveInteger(
+                            value,
+                          ),
+                    )
+                  }
                 />
-              </button>
-            </div>
+              </Field>
 
-            <div className="mb-5 grid grid-cols-3 gap-2">
-              {[
-                [
-                  "session",
-                  "Programme",
-                ],
-                [
-                  "climbing",
-                  "Grimpe",
-                ],
-                [
-                  "kilter",
-                  "Kilter",
-                ],
-              ].map(
-                ([
-                  id,
-                  label,
-                ]) => (
-                  <button
-                    key={id}
-                    type="button"
-                    onClick={() => {
-                      setManualType(
-                        id as ManualType,
-                      );
+              <Field label="Choisir l’intensité">
+                <div className="grid grid-cols-3 gap-2">
+                  {(
+                    [
+                      "facile",
+                      "moyen",
+                      "dur",
+                    ] as ClimbingIntensity[]
+                  ).map(
+                    (
+                      intensity,
+                    ) => (
+                      <button
+                        key={
+                          intensity
+                        }
+                        type="button"
+                        onClick={() =>
+                          setClimbingIntensity(
+                            intensity,
+                          )
+                        }
+                        className={cn(
+                          "rounded-xl border py-3 text-sm font-black capitalize transition-all active:scale-[0.98]",
 
-                      setFormError(
-                        "",
-                      );
-                    }}
-                    className={cn(
-                      "rounded-xl border p-3 text-sm font-bold",
-                      manualType ===
-                        id
-                        ? "border-white bg-white text-black"
-                        : "border-border bg-card",
-                    )}
-                  >
-                    {label}
-                  </button>
-                ),
-              )}
-            </div>
+                          climbingIntensity ===
+                            intensity
+                            ? "border-white bg-white text-black"
+                            : "border-border bg-card text-muted-foreground",
+                        )}
+                      >
+                        {
+                          intensity
+                        }
+                      </button>
+                    ),
+                  )}
+                </div>
+              </Field>
 
-            <label className="mb-5 block">
-              <span className="mb-2 block text-xs font-bold uppercase text-muted-foreground">
-                Date
-              </span>
+              <Field label="Sélectionner les couleurs réussies">
+                <div className="grid grid-cols-3 gap-2">
+                  {CLIMBING_COLORS.map(
+                    (color) => {
+                      const selected =
+                        climbingColors.includes(
+                          color.id,
+                        );
 
-              <input
-                type="date"
-                value={
-                  selectedDate
-                }
-                max={
-                  getLocalDate()
-                }
-                onChange={(
-                  event,
-                ) =>
-                  setSelectedDate(
-                    event
-                      .target
-                      .value,
-                  )
-                }
-                className="w-full rounded-xl border border-border bg-card px-4 py-3"
-              />
-            </label>
-
-            {manualType ===
-              "session" && (
-              <select
-                value={
-                  selectedSessionId
-                }
-                onChange={(
-                  event,
-                ) =>
-                  setSelectedSessionId(
-                    event
-                      .target
-                      .value,
-                  )
-                }
-                className="mb-5 w-full rounded-xl border border-border bg-card px-4 py-3"
-              >
-                {visibleSessions.map(
-                  (session) => (
-                    <option
-                      key={
-                        session.id
-                      }
-                      value={
-                        session.id
-                      }
-                    >
-                      {
-                        session.name
-                      }
-                    </option>
-                  ),
-                )}
-              </select>
-            )}
-
-            {manualType ===
-              "climbing" && (
-              <div className="mb-5 space-y-4">
-                <label className="block">
-                  <span className="mb-2 block text-xs font-bold uppercase text-muted-foreground">
-                    Intensité
-                  </span>
-
-                  <div className="grid grid-cols-3 gap-2">
-                    {(
-                      [
-                        "facile",
-                        "moyen",
-                        "dur",
-                      ] as ClimbingIntensity[]
-                    ).map(
-                      (
-                        intensity,
-                      ) => (
+                      return (
                         <button
                           key={
-                            intensity
+                            color.id
                           }
                           type="button"
                           onClick={() =>
-                            setClimbingIntensity(
-                              intensity,
+                            toggleClimbingColor(
+                              color.id,
                             )
                           }
                           className={cn(
-                            "rounded-xl border p-3 capitalize",
-                            climbingIntensity ===
-                              intensity
-                              ? "border-white bg-white text-black"
-                              : "border-border bg-card",
+                            "relative min-w-0 rounded-xl border py-3 text-sm font-black transition-all active:scale-[0.98]",
+
+                            selected
+                              ? color.className
+                              : "border-border bg-card text-muted-foreground",
                           )}
                         >
+                          {selected && (
+                            <Check
+                              size={13}
+                              className="absolute right-1.5 top-1.5"
+                            />
+                          )}
+
                           {
-                            intensity
+                            color.label
                           }
                         </button>
-                      ),
-                    )}
-                  </div>
-                </label>
-
-                <label className="block">
-                  <span className="mb-2 block text-xs font-bold uppercase text-muted-foreground">
-                    Durée en minutes
-                  </span>
-
-                  <input
-                    type="number"
-                    min="15"
-                    step="5"
-                    value={
-                      climbingDuration
-                    }
-                    onChange={(
-                      event,
-                    ) =>
-                      setClimbingDuration(
-                        Number(
-                          event
-                            .target
-                            .value,
-                        ),
-                      )
-                    }
-                    className="w-full rounded-xl border border-border bg-card px-4 py-3"
-                  />
-                </label>
-                <div>
-                  <span className="mb-2 block text-xs font-bold uppercase text-muted-foreground">
-                    Couleurs réussies
-                  </span>
-
-                  <p className="mb-3 text-xs text-muted-foreground">
-                    Sélectionne uniquement les couleurs où tu as réussi au moins un bloc.
-                  </p>
-
-                  <div className="grid grid-cols-3 gap-2">
-                    {CLIMBING_COLORS.map(
-                      (color) => {
-                        const selected =
-                          climbingColorsSucceeded.includes(
-                            color.id,
-                          );
-
-                        return (
-                          <button
-                            key={color.id}
-                            type="button"
-                            onClick={() =>
-                              setClimbingColorsSucceeded(
-                                (previous) =>
-                                  selected
-                                    ? previous.filter(
-                                        (item) =>
-                                          item !== color.id,
-                                      )
-                                    : [
-                                        ...previous,
-                                        color.id,
-                                      ],
-                              )
-                            }
-                            className="rounded-xl border px-3 py-3 text-sm font-bold"
-                            style={{
-                              backgroundColor:
-                                selected
-                                  ? color.color
-                                  : "transparent",
-
-                              borderColor:
-                                selected
-                                  ? color.color
-                                  : "rgba(255,255,255,0.15)",
-
-                              color:
-                                selected
-                                  ? color.textColor ??
-                                    "#FFFFFF"
-                                  : "#FFFFFF",
-
-                              boxShadow:
-                                selected
-                                  ? `0 0 16px ${color.color}66`
-                                  : "none",
-                            }}
-                          >
-                            {color.label}
-                          </button>
-                        );
-                      },
-                    )}
-                  </div>
+                      );
+                    },
+                  )}
                 </div>
-              </div>
-            )}
+              </Field>
+            </>
+          )}
 
-            {manualType ===
-              "kilter" && (
-              <div className="mb-5 space-y-3">
+          {choice ===
+            "kilter" && (
+            <>
+              <Field label="Durée totale en minutes">
+                <NumberInput
+                  value={
+                    kilterDuration
+                  }
+                  placeholder="Laisser vide"
+                  onChange={(
+                    value,
+                  ) =>
+                    setKilterDuration(
+                      value ===
+                      ""
+                        ? ""
+                        : parsePositiveInteger(
+                            value,
+                          ),
+                    )
+                  }
+                />
+              </Field>
+
+              <div className="space-y-3">
+                <div className="flex items-center justify-between gap-3">
+                  <h3 className="min-w-0 text-xs font-black uppercase tracking-wider text-muted-foreground">
+                    Enregistrer les blocs tentés
+                  </h3>
+
+                  <button
+                    type="button"
+                    onClick={
+                      addKilterEntry
+                    }
+                    className="flex flex-shrink-0 items-center gap-1.5 rounded-lg border border-border px-3 py-2 text-xs font-bold text-white active:scale-95"
+                  >
+                    <Plus
+                      size={14}
+                    />
+
+                    Ajouter
+                  </button>
+                </div>
+
                 {kilterEntries.map(
                   (
                     entry,
@@ -1510,81 +1089,37 @@ export function SeancesPage() {
                       key={
                         entry.id
                       }
-                      className="space-y-4 rounded-xl border border-border bg-card p-4"
+                      className="w-full space-y-3 overflow-x-hidden rounded-2xl border border-border bg-card p-4"
                     >
-                      <div className="flex items-center justify-between">
-                        <h3 className="font-bold">
-                          Partie{" "}
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="text-sm font-black text-white">
+                          Bloc{" "}
                           {index +
                             1}
-                        </h3>
+                        </span>
 
-                        {kilterEntries.length >
-                          1 && (
-                          <button
-                            type="button"
-                            onClick={() =>
-                              setKilterEntries(
-                                (
-                                  previous,
-                                ) =>
-                                  previous.filter(
-                                    (
-                                      item,
-                                    ) =>
-                                      item.id !==
-                                      entry.id,
-                                  ),
-                              )
-                            }
-                          >
-                            <Trash2
-                              size={
-                                17
-                              }
-                            />
-                          </button>
-                        )}
+                        <button
+                          type="button"
+                          onClick={() =>
+                            deleteKilterEntry(
+                              entry.id,
+                            )
+                          }
+                          disabled={
+                            kilterEntries.length <=
+                            1
+                          }
+                          className="rounded-lg p-2 text-muted-foreground disabled:opacity-30"
+                          aria-label="Supprimer le bloc"
+                        >
+                          <Trash2
+                            size={16}
+                          />
+                        </button>
                       </div>
 
-                      <div className="grid grid-cols-2 gap-3">
-                        <label className="block">
-                          <span className="mb-1 block text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
-                            Angle (°)
-                          </span>
-
-                          <input
-                            type="number"
-                            min="0"
-                            max="70"
-                            step="5"
-                            value={
-                              entry.angle
-                            }
-                            onChange={(
-                              event,
-                            ) =>
-                              updateKilterEntry(
-                                entry.id,
-                                {
-                                  angle:
-                                    Number(
-                                      event
-                                        .target
-                                        .value,
-                                    ),
-                                },
-                              )
-                            }
-                            className="w-full rounded-xl border border-border bg-background px-3 py-3"
-                          />
-                        </label>
-
-                        <label className="block">
-                          <span className="mb-1 block text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
-                            Niveau
-                          </span>
-
+                      <div className="grid min-w-0 grid-cols-2 gap-3">
+                        <Field label="Cotation">
                           <select
                             value={
                               entry.grade
@@ -1596,20 +1131,26 @@ export function SeancesPage() {
                                 entry.id,
                                 {
                                   grade:
-                                    Number(
-                                      event
-                                        .target
-                                        .value,
+                                    Math.max(
+                                      0,
+                                      Math.min(
+                                        17,
+                                        Number.parseInt(
+                                          event.target
+                                            .value,
+                                          10,
+                                        ),
+                                      ),
                                     ),
                                 },
                               )
                             }
-                            className="w-full rounded-xl border border-border bg-background px-3 py-3"
+                            className="w-full min-w-0 rounded-xl border border-border bg-background px-3 py-3 text-white"
                           >
                             {Array.from(
                               {
                                 length:
-                                  11,
+                                  18,
                               },
                               (
                                 _,
@@ -1631,149 +1172,353 @@ export function SeancesPage() {
                               ),
                             )}
                           </select>
-                        </label>
-                      </div>
+                        </Field>
 
-                      <label className="block">
-                        <span className="mb-1 block text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
-                          Résultat
-                        </span>
-
-                        <select
-                          value={
-                            entry.result
-                          }
-                          onChange={(
-                            event,
-                          ) =>
-                            updateKilterEntry(
-                              entry.id,
-                              {
-                                result:
-                                  event
-                                    .target
-                                    .value as KilterResult,
-                              },
-                            )
-                          }
-                          className="w-full rounded-xl border border-border bg-background px-3 py-3"
-                        >
-                          <option value="reussi">
-                            Réussi
-                          </option>
-
-                          <option value="travaille">
-                            Travaillé
-                          </option>
-
-                          <option value="echoue">
-                            Échoué
-                          </option>
-                        </select>
-                      </label>
-
-                      <div className="grid grid-cols-2 gap-3">
-                        <label className="block">
-                          <span className="mb-1 block text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
-                            Nombre d’essais
-                          </span>
-
-                          <input
-                            type="number"
-                            min="0"
+                        <Field label="Inclinaison">
+                          <select
                             value={
-                              entry.attempts ??
-                              ""
+                              entry.angle
                             }
                             onChange={(
                               event,
+                            ) =>
+                              updateKilterEntry(
+                                entry.id,
+                                {
+                                  angle:
+                                    Number.parseInt(
+                                      event.target
+                                        .value,
+                                      10,
+                                    ),
+                                },
+                              )
+                            }
+                            className="w-full min-w-0 rounded-xl border border-border bg-background px-3 py-3 text-white"
+                          >
+                            {KILTER_ANGLES.map(
+                              (
+                                angle,
+                              ) => (
+                                <option
+                                  key={
+                                    angle
+                                  }
+                                  value={
+                                    angle
+                                  }
+                                >
+                                  {
+                                    angle
+                                  }
+                                  °
+                                </option>
+                              ),
+                            )}
+                          </select>
+                        </Field>
+
+                        <Field label="Résultat">
+                          <select
+                            value={
+                              entry.result
+                            }
+                            onChange={(
+                              event,
+                            ) =>
+                              updateKilterEntry(
+                                entry.id,
+                                {
+                                  result:
+                                    event.target
+                                      .value as KilterResult,
+                                },
+                              )
+                            }
+                            className="w-full min-w-0 rounded-xl border border-border bg-background px-3 py-3 text-white"
+                          >
+                            <option value="reussi">
+                              Réussi
+                            </option>
+
+                            <option value="travaille">
+                              Travaillé
+                            </option>
+
+                            <option value="echoue">
+                              Échoué
+                            </option>
+                          </select>
+                        </Field>
+
+                        <Field label="Essais">
+                          <NumberInput
+                            value={
+                              entry.attempts ??
+                              1
+                            }
+                            min={1}
+                            onChange={(
+                              value,
                             ) =>
                               updateKilterEntry(
                                 entry.id,
                                 {
                                   attempts:
-                                    event
-                                      .target
-                                      .value ===
-                                    ""
-                                      ? undefined
-                                      : Number(
-                                          event
-                                            .target
-                                            .value,
-                                        ),
+                                    Math.max(
+                                      1,
+                                      parsePositiveInteger(
+                                        value,
+                                      ),
+                                    ),
                                 },
                               )
                             }
-                            className="w-full rounded-xl border border-border bg-background px-3 py-3"
                           />
-                        </label>
-
-                        <label className="block">
-                          <span className="mb-1 block text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
-                            Durée (min)
-                          </span>
-
-                          <input
-                            type="number"
-                            min="0"
-                            value={
-                              entry.durationMinutes ??
-                              ""
-                            }
-                            onChange={(
-                              event,
-                            ) =>
-                              updateKilterEntry(
-                                entry.id,
-                                {
-                                  durationMinutes:
-                                    event
-                                      .target
-                                      .value ===
-                                    ""
-                                      ? undefined
-                                      : Number(
-                                          event
-                                            .target
-                                            .value,
-                                        ),
-                                },
-                              )
-                            }
-                            className="w-full rounded-xl border border-border bg-background px-3 py-3"
-                          />
-                        </label>
+                        </Field>
                       </div>
                     </div>
                   ),
                 )}
+              </div>
+            </>
+          )}
 
-                <button
-                  type="button"
-                  onClick={() =>
-                    setKilterEntries(
-                      (
-                        previous,
-                      ) => [
-                        ...previous,
-                        createKilterEntry(),
-                      ],
+          {choice ===
+            "route" && (
+            <>
+              <Field label="Durée totale en minutes">
+                <NumberInput
+                  value={
+                    routeDuration
+                  }
+                  placeholder="Laisser vide"
+                  onChange={(
+                    value,
+                  ) =>
+                    setRouteDuration(
+                      value ===
+                      ""
+                        ? ""
+                        : parsePositiveInteger(
+                            value,
+                          ),
                     )
                   }
-                  className="w-full rounded-xl border border-dashed border-border py-3 text-sm font-bold"
-                >
-                  + Ajouter une partie
-                </button>
-              </div>
-            )}
+                />
+              </Field>
 
-            {formError && (
-              <div className="mb-4 rounded-xl border border-red-500/40 bg-red-500/10 p-3 text-sm text-red-200">
-                {formError}
-              </div>
-            )}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <h3 className="text-xs font-black uppercase tracking-wider text-muted-foreground">
+                      Enregistrer les voies
+                    </h3>
 
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Enregistrer chaque cotation séparément.
+                    </p>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={
+                      addRouteEntry
+                    }
+                    className="flex flex-shrink-0 items-center gap-1.5 rounded-lg border border-border px-3 py-2 text-xs font-bold text-white active:scale-95"
+                  >
+                    <Plus
+                      size={14}
+                    />
+
+                    Ajouter
+                  </button>
+                </div>
+
+                {routeEntries.map(
+                  (
+                    entry,
+                    index,
+                  ) => (
+                    <div
+                      key={
+                        entry.id
+                      }
+                      className="w-full space-y-3 overflow-x-hidden rounded-2xl border border-border bg-card p-4"
+                    >
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="text-sm font-black text-white">
+                          Voie{" "}
+                          {index +
+                            1}
+                        </span>
+
+                        <button
+                          type="button"
+                          onClick={() =>
+                            deleteRouteEntry(
+                              entry.id,
+                            )
+                          }
+                          disabled={
+                            routeEntries.length <=
+                            1
+                          }
+                          className="rounded-lg p-2 text-muted-foreground disabled:opacity-30"
+                          aria-label="Supprimer la voie"
+                        >
+                          <Trash2
+                            size={16}
+                          />
+                        </button>
+                      </div>
+
+                      <div className="grid min-w-0 grid-cols-2 gap-3">
+                        <Field label="Cotation">
+                          <select
+                            value={
+                              entry.grade
+                            }
+                            onChange={(
+                              event,
+                            ) =>
+                              updateRouteEntry(
+                                entry.id,
+                                {
+                                  grade:
+                                    event.target
+                                      .value as RouteGrade,
+                                },
+                              )
+                            }
+                            className="w-full min-w-0 rounded-xl border border-border bg-background px-3 py-3 text-white"
+                          >
+                            {ROUTE_GRADES.map(
+                              (
+                                grade,
+                              ) => (
+                                <option
+                                  key={
+                                    grade
+                                  }
+                                  value={
+                                    grade
+                                  }
+                                >
+                                  {
+                                    grade
+                                  }
+                                </option>
+                              ),
+                            )}
+                          </select>
+                        </Field>
+
+                        <Field label="Mode">
+                          <select
+                            value={
+                              entry.mode
+                            }
+                            onChange={(
+                              event,
+                            ) =>
+                              updateRouteEntry(
+                                entry.id,
+                                {
+                                  mode:
+                                    event.target
+                                      .value as RouteClimbingMode,
+                                },
+                              )
+                            }
+                            className="w-full min-w-0 rounded-xl border border-border bg-background px-3 py-3 text-white"
+                          >
+                            <option value="moulinette">
+                              Moulinette
+                            </option>
+
+                            <option value="tete">
+                              En tête
+                            </option>
+                          </select>
+                        </Field>
+
+                        <Field label="Résultat">
+                          <select
+                            value={
+                              entry.result
+                            }
+                            onChange={(
+                              event,
+                            ) =>
+                              updateRouteEntry(
+                                entry.id,
+                                {
+                                  result:
+                                    event.target
+                                      .value as RouteClimbingResult,
+                                },
+                              )
+                            }
+                            className="w-full min-w-0 rounded-xl border border-border bg-background px-3 py-3 text-white"
+                          >
+                            <option value="reussi">
+                              Réussie
+                            </option>
+
+                            <option value="travaille">
+                              Travaillée
+                            </option>
+
+                            <option value="echoue">
+                              Échouée
+                            </option>
+                          </select>
+                        </Field>
+
+                        <Field label="Essais">
+                          <NumberInput
+                            value={
+                              entry.attempts ??
+                              1
+                            }
+                            min={1}
+                            onChange={(
+                              value,
+                            ) =>
+                              updateRouteEntry(
+                                entry.id,
+                                {
+                                  attempts:
+                                    Math.max(
+                                      1,
+                                      parsePositiveInteger(
+                                        value,
+                                      ),
+                                    ),
+                                },
+                              )
+                            }
+                          />
+                        </Field>
+                      </div>
+
+                      {entry.mode ===
+                        "tete" &&
+                        entry.result ===
+                          "reussi" && (
+                          <div className="rounded-xl border border-success/30 bg-success/10 px-3 py-2 text-xs text-success">
+                            Cette réussite compte aussi comme une réussite en moulinette pour cette cotation.
+                          </div>
+                        )}
+                    </div>
+                  ),
+                )}
+              </div>
+            </>
+          )}
+
+          <Field label="Ajouter une note">
             <textarea
               value={
                 note
@@ -1782,29 +1527,589 @@ export function SeancesPage() {
                 event,
               ) =>
                 setNote(
-                  event
-                    .target
+                  event.target
                     .value,
                 )
               }
-              placeholder="Note facultative"
-              className="mb-5 min-h-24 w-full rounded-xl border border-border bg-card p-4"
+              placeholder="Noter les sensations, difficultés, douleurs ou progrès…"
+              className="min-h-24 w-full min-w-0 resize-none rounded-xl border border-border bg-card px-3 py-3 text-sm text-white outline-none focus:border-white/40"
             />
+          </Field>
 
-            <button
-              type="button"
-              onClick={
-                handleManualAdd
+          <button
+            type="button"
+            onClick={
+              saveManualLog
+            }
+            disabled={
+              closing
+            }
+            className="w-full rounded-xl bg-white py-4 text-sm font-black text-black active:scale-[0.99] disabled:opacity-60"
+          >
+            Enregistrer
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Daily suggestion
+// ─────────────────────────────────────────────────────────────────────────────
+
+function DailySuggestionCard({
+  onOpenManual,
+}: {
+  onOpenManual: (
+    type: ManualType,
+  ) => void;
+}) {
+  const {
+    data,
+  } =
+    useClimbTrack();
+
+  const navigate =
+    useNavigate();
+
+  const [
+    expanded,
+    setExpanded,
+  ] =
+    useState(
+      false,
+    );
+
+  const [
+    preference,
+    setPreference,
+  ] =
+    useState<DailyPreference>(
+      "unknown",
+    );
+
+  const [
+    availableMinutesText,
+    setAvailableMinutesText,
+  ] =
+    useState("");
+
+  const [
+    variation,
+    setVariation,
+  ] =
+    useState(
+      0,
+    );
+
+  const [
+    rotating,
+    setRotating,
+  ] =
+    useState(
+      false,
+    );
+
+  const suggestion =
+    useMemo(
+      () =>
+        generateDailySuggestion({
+          logs:
+            data.sessionLogs,
+
+          injuries:
+            data.injuries,
+
+          date:
+            getTodayLocalDate(),
+
+          availableMinutes:
+            parseOptionalMinutes(
+              availableMinutesText,
+            ),
+
+          preference,
+
+          variation,
+        }),
+      [
+        data.sessionLogs,
+        data.injuries,
+        availableMinutesText,
+        preference,
+        variation,
+      ],
+    );
+
+  function refreshSuggestion() {
+    if (
+      rotating
+    ) {
+      return;
+    }
+
+    setRotating(
+      true,
+    );
+
+    setVariation(
+      (previous) =>
+        previous + 1,
+    );
+
+    window.setTimeout(
+      () => {
+        setRotating(
+          false,
+        );
+      },
+      1000,
+    );
+  }
+
+  function openStep(
+    step: SuggestedStep,
+  ) {
+    if (
+      step.type ===
+        "full-session" &&
+      step.sessionId
+    ) {
+      navigate(
+        `/seance/${step.sessionId}`,
+      );
+
+      return;
+    }
+
+    if (
+      step.type ===
+      "kilter"
+    ) {
+      onOpenManual(
+        "kilter",
+      );
+
+      return;
+    }
+
+    if (
+      step.type ===
+      "climbing"
+    ) {
+      onOpenManual(
+        "climbing",
+      );
+
+      return;
+    }
+
+    if (
+      step.sessionId
+    ) {
+      navigate(
+        `/seance/${step.sessionId}`,
+      );
+    }
+  }
+
+  return (
+    <section className="w-full overflow-hidden rounded-2xl border border-border bg-card">
+      <div className="flex items-center gap-3 p-4">
+        <button
+          type="button"
+          onClick={() =>
+            setExpanded(
+              (previous) =>
+                !previous,
+            )
+          }
+          className="flex min-w-0 flex-1 items-center gap-3 text-left"
+        >
+          <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-white text-black">
+            <Sparkles
+              size={19}
+            />
+          </div>
+
+          <div className="min-w-0 flex-1">
+            <h2 className="text-sm font-black text-white">
+              Entraînement du jour
+            </h2>
+
+            <p className="truncate text-xs text-muted-foreground">
+              {suggestion.plannedMinutes >
+              0
+                ? `${suggestion.plannedMinutes} min`
+                : "Récupérer"}
+            </p>
+          </div>
+
+          {expanded ? (
+            <ChevronUp
+              size={18}
+              className="flex-shrink-0 text-muted-foreground"
+            />
+          ) : (
+            <ChevronDown
+              size={18}
+              className="flex-shrink-0 text-muted-foreground"
+            />
+          )}
+        </button>
+
+        <button
+          type="button"
+          onClick={
+            refreshSuggestion
+          }
+          disabled={
+            rotating
+          }
+          className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full border border-border bg-background text-white active:scale-95 disabled:opacity-70"
+          aria-label="Régénérer la proposition"
+        >
+          <RefreshCw
+            size={17}
+            className={cn(
+              "transition-transform",
+
+              rotating &&
+                "animate-spin",
+            )}
+          />
+        </button>
+      </div>
+
+      {expanded && (
+        <div className="w-full space-y-4 overflow-x-hidden border-t border-border p-4">
+          <div className="grid min-w-0 grid-cols-2 gap-3">
+            <Field label="Temps disponible">
+              <input
+                type="number"
+                min="0"
+                inputMode="numeric"
+                value={
+                  availableMinutesText
+                }
+                onChange={(
+                  event,
+                ) =>
+                  setAvailableMinutesText(
+                    event.target
+                      .value,
+                  )
+                }
+                placeholder="Libre"
+                className="w-full min-w-0 rounded-xl border border-border bg-background px-3 py-3 font-mono text-white outline-none focus:border-white/40"
+              />
+            </Field>
+
+            <Field label="Choisir l’envie">
+              <select
+                value={
+                  preference
+                }
+                onChange={(
+                  event,
+                ) =>
+                  setPreference(
+                    event.target
+                      .value as DailyPreference,
+                  )
+                }
+                className="w-full min-w-0 rounded-xl border border-border bg-background px-3 py-3 text-white"
+              >
+                {PREFERENCE_OPTIONS.map(
+                  (option) => (
+                    <option
+                      key={
+                        option.value
+                      }
+                      value={
+                        option.value
+                      }
+                    >
+                      {
+                        option.label
+                      }
+                    </option>
+                  ),
+                )}
+              </select>
+            </Field>
+          </div>
+
+          <div className="min-w-0">
+            <h3 className="text-base font-black text-white">
+              {
+                suggestion.title
               }
-              className="w-full rounded-xl bg-white py-4 text-lg font-bold text-black"
-            >
-              {manualType ===
-              "session"
-                ? "Renseigner la séance"
-                : "Enregistrer"}
-            </button>
+            </h3>
+
+            <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+              {
+                suggestion.explanation
+              }
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            {suggestion.steps.map(
+              (step) => {
+                const clickable =
+                  step.type ===
+                    "full-session" ||
+                  step.type ===
+                    "climbing" ||
+                  step.type ===
+                    "kilter" ||
+                  Boolean(
+                    step.sessionId,
+                  );
+
+                return (
+                  <button
+                    key={
+                      step.id
+                    }
+                    type="button"
+                    disabled={
+                      !clickable
+                    }
+                    onClick={() =>
+                      openStep(
+                        step,
+                      )
+                    }
+                    className={cn(
+                      "w-full min-w-0 overflow-hidden rounded-xl border border-border bg-background p-3 text-left",
+
+                      clickable &&
+                        "transition-transform active:scale-[0.99]",
+
+                      !clickable &&
+                        "cursor-default",
+                    )}
+                  >
+                    <div className="flex min-w-0 items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="break-words text-sm font-black text-white">
+                          {
+                            step.title
+                          }
+                        </p>
+
+                        {step.subtitle && (
+                          <p className="mt-0.5 break-words text-xs text-muted-foreground">
+                            {
+                              step.subtitle
+                            }
+                          </p>
+                        )}
+                      </div>
+
+                      {step.durationMinutes >
+                        0 && (
+                        <span className="flex-shrink-0 rounded-full bg-white/10 px-2.5 py-1 font-mono text-xs text-white">
+                          {
+                            step.durationMinutes
+                          }{" "}
+                          min
+                        </span>
+                      )}
+                    </div>
+
+                    {step.description && (
+                      <p className="mt-2 break-words text-xs leading-relaxed text-muted-foreground">
+                        {
+                          step.description
+                        }
+                      </p>
+                    )}
+
+                    {step.exercises &&
+                      step.exercises.length >
+                        0 && (
+                        <div className="mt-2 space-y-1">
+                          {step.exercises.map(
+                            (
+                              exercise,
+                              index,
+                            ) => (
+                              <p
+                                key={`${exercise}-${index}`}
+                                className="break-words text-xs text-white/75"
+                              >
+                                •{" "}
+                                {
+                                  exercise
+                                }
+                              </p>
+                            ),
+                          )}
+                        </div>
+                      )}
+
+                    {step.warning && (
+                      <p className="mt-2 break-words text-xs font-bold leading-relaxed text-orange-300">
+                        {
+                          step.warning
+                        }
+                      </p>
+                    )}
+                  </button>
+                );
+              },
+            )}
           </div>
         </div>
+      )}
+    </section>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Page
+// ─────────────────────────────────────────────────────────────────────────────
+
+export function SeancesPage() {
+  const navigate =
+    useNavigate();
+
+  const [
+    manualSheetType,
+    setManualSheetType,
+  ] =
+    useState<
+      ManualType | null
+    >(
+      null,
+    );
+
+  const programmedSessions =
+    useMemo(
+      () =>
+        SESSIONS.filter(
+          (session) =>
+            session.exercises
+              .length >
+            0,
+        ),
+      [],
+    );
+
+  function openManualSheet(
+    type: ManualType,
+  ) {
+    setManualSheetType(
+      type,
+    );
+  }
+
+  function toggleAddSheet() {
+    if (
+      manualSheetType
+    ) {
+      setManualSheetType(
+        null,
+      );
+
+      return;
+    }
+
+    setManualSheetType(
+      "climbing",
+    );
+  }
+
+  return (
+    <div className="min-h-screen w-full overflow-x-hidden bg-background pb-28 pt-safe">
+      <header className="border-b border-border px-5 py-6">
+        <div className="flex items-center justify-between gap-4">
+          <h1 className="text-3xl font-extrabold tracking-tight text-white">
+            Séances
+          </h1>
+
+          <button
+            type="button"
+            onClick={
+              toggleAddSheet
+            }
+            className={cn(
+              "flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full bg-white text-black shadow-lg active:scale-90",
+            )}
+            aria-label={
+              manualSheetType
+                ? "Fermer"
+                : "Ajouter une séance"
+            }
+          >
+            <Plus
+              size={22}
+              strokeWidth={3}
+              className={cn(
+                "transition-transform duration-200 ease-out",
+
+                manualSheetType &&
+                  "rotate-45",
+              )}
+            />
+          </button>
+        </div>
+      </header>
+
+      <main className="w-full space-y-6 overflow-x-hidden p-5">
+        <DailySuggestionCard
+          onOpenManual={
+            openManualSheet
+          }
+        />
+
+        <section className="w-full space-y-3">
+          <div className="flex items-center gap-2">
+            <Clock3
+              size={17}
+              className="text-muted-foreground"
+            />
+
+            <h2 className="text-xs font-black uppercase tracking-[0.16em] text-muted-foreground">
+              Programmes
+            </h2>
+          </div>
+
+          {programmedSessions.map(
+            (session) => (
+              <SessionCard
+                key={
+                  session.id
+                }
+                session={
+                  session
+                }
+                onClick={() =>
+                  navigate(
+                    `/seance/${session.id}`,
+                  )
+                }
+              />
+            ),
+          )}
+        </section>
+      </main>
+
+      {manualSheetType && (
+        <ManualLogSheet
+          initialType={
+            manualSheetType
+          }
+          onClose={() =>
+            setManualSheetType(
+              null,
+            )
+          }
+        />
       )}
     </div>
   );

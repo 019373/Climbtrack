@@ -1,150 +1,803 @@
-import { AppData } from '../context/ClimbTrackContext';
-import { ExerciseDef, SESSIONS, TrackingType } from '../data/sessions';
+import {
+  SESSIONS,
+} from "@/data/sessions";
 
-export const BUILTIN_CATEGORIES = [
-  'Suspensions', 'Préhension', 'Tractions', 'Musculation', 'Gainage', 'Mobilité', 'Prévention',
-];
+import type {
+  ExerciseDef,
+  TrackingType,
+} from "@/data/sessions";
 
-export const TRACKING_LABELS: Record<TrackingType, string> = {
-  'duration+assistance': 'Durée + Assistance',
-  'reps': 'Répétitions',
-  'weight': 'Charge',
-  'weight+duration': 'Charge + Durée',
-  'assistance': 'Assistance',
-  'weight+reps': 'Charge + Répétitions',
-  'duration': 'Durée',
-  'none': 'Aucun suivi',
+// ─────────────────────────────────────────────────────────────────────────────
+// Types
+// ─────────────────────────────────────────────────────────────────────────────
+
+type ExerciseOverrideLike = {
+  hidden?: boolean;
+
+  name?: string;
+  description?: string;
+  category?: string;
+  tracking?: TrackingType;
+
+  sessionIds?: string[];
+
+  assistanceOptions?: ExerciseDef["assistanceOptions"];
+
+  isHangboard?: boolean;
+
+  variantOptions?: ExerciseDef["variantOptions"];
+
+  bandOptions?: ExerciseDef["bandOptions"];
+
+  totalWeight?: boolean;
+
+  perSide?: boolean;
+
+  primaryRepsLabel?: string;
+  secondaryRepsLabel?: string;
+
+  primaryWeightLabel?: string;
+  secondaryWeightLabel?: string;
 };
 
+type ExerciseDataLike = {
+  customExercises?: ExerciseDef[];
+
+  exerciseOverrides?: Record<
+    string,
+    ExerciseOverrideLike | undefined
+  >;
+
+  customCategories?: string[];
+
+  exerciseCategoryOrder?: Record<
+    string,
+    string[] | undefined
+  >;
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Types de suivi
+// ─────────────────────────────────────────────────────────────────────────────
+
 export const TRACKING_TYPES: TrackingType[] = [
-  'duration+assistance', 'reps', 'weight', 'weight+duration',
-  'assistance', 'weight+reps', 'duration', 'none',
+  "none",
+  "reps",
+  "duration",
+  "weight",
+  "weight+reps",
+  "weight+duration",
+  "reps+duration",
+  "weight+reps+duration",
+  "assistance",
+  "duration+assistance",
+  "duration+band",
+  "dual-reps+weight",
+  "dual-reps+dual-weight",
+  "variant+reps",
+  "variant+weight+duration",
 ];
 
-/** Returns built-in exercise→session(s) mapping (an exercise may appear in one session). */
-export function getBuiltinSessionMap(): Record<string, string[]> {
-  const map: Record<string, string[]> = {};
-  SESSIONS.forEach(s => {
-    s.exercises.forEach(ex => {
-      if (!map[ex.id]) map[ex.id] = [];
-      map[ex.id].push(s.id);
-    });
-  });
-  return map;
+export const TRACKING_LABELS: Record<
+  TrackingType,
+  string
+> = {
+  none:
+    "Aucun suivi",
+
+  reps:
+    "Répétitions",
+
+  duration:
+    "Durée",
+
+  weight:
+    "Charge",
+
+  "weight+reps":
+    "Charge + répétitions",
+
+  "weight+duration":
+    "Charge + durée",
+
+  "reps+duration":
+    "Répétitions + durée",
+
+  "weight+reps+duration":
+    "Charge + répétitions + durée",
+
+  assistance:
+    "Assistance + répétitions + durée",
+
+  "duration+assistance":
+    "Durée + assistance",
+
+  "duration+band":
+    "Durée + élastique",
+
+  "dual-reps+weight":
+    "Deux répétitions + une charge",
+
+  "dual-reps+dual-weight":
+    "Deux répétitions + deux charges",
+
+  "variant+reps":
+    "Variante + répétitions",
+
+  "variant+weight+duration":
+    "Variante + charge + durée",
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Catégories
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const BUILTIN_CATEGORIES: string[] = [
+  "Doigts",
+  "Puissance",
+  "Résistance",
+  "Dos",
+  "Épaules",
+  "Pectoraux",
+  "Bras",
+  "Gainage",
+  "Jambes",
+  "Prévention",
+  "Souplesse / mobilité",
+];
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Helpers
+// ─────────────────────────────────────────────────────────────────────────────
+
+function uniqueById(
+  exercises: ExerciseDef[],
+): ExerciseDef[] {
+  const result =
+    new Map<
+      string,
+      ExerciseDef
+    >();
+
+  exercises.forEach(
+    (exercise) => {
+      /*
+       * Le dernier exercice portant cet ID gagne.
+       *
+       * Les IDs restent néanmoins uniques :
+       * on ne crée jamais un nouvel ID lors
+       * d'une modification.
+       */
+      result.set(
+        exercise.id,
+        exercise,
+      );
+    },
+  );
+
+  return Array.from(
+    result.values(),
+  );
 }
 
-/** All built-in exercises, deduplicated by id. */
-export function getAllBuiltinExercises(): ExerciseDef[] {
-  const seen = new Set<string>();
-  const result: ExerciseDef[] = [];
-  SESSIONS.forEach(s => {
-    s.exercises.forEach(ex => {
-      if (!seen.has(ex.id)) { seen.add(ex.id); result.push(ex); }
-    });
-  });
-  return result;
-}
+/**
+ * Appliquer les modifications enregistrées
+ * sans perdre les propriétés de l'exercice original.
+ *
+ * L'ID n'est volontairement jamais présent
+ * dans les overrides.
+ */
+function applyOverride(
+  exercise: ExerciseDef,
+  override?: ExerciseOverrideLike,
+): ExerciseDef {
+  if (
+    !override
+  ) {
+    return exercise;
+  }
 
-/** Returns all categories (built-in first, then custom). */
-export function getAllCategories(data: AppData): string[] {
-  const custom = (data.customCategories ?? []).filter(c => !BUILTIN_CATEGORIES.includes(c));
-  return [...BUILTIN_CATEGORIES, ...custom];
-}
-
-/** Apply overrides (name, category, tracking) to an exercise. */
-export function applyOverride(ex: ExerciseDef, data: AppData): ExerciseDef {
-  const ov = data.exerciseOverrides?.[ex.id];
-  if (!ov) return ex;
   return {
-    ...ex,
-    name: ov.name ?? ex.name,
-    category: ov.category ?? ex.category,
-    tracking: ov.tracking ?? ex.tracking,
-    description: ov.description ?? ex.description,
+    ...exercise,
+
+    /*
+     * Pour le nom et la catégorie,
+     * ignorer une chaîne vide accidentelle.
+     */
+    name:
+      typeof override.name ===
+        "string" &&
+      override.name.trim()
+        ? override.name.trim()
+        : exercise.name,
+
+    /*
+     * Une description vide est autorisée.
+     * Cela permet réellement de supprimer
+     * une ancienne description.
+     */
+    description:
+      typeof override.description ===
+        "string"
+        ? override.description
+        : exercise.description,
+
+    category:
+      typeof override.category ===
+        "string" &&
+      override.category.trim()
+        ? override.category.trim()
+        : exercise.category,
+
+    tracking:
+      override.tracking ??
+      exercise.tracking,
+
+    /*
+     * [] est une valeur valide :
+     * elle signifie que l'exercice n'est
+     * associé à aucune séance.
+     */
+    sessionIds:
+      override.sessionIds !==
+      undefined
+        ? [
+            ...override.sessionIds,
+          ]
+        : exercise.sessionIds,
+
+    assistanceOptions:
+      override.assistanceOptions !==
+      undefined
+        ? [
+            ...override.assistanceOptions,
+          ]
+        : exercise.assistanceOptions,
+
+    isHangboard:
+      override.isHangboard !==
+      undefined
+        ? override.isHangboard
+        : exercise.isHangboard,
+
+    variantOptions:
+      override.variantOptions !==
+      undefined
+        ? [
+            ...override.variantOptions,
+          ]
+        : exercise.variantOptions,
+
+    bandOptions:
+      override.bandOptions !==
+      undefined
+        ? [
+            ...override.bandOptions,
+          ]
+        : exercise.bandOptions,
+
+    totalWeight:
+      override.totalWeight !==
+      undefined
+        ? override.totalWeight
+        : exercise.totalWeight,
+
+    perSide:
+      override.perSide !==
+      undefined
+        ? override.perSide
+        : exercise.perSide,
+
+    /*
+     * Les labels peuvent volontairement être
+     * supprimés : chaîne vide = aucun label.
+     */
+    primaryRepsLabel:
+      override.primaryRepsLabel !==
+      undefined
+        ? override.primaryRepsLabel
+        : exercise.primaryRepsLabel,
+
+    secondaryRepsLabel:
+      override.secondaryRepsLabel !==
+      undefined
+        ? override.secondaryRepsLabel
+        : exercise.secondaryRepsLabel,
+
+    primaryWeightLabel:
+      override.primaryWeightLabel !==
+      undefined
+        ? override.primaryWeightLabel
+        : exercise.primaryWeightLabel,
+
+    secondaryWeightLabel:
+      override.secondaryWeightLabel !==
+      undefined
+        ? override.secondaryWeightLabel
+        : exercise.secondaryWeightLabel,
   };
 }
 
-/** 
- * Returns effective exercises for a given session, respecting overrides,
- * custom exercises, hidden flags, and category ordering.
+// ─────────────────────────────────────────────────────────────────────────────
+// Exercices intégrés
+// ─────────────────────────────────────────────────────────────────────────────
+
+export function getBuiltinExercises(): ExerciseDef[] {
+  return uniqueById(
+    SESSIONS.flatMap(
+      (session) =>
+        session.exercises,
+    ),
+  );
+}
+
+/*
+ * Alias conservé pour compatibilité
+ * avec les anciens imports.
  */
-export function getSessionExercises(sessionId: string, data: AppData): ExerciseDef[] {
-  const session = SESSIONS.find(s => s.id === sessionId);
-  if (!session) return [];
-
-  const overrides = data.exerciseOverrides ?? {};
-  const orderMap = data.exerciseCategoryOrder ?? {};
-  const result: ExerciseDef[] = [];
-
-  // 1. Built-in exercises for this session
-  session.exercises.forEach(ex => {
-    const ov = overrides[ex.id];
-    if (ov?.hidden) return;
-    // If sessionIds override exists, respect it
-    if (ov?.sessionIds !== undefined && !ov.sessionIds.includes(sessionId)) return;
-    result.push(applyOverride(ex, data));
-  });
-
-  // 2. Custom exercises assigned to this session
-  (data.customExercises ?? []).forEach(ex => {
-    const ov = overrides[ex.id];
-    if (ov?.hidden) return;
-    const sessionIds = ov?.sessionIds ?? ex.sessionIds ?? [];
-    if (sessionIds.includes(sessionId)) {
-      result.push(applyOverride(ex, data));
-    }
-  });
-
-  // 3. Sort by exerciseCategoryOrder within each category
-  result.sort((a, b) => {
-    if (a.category !== b.category) return 0;
-    const order = orderMap[a.category];
-    if (!order) return 0;
-    const ia = order.indexOf(a.id);
-    const ib = order.indexOf(b.id);
-    if (ia === -1 && ib === -1) return 0;
-    if (ia === -1) return 1;
-    if (ib === -1) return -1;
-    return ia - ib;
-  });
-
-  return result;
+export function getBuiltInExercises(): ExerciseDef[] {
+  return getBuiltinExercises();
 }
 
-/** All managed exercises (built-in + custom) with overrides applied — for the manager UI. */
-export function getAllManagedExercises(data: AppData): ExerciseDef[] {
-  const seen = new Set<string>();
-  const result: ExerciseDef[] = [];
+export const BUILTIN_EXERCISES =
+  getBuiltinExercises();
 
-  getAllBuiltinExercises().forEach(ex => {
-    seen.add(ex.id);
-    result.push(applyOverride(ex, data));
-  });
+// ─────────────────────────────────────────────────────────────────────────────
+// Tous les exercices gérés
+// ─────────────────────────────────────────────────────────────────────────────
 
-  (data.customExercises ?? []).forEach(ex => {
-    if (!seen.has(ex.id)) {
-      seen.add(ex.id);
-      result.push(applyOverride(ex, data));
-    }
-  });
+export function getAllManagedExercises(
+  data: ExerciseDataLike,
+): ExerciseDef[] {
+  const overrides =
+    data.exerciseOverrides ??
+    {};
 
-  return result;
+  const builtinExercises =
+    getBuiltinExercises().map(
+      (exercise) =>
+        applyOverride(
+          exercise,
+          overrides[
+            exercise.id
+          ],
+        ),
+    );
+
+  const customExercises =
+    (
+      data.customExercises ??
+      []
+    ).map(
+      (exercise) =>
+        applyOverride(
+          exercise,
+          overrides[
+            exercise.id
+          ],
+        ),
+    );
+
+  return uniqueById([
+    ...builtinExercises,
+    ...customExercises,
+  ]);
 }
 
-/** Which sessions an exercise currently appears in (considering overrides). */
-export function getExerciseSessionIds(exerciseId: string, data: AppData): string[] {
-  const ov = data.exerciseOverrides?.[exerciseId];
-  if (ov?.sessionIds !== undefined) return ov.sessionIds;
-
-  // Check custom exercises
-  const custom = (data.customExercises ?? []).find(e => e.id === exerciseId);
-  if (custom) return custom.sessionIds ?? [];
-
-  // Built-in: derive from SESSIONS
-  return getBuiltinSessionMap()[exerciseId] ?? [];
+export function getAllExercises(
+  data: ExerciseDataLike,
+): ExerciseDef[] {
+  return getAllManagedExercises(
+    data,
+  );
 }
 
-/** Whether an exercise is hidden (deleted from sessions). */
-export function isExerciseHidden(exerciseId: string, data: AppData): boolean {
-  return data.exerciseOverrides?.[exerciseId]?.hidden === true;
+// ─────────────────────────────────────────────────────────────────────────────
+// Catégories disponibles
+// ─────────────────────────────────────────────────────────────────────────────
+
+export function getAllCategories(
+  data: ExerciseDataLike,
+): string[] {
+  const categories =
+    new Set<string>(
+      BUILTIN_CATEGORIES,
+    );
+
+  (
+    data.customCategories ??
+    []
+  ).forEach(
+    (category) => {
+      const trimmed =
+        category.trim();
+
+      if (
+        trimmed
+      ) {
+        categories.add(
+          trimmed,
+        );
+      }
+    },
+  );
+
+  /*
+   * Inclure également les catégories obtenues
+   * après application des overrides.
+   */
+  getAllManagedExercises(
+    data,
+  ).forEach(
+    (exercise) => {
+      const category =
+        exercise.category.trim();
+
+      if (
+        category
+      ) {
+        categories.add(
+          category,
+        );
+      }
+    },
+  );
+
+  /*
+   * Conserver une catégorie qui possède
+   * encore un ordre personnalisé sauvegardé.
+   */
+  Object.keys(
+    data.exerciseCategoryOrder ??
+      {},
+  ).forEach(
+    (category) => {
+      const trimmed =
+        category.trim();
+
+      if (
+        trimmed
+      ) {
+        categories.add(
+          trimmed,
+        );
+      }
+    },
+  );
+
+  return Array.from(
+    categories,
+  );
+}
+
+export function getExerciseCategories(
+  data: ExerciseDataLike,
+): string[] {
+  return getAllCategories(
+    data,
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Visibilité
+// ─────────────────────────────────────────────────────────────────────────────
+
+export function isExerciseHidden(
+  exerciseId: string,
+  data: ExerciseDataLike,
+): boolean {
+  return (
+    data.exerciseOverrides?.[
+      exerciseId
+    ]?.hidden === true
+  );
+}
+
+export function getVisibleExercises(
+  data: ExerciseDataLike,
+): ExerciseDef[] {
+  return getAllManagedExercises(
+    data,
+  ).filter(
+    (exercise) =>
+      !isExerciseHidden(
+        exercise.id,
+        data,
+      ),
+  );
+}
+
+export function getHiddenExercises(
+  data: ExerciseDataLike,
+): ExerciseDef[] {
+  return getAllManagedExercises(
+    data,
+  ).filter(
+    (exercise) =>
+      isExerciseHidden(
+        exercise.id,
+        data,
+      ),
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Séances associées
+// ─────────────────────────────────────────────────────────────────────────────
+
+export function getExerciseSessionIds(
+  exerciseId: string,
+  data: ExerciseDataLike,
+): string[] {
+  const override =
+    data.exerciseOverrides?.[
+      exerciseId
+    ];
+
+  /*
+   * Important :
+   *
+   * ne pas écrire `if (override?.sessionIds)`.
+   * Un tableau vide [] est une modification valide :
+   * cela signifie "aucune séance".
+   */
+  if (
+    override?.sessionIds !==
+    undefined
+  ) {
+    return [
+      ...override.sessionIds,
+    ];
+  }
+
+  const customExercise =
+    (
+      data.customExercises ??
+      []
+    ).find(
+      (exercise) =>
+        exercise.id ===
+        exerciseId,
+    );
+
+  if (
+    customExercise
+  ) {
+    return [
+      ...(
+        customExercise.sessionIds ??
+        []
+      ),
+    ];
+  }
+
+  /*
+   * Pour les exercices intégrés,
+   * reconstruire les séances d'origine
+   * directement depuis SESSIONS.
+   */
+  return SESSIONS.filter(
+    (session) =>
+      session.exercises.some(
+        (exercise) =>
+          exercise.id ===
+          exerciseId,
+      ),
+  ).map(
+    (session) =>
+      session.id,
+  );
+}
+
+export function getSessionIdsForExercise(
+  exerciseId: string,
+  data: ExerciseDataLike,
+): string[] {
+  return getExerciseSessionIds(
+    exerciseId,
+    data,
+  );
+}
+
+export function getExercisesForSession(
+  sessionId: string,
+  data: ExerciseDataLike,
+): ExerciseDef[] {
+  return getAllManagedExercises(
+    data,
+  ).filter(
+    (exercise) => {
+      if (
+        isExerciseHidden(
+          exercise.id,
+          data,
+        )
+      ) {
+        return false;
+      }
+
+      return getExerciseSessionIds(
+        exercise.id,
+        data,
+      ).includes(
+        sessionId,
+      );
+    },
+  );
+}
+
+export function getSessionExercises(
+  sessionId: string,
+  data: ExerciseDataLike,
+): ExerciseDef[] {
+  return getExercisesForSession(
+    sessionId,
+    data,
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Recherche d'un exercice
+// ─────────────────────────────────────────────────────────────────────────────
+
+export function getExerciseById(
+  exerciseId: string,
+  data: ExerciseDataLike,
+): ExerciseDef | undefined {
+  return getAllManagedExercises(
+    data,
+  ).find(
+    (exercise) =>
+      exercise.id ===
+      exerciseId,
+  );
+}
+
+export function findExerciseById(
+  exerciseId: string,
+  data: ExerciseDataLike,
+): ExerciseDef | undefined {
+  return getExerciseById(
+    exerciseId,
+    data,
+  );
+}
+
+export function isBuiltinExercise(
+  exerciseId: string,
+): boolean {
+  return BUILTIN_EXERCISES.some(
+    (exercise) =>
+      exercise.id ===
+      exerciseId,
+  );
+}
+
+export function isBuiltInExercise(
+  exerciseId: string,
+): boolean {
+  return isBuiltinExercise(
+    exerciseId,
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Identifiants
+// ─────────────────────────────────────────────────────────────────────────────
+
+export function createExerciseId(
+  name: string,
+): string {
+  const normalized =
+    name
+      .trim()
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(
+        /[\u0300-\u036f]/g,
+        "",
+      )
+      .replace(
+        /[^a-z0-9]+/g,
+        "-",
+      )
+      .replace(
+        /^-+|-+$/g,
+        "",
+      );
+
+  return (
+    normalized ||
+    `exercice-${Date.now()}`
+  );
+}
+
+export function makeExerciseId(
+  name: string,
+): string {
+  return createExerciseId(
+    name,
+  );
+}
+
+export function createUniqueExerciseId(
+  name: string,
+  existingExercises: ExerciseDef[],
+): string {
+  const baseId =
+    createExerciseId(
+      name,
+    );
+
+  const ids =
+    new Set(
+      existingExercises.map(
+        (exercise) =>
+          exercise.id,
+      ),
+    );
+
+  if (
+    !ids.has(
+      baseId,
+    )
+  ) {
+    return baseId;
+  }
+
+  let suffix =
+    2;
+
+  while (
+    ids.has(
+      `${baseId}-${suffix}`,
+    )
+  ) {
+    suffix +=
+      1;
+  }
+
+  return `${baseId}-${suffix}`;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Recherche textuelle
+// ─────────────────────────────────────────────────────────────────────────────
+
+export function searchExercises(
+  exercises: ExerciseDef[],
+  query: string,
+): ExerciseDef[] {
+  const normalizedQuery =
+    query
+      .trim()
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(
+        /[\u0300-\u036f]/g,
+        "",
+      );
+
+  if (
+    !normalizedQuery
+  ) {
+    return exercises;
+  }
+
+  return exercises.filter(
+    (exercise) => {
+      const searchable =
+        `${exercise.name} ${exercise.description} ${exercise.category}`
+          .toLowerCase()
+          .normalize("NFD")
+          .replace(
+            /[\u0300-\u036f]/g,
+            "",
+          );
+
+      return searchable.includes(
+        normalizedQuery,
+      );
+    },
+  );
 }

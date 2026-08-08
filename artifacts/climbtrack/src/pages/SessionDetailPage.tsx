@@ -1,278 +1,733 @@
 import {
   useEffect,
-  useRef,
+  useMemo,
   useState,
 } from "react";
 
 import {
-  useLocation,
-  useRoute,
-} from "wouter";
-
-import {
-  ChevronLeft,
+  AlertTriangle,
+  ArrowLeft,
+  ClipboardList,
+  Save,
 } from "lucide-react";
 
 import {
-  SESSIONS,
-} from "@/data/sessions";
-
-import type {
-  ExerciseDef,
-  SessionDef,
-} from "@/data/sessions";
+  useNavigate,
+  useParams,
+} from "react-router-dom";
 
 import {
   useClimbTrack,
+  type ExerciseLog,
+  type SessionLog,
 } from "@/context/ClimbTrackContext";
 
-import type {
-  ExerciseLog,
-  FinisherType,
-  SessionLog,
-} from "@/context/ClimbTrackContext";
+import {
+  SESSIONS,
+  type ExerciseDef,
+} from "@/data/sessions";
 
 import {
   ExerciseRow,
 } from "@/components/ExerciseRow";
 
 import {
-  MUSCLE_SCORES,
-} from "@/data/muscleScores";
-
-import {
-  getSessionExercises,
+  getExercisesForSession,
 } from "@/utils/exercises";
 
 import {
-  getTodayLocalDate,
-} from "@/utils/dailySuggestion";
+  cn,
+} from "@/lib/utils";
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Helpers
+// ─────────────────────────────────────────────────────────────────────────────
+
+function generateId(): string {
+  if (
+    typeof crypto !==
+      "undefined" &&
+    typeof crypto.randomUUID ===
+      "function"
+  ) {
+    return crypto.randomUUID();
+  }
+
+  return `${Date.now()}-${Math.random()
+    .toString(36)
+    .slice(2, 9)}`;
+}
+
+function getLocalDateString(): string {
+  const now =
+    new Date();
+
+  const offset =
+    now.getTimezoneOffset() *
+    60_000;
+
+  return new Date(
+    now.getTime() -
+      offset,
+  )
+    .toISOString()
+    .split("T")[0];
+}
+
+function createInitialExerciseLog(
+  exercise: ExerciseDef,
+  defaults:
+    | ReturnType<
+        typeof useClimbTrack
+      >["data"]["exerciseDefaults"][string]
+    | undefined,
+): ExerciseLog {
+  const source =
+    defaults ??
+    exercise.defaultValues;
+
+  const tracksJumps =
+    exercise.id ===
+      "sauts-prise" ||
+    exercise.id ===
+      "croise-dynamique-19-30";
+
+  return {
+    exerciseId:
+      exercise.id,
+
+    completed:
+      false,
+
+    sets:
+      source.sets ?? 0,
+
+    reps:
+      source.reps,
+
+    secondaryReps:
+      source.secondaryReps,
+
+    duration:
+      source.duration,
+
+    weight:
+      source.weight,
+
+    secondaryWeight:
+      source.secondaryWeight,
+
+    assistance:
+      source.assistance,
+
+    progressionValue:
+      source.progressionValue,
+
+    bandColor:
+      source.bandColor,
+
+    bandStretch:
+      source.bandStretch,
+
+    variant:
+      exercise.variantOptions?.[0],
+
+    leftHandJumps:
+      tracksJumps
+        ? source.reps
+        : undefined,
+
+    rightHandJumps:
+      tracksJumps
+        ? source.reps
+        : undefined,
+  };
+}
+
+function normalizePainArea(
+  value: string,
+): string {
+  return value
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(
+      /[\u0300-\u036f]/g,
+      "",
+    );
+}
+
+function exerciseMatchesInjury(
+  exercise: ExerciseDef,
+  injuryArea: string,
+): boolean {
+  const searchableText =
+    normalizePainArea(
+      `${exercise.name} ${exercise.description} ${exercise.category}`,
+    );
+
+  const area =
+    normalizePainArea(
+      injuryArea,
+    );
+
+  const mappings: {
+    terms: string[];
+    exerciseTerms: string[];
+  }[] = [
+    {
+      terms: [
+        "doigt",
+        "doigts",
+        "main",
+        "poulie",
+      ],
+
+      exerciseTerms: [
+        "suspension",
+        "repeaters",
+        "pince",
+        "prise",
+        "croise",
+        "doigt",
+      ],
+    },
+
+    {
+      terms: [
+        "poignet",
+        "avant bras",
+        "avant-bras",
+      ],
+
+      exerciseTerms: [
+        "suspension",
+        "pince",
+        "poignet",
+        "pronation",
+        "supination",
+        "traction",
+      ],
+    },
+
+    {
+      terms: [
+        "coude",
+        "biceps",
+        "triceps",
+      ],
+
+      exerciseTerms: [
+        "traction",
+        "rowing",
+        "lat pulldown",
+        "triceps",
+        "dips",
+        "developpe",
+      ],
+    },
+
+    {
+      terms: [
+        "epaule",
+        "épaule",
+        "coiffe",
+      ],
+
+      exerciseTerms: [
+        "traction",
+        "developpe",
+        "face pull",
+        "rotation",
+        "scapular",
+        "lat pulldown",
+        "dips",
+        "suspension",
+      ],
+    },
+
+    {
+      terms: [
+        "pectoraux",
+        "pectoral",
+        "pec",
+      ],
+
+      exerciseTerms: [
+        "developpe couche",
+        "dips",
+        "pompe",
+      ],
+    },
+
+    {
+      terms: [
+        "dos",
+        "lombaire",
+        "rachis",
+      ],
+
+      exerciseTerms: [
+        "rowing",
+        "souleve",
+        "superman",
+        "gainage",
+        "squat",
+        "rotation",
+      ],
+    },
+
+    {
+      terms: [
+        "hanche",
+        "aine",
+        "adducteur",
+        "gracile",
+      ],
+
+      exerciseTerms: [
+        "fente",
+        "squat",
+        "copenhagen",
+        "papillon",
+        "grenouille",
+        "hanche",
+      ],
+    },
+
+    {
+      terms: [
+        "ischio",
+        "biceps femoral",
+        "semi tendineux",
+        "semi membraneux",
+      ],
+
+      exerciseTerms: [
+        "souleve de terre",
+        "pont",
+        "ischios",
+        "fente",
+        "step-up",
+      ],
+    },
+
+    {
+      terms: [
+        "genou",
+      ],
+
+      exerciseTerms: [
+        "squat",
+        "fente",
+        "step-up",
+        "quadriceps",
+        "genou",
+      ],
+    },
+
+    {
+      terms: [
+        "mollet",
+        "cheville",
+        "tibia",
+        "tibial",
+      ],
+
+      exerciseTerms: [
+        "mollet",
+        "cheville",
+        "tibialis",
+        "equilibre",
+        "step-up",
+      ],
+    },
+  ];
+
+  return mappings.some(
+    (mapping) =>
+      mapping.terms.some(
+        (term) =>
+          area.includes(
+            normalizePainArea(
+              term,
+            ),
+          ),
+      ) &&
+      mapping.exerciseTerms.some(
+        (term) =>
+          searchableText.includes(
+            normalizePainArea(
+              term,
+            ),
+          ),
+      ),
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Zones de douleur
+// ─────────────────────────────────────────────────────────────────────────────
+
+const PAIN_AREAS = [
+  "Doigts",
+
+  "Poignet gauche",
+  "Poignet droit",
+
+  "Coude gauche",
+  "Coude droit",
+
+  "Épaule gauche",
+  "Épaule droite",
+
+  "Pectoral gauche",
+  "Pectoral droit",
+
+  "Haut du dos",
+  "Bas du dos",
+
+  "Hanche gauche",
+  "Hanche droite",
+
+  "Aine gauche",
+  "Aine droite",
+
+  "Ischio gauche",
+  "Ischio droit",
+
+  "Genou gauche",
+  "Genou droit",
+
+  "Mollet gauche",
+  "Mollet droit",
+
+  "Cheville gauche",
+  "Cheville droite",
+];
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Page
+// ─────────────────────────────────────────────────────────────────────────────
 
 export function SessionDetailPage() {
-  const [
-    match,
-    params,
-  ] = useRoute(
-    "/seance/:id",
-  );
+  const {
+    sessionId,
+  } = useParams<{
+    sessionId: string;
+  }>();
 
-  const [
-    ,
-    setLocation,
-  ] = useLocation();
+  const navigate =
+    useNavigate();
 
   const {
     data,
     addSessionLog,
-    updateExerciseDefault,
   } = useClimbTrack();
 
-  const [
-    sessionDef,
-    setSessionDef,
-  ] =
-    useState<SessionDef | null>(
-      null,
+  /*
+   * Toujours ouvrir une séance depuis le haut.
+   *
+   * Sans cela, le navigateur peut conserver
+   * la position de scroll de la page précédente.
+   */
+  useEffect(
+    () => {
+      window.scrollTo({
+        top: 0,
+        left: 0,
+        behavior: "auto",
+      });
+    },
+    [
+      sessionId,
+    ],
+  );
+
+  const session =
+    SESSIONS.find(
+      (currentSession) =>
+        currentSession.id ===
+        sessionId,
+    );
+
+  const visibleExercises =
+    useMemo(
+      () => {
+        if (
+          !sessionId
+        ) {
+          return [];
+        }
+
+        return getExercisesForSession(
+          sessionId,
+          data,
+        );
+      },
+      [
+        sessionId,
+        data,
+      ],
     );
 
   const [
-    sessionExercises,
-    setSessionExercises,
-  ] = useState<ExerciseDef[]>(
-    [],
+    exerciseLogs,
+    setExerciseLogs,
+  ] = useState<
+    ExerciseLog[]
+  >(() => {
+    if (
+      !sessionId
+    ) {
+      return [];
+    }
+
+    return getExercisesForSession(
+      sessionId,
+      data,
+    ).map(
+      (exercise) =>
+        createInitialExerciseLog(
+          exercise,
+          data.exerciseDefaults[
+            exercise.id
+          ],
+        ),
+    );
+  });
+
+  /*
+   * Garder l'état de la séance cohérent si la liste
+   * des exercices change pendant que la page existe.
+   *
+   * Les valeurs déjà modifiées temporairement sont conservées.
+   */
+  useEffect(
+    () => {
+      setExerciseLogs(
+        (previous) => {
+          const previousById =
+            new Map(
+              previous.map(
+                (log) => [
+                  log.exerciseId,
+                  log,
+                ],
+              ),
+            );
+
+          return visibleExercises.map(
+            (exercise) =>
+              previousById.get(
+                exercise.id,
+              ) ??
+              createInitialExerciseLog(
+                exercise,
+                data.exerciseDefaults[
+                  exercise.id
+                ],
+              ),
+          );
+        },
+      );
+    },
+    [
+      sessionId,
+      visibleExercises,
+      data.exerciseDefaults,
+    ],
   );
-
-  const [
-    logs,
-    setLogs,
-  ] = useState<
-    Record<
-      string,
-      ExerciseLog
-    >
-  >({});
-
-  const [
-    painAreas,
-    setPainAreas,
-  ] = useState<
-    Record<
-      string,
-      number
-    >
-  >({});
 
   const [
     note,
     setNote,
-  ] = useState("");
+  ] =
+    useState("");
 
-  const search =
-    new URLSearchParams(
-      window.location.search,
+  const [
+    pain,
+    setPain,
+  ] = useState<
+    Record<string, number>
+  >({});
+
+  const [
+    showPainSection,
+    setShowPainSection,
+  ] =
+    useState(false);
+
+  const activeInjuries =
+    useMemo(
+      () =>
+        data.injuries.filter(
+          (injury) =>
+            injury.status !==
+            "guerie",
+        ),
+      [
+        data.injuries,
+      ],
     );
 
-  const manualDate =
-    search.get("date");
+  const painfulExerciseIds =
+    useMemo(
+      () => {
+        const result =
+          new Set<string>();
 
-  const finisherType =
-    search.get(
-      "finisherType",
-    ) as FinisherType | null;
+        visibleExercises.forEach(
+          (exercise) => {
+            const matches =
+              activeInjuries.some(
+                (injury) =>
+                  exerciseMatchesInjury(
+                    exercise,
+                    injury.area,
+                  ),
+              );
 
-  const requestedExercises =
-    search
-      .get("exerciseIds")
-      ?.split(",")
-      .filter(Boolean);
-
-  const dataRef =
-    useRef(data);
-
-  dataRef.current =
-    data;
-
-  useEffect(() => {
-    if (
-      !match ||
-      !params?.id
-    ) {
-      return;
-    }
-
-    const definition =
-      SESSIONS.find(
-        (session) =>
-          session.id ===
-          params.id,
-      );
-
-    if (!definition) {
-      setLocation("/");
-      return;
-    }
-
-    setSessionDef(
-      definition,
-    );
-
-    let exercises =
-      getSessionExercises(
-        params.id,
-        dataRef.current,
-      );
-
-    if (
-      requestedExercises?.length
-    ) {
-      const requested =
-        new Set(
-          requestedExercises,
+            if (
+              matches
+            ) {
+              result.add(
+                exercise.id,
+              );
+            }
+          },
         );
 
-      exercises =
-        exercises.filter(
-          (exercise) =>
-            requested.has(
-              exercise.id,
-            ),
-        );
-    }
-
-    setSessionExercises(
-      exercises,
-    );
-
-    const initialLogs: Record<
-      string,
-      ExerciseLog
-    > = {};
-
-    exercises.forEach(
-      (exercise) => {
-        const defaults =
-          dataRef.current
-            .exerciseDefaults[
-              exercise.id
-            ] ??
-          exercise.defaultValues;
-
-        initialLogs[
-          exercise.id
-        ] = {
-          exerciseId:
-            exercise.id,
-
-          completed:
-            false,
-
-          sets:
-            defaults.sets,
-
-          reps:
-            defaults.reps,
-
-          duration:
-            defaults.duration,
-
-          weight:
-            defaults.weight,
-
-          assistance:
-            defaults.assistance,
-
-          progressionValue:
-            exercise.id ===
-            "suspension-slopers"
-              ? 30
-              : undefined,
-
-          leftHandJumps:
-            exercise.id ===
-            "sauts-prise"
-              ? 3
-              : undefined,
-
-          rightHandJumps:
-            exercise.id ===
-            "sauts-prise"
-              ? 3
-              : undefined,
-        };
+        return result;
       },
+      [
+        visibleExercises,
+        activeInjuries,
+      ],
     );
 
-    setLogs(
-      initialLogs,
-    );
-  }, [
-    match,
-    params?.id,
-    setLocation,
-  ]);
+  if (
+    !session
+  ) {
+    return (
+      <div className="min-h-screen overflow-x-hidden bg-background p-5 pt-safe">
+        <button
+          type="button"
+          onClick={() =>
+            navigate(
+              "/seances",
+            )
+          }
+          className="mb-6 flex items-center gap-2 text-sm font-bold text-muted-foreground"
+        >
+          <ArrowLeft
+            size={18}
+          />
 
-  if (!sessionDef) {
-    return null;
+          Retour
+        </button>
+
+        <div className="rounded-2xl border border-border bg-card py-20 text-center">
+          <ClipboardList
+            size={42}
+            className="mx-auto mb-4 text-muted-foreground/30"
+          />
+
+          <p className="font-bold text-muted-foreground">
+            Séance introuvable.
+          </p>
+        </div>
+      </div>
+    );
   }
 
-  function handleFinish() {
-    const date =
-      manualDate ??
-      getTodayLocalDate();
+  function updateExerciseLog(
+    exerciseId: string,
+    updatedLog: ExerciseLog,
+  ) {
+    setExerciseLogs(
+      (previous) =>
+        previous.map(
+          (log) =>
+            log.exerciseId ===
+            exerciseId
+              ? updatedLog
+              : log,
+        ),
+    );
+  }
 
-    const newSessionLog: SessionLog =
-      {
+  function updatePain(
+    area: string,
+    value: number,
+  ) {
+    setPain(
+      (previous) => ({
+        ...previous,
+
+        [area]:
+          value,
+      }),
+    );
+  }
+
+  function saveSession() {
+    const completedCount =
+      exerciseLogs.filter(
+        (log) =>
+          log.completed,
+      ).length;
+
+    if (
+      completedCount ===
+      0
+    ) {
+      return;
+    }
+
+    const painEntries =
+      Object.fromEntries(
+        Object.entries(
+          pain,
+        ).filter(
+          (
+            [
+              ,
+              value,
+            ],
+          ) =>
+            value >
+            0,
+        ),
+      );
+
+    const sessionLog:
+      SessionLog = {
         id:
-          crypto.randomUUID(),
+          generateId(),
 
-        date,
+        date:
+          getLocalDateString(),
+
+        completedAt:
+          new Date().toISOString(),
 
         sessionId:
-          sessionDef.id,
+          session.id,
 
+        /*
+         * Sauvegarder également les exercices non réalisés.
+         *
+         * Cela permet ensuite :
+         * - de distinguer réalisé / non réalisé ;
+         * - de détecter une séance partielle ;
+         * - de proposer uniquement ce qu'il reste à faire.
+         */
         exerciseLogs:
-          Object.values(
-            logs,
+          exerciseLogs.map(
+            (log) => ({
+              ...log,
+            }),
           ),
 
         note:
@@ -281,274 +736,402 @@ export function SessionDetailPage() {
 
         pain:
           Object.keys(
-            painAreas,
-          ).length > 0
-            ? painAreas
+            painEntries,
+          ).length >
+          0
+            ? painEntries
             : undefined,
-
-        finisherType:
-          finisherType ??
-          undefined,
       };
 
     addSessionLog(
-      newSessionLog,
+      sessionLog,
     );
 
-    setLocation("/");
-  }
-
-  function getPainWarning(
-    exerciseId: string,
-  ) {
-    const scores =
-      MUSCLE_SCORES[
-        exerciseId
-      ];
-
-    if (!scores) {
-      return false;
-    }
-
-    const fingersPain =
-      (
-        painAreas[
-          "Doigts"
-        ] ?? 0
-      ) > 3 &&
-      (
-        scores.doigts ??
-        0
-      ) >= 3;
-
-    const shoulderPain =
-      (
-        (
-          painAreas[
-            "Épaule droite"
-          ] ?? 0
-        ) > 3 ||
-        (
-          painAreas[
-            "Épaule gauche"
-          ] ?? 0
-        ) > 3
-      ) &&
-      (
-        scores.épaules ??
-        0
-      ) >= 3;
-
-    return (
-      fingersPain ||
-      shoulderPain
+    navigate(
+      "/historique",
     );
   }
 
-  const painSliders = [
-    "Doigts",
-    "Poignet droit",
-    "Poignet gauche",
-    "Coude droit",
-    "Coude gauche",
-    "Épaule droite",
-    "Épaule gauche",
-  ];
+  const completedCount =
+    exerciseLogs.filter(
+      (log) =>
+        log.completed,
+    ).length;
+
+  const completionPercentage =
+    exerciseLogs.length >
+    0
+      ? Math.round(
+          (
+            completedCount /
+            exerciseLogs.length
+          ) *
+            100,
+        )
+      : 0;
+
+  const painCount =
+    Object.values(
+      pain,
+    ).filter(
+      (value) =>
+        value > 0,
+    ).length;
 
   return (
-    <div className="min-h-screen bg-background pb-32">
-      <header className="sticky top-0 z-10 border-b border-border bg-background/95 pt-safe backdrop-blur-md">
-        <div className="flex items-center gap-3 px-4 py-4">
+    <div className="min-h-screen w-full overflow-x-hidden bg-background pb-36 pt-safe">
+      {/*
+       * IMPORTANT :
+       * le header n'est volontairement PAS sticky.
+       *
+       * Le nom de la séance et la progression remontent
+       * donc normalement avec le contenu lorsque l'on scroll.
+       */}
+      <header className="border-b border-border bg-background px-5 py-4">
+        <div className="flex items-start gap-4">
           <button
             type="button"
             onClick={() =>
-              setLocation("/")
+              navigate(
+                "/seances",
+              )
             }
-            className="-ml-2 rounded-full p-2 hover:bg-white/10"
+            className="mt-0.5 flex-shrink-0 rounded-full border border-border p-2 text-muted-foreground active:scale-95"
+            aria-label="Retour"
           >
-            <ChevronLeft
-              size={24}
-              className="text-white"
+            <ArrowLeft
+              size={19}
             />
           </button>
 
-          <div>
-            <h1 className="text-lg font-bold text-white">
+          <div className="min-w-0 flex-1">
+            <h1 className="text-xl font-black leading-tight text-white">
               {
-                sessionDef.name
+                session.name
               }
             </h1>
 
-            {manualDate && (
-              <p className="mt-0.5 text-xs text-muted-foreground">
-                Séance du{" "}
-                {new Date(
-                  `${manualDate}T12:00:00`,
-                ).toLocaleDateString(
-                  "fr-CH",
-                  {
-                    day:
-                      "2-digit",
-                    month:
-                      "long",
-                    year:
-                      "numeric",
-                  },
-                )}
-              </p>
-            )}
+            <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+              {
+                session.moment
+              }
+            </p>
+          </div>
+        </div>
+
+        <div className="mt-4">
+          <div className="mb-1.5 flex items-center justify-between text-xs font-bold">
+            <span className="text-muted-foreground">
+              {
+                completedCount
+              }{" "}
+              sur{" "}
+              {
+                exerciseLogs.length
+              }{" "}
+              exercices
+            </span>
+
+            <span className="font-mono text-white">
+              {
+                completionPercentage
+              }
+              %
+            </span>
+          </div>
+
+          <div className="h-1.5 overflow-hidden rounded-full bg-white/10">
+            <div
+              className="h-full rounded-full bg-white transition-all duration-300"
+              style={{
+                width:
+                  `${completionPercentage}%`,
+              }}
+            />
           </div>
         </div>
       </header>
 
-      <main className="space-y-4 p-4">
-        {sessionExercises.map(
-          (exercise) => {
-            const exerciseLog =
-              logs[
-                exercise.id
-              ];
-
-            if (!exerciseLog) {
-              return null;
-            }
-
-            return (
-              <ExerciseRow
-                key={
-                  exercise.id
-                }
-
-                exercise={
-                  exercise
-                }
-
-                defaults={
-                  data
-                    .exerciseDefaults[
-                      exercise.id
-                    ] ??
-                  exercise.defaultValues
-                }
-
-                log={
-                  exerciseLog
-                }
-
-                onChange={(
-                  updatedLog,
-                ) =>
-                  setLogs(
-                    (
-                      previous,
-                    ) => ({
-                      ...previous,
-
-                      [exercise.id]:
-                        updatedLog,
-                    }),
-                  )
-                }
-
-                onUpdateDefault={(
-                  defaults,
-                ) =>
-                  updateExerciseDefault(
-                    exercise.id,
-                    defaults,
-                  )
-                }
-
-                isPainful={getPainWarning(
-                  exercise.id,
-                )}
+      <main className="w-full space-y-6 overflow-x-hidden p-5">
+        {activeInjuries.length >
+          0 && (
+          <section className="rounded-2xl border border-orange-500/30 bg-orange-500/10 p-4">
+            <div className="flex items-start gap-3">
+              <AlertTriangle
+                size={20}
+                className="mt-0.5 flex-shrink-0 text-orange-400"
               />
-            );
-          },
+
+              <div className="min-w-0">
+                <h2 className="text-sm font-black text-orange-300">
+                  Blessure active ou en amélioration
+                </h2>
+
+                <p className="mt-1 text-xs leading-relaxed text-orange-200/80">
+                  Certains exercices sont signalés selon les zones enregistrées. Adapter ou arrêter l’exercice si la douleur augmente ou modifie le mouvement.
+                </p>
+
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {activeInjuries.map(
+                    (injury) => (
+                      <span
+                        key={
+                          injury.id
+                        }
+                        className="max-w-full rounded-full border border-orange-500/30 bg-background/40 px-3 py-1.5 text-xs font-bold text-orange-200"
+                      >
+                        {
+                          injury.area
+                        }{" "}
+                        ·{" "}
+                        {
+                          injury.painLevel
+                        }
+                        /10
+                      </span>
+                    ),
+                  )}
+                </div>
+              </div>
+            </div>
+          </section>
         )}
 
-        <div className="mt-8 border-t border-border pt-6">
-          <h3 className="mb-4 text-sm font-bold uppercase tracking-wider text-white">
-            Douleurs & gênes
-          </h3>
+        {visibleExercises.length >
+        0 ? (
+          <section className="w-full space-y-3">
+            {visibleExercises.map(
+              (exercise) => {
+                const log =
+                  exerciseLogs.find(
+                    (
+                      currentLog,
+                    ) =>
+                      currentLog.exerciseId ===
+                      exercise.id,
+                  );
 
-          <div className="space-y-4 rounded-xl border border-border bg-card p-4">
-            {painSliders.map(
-              (area) => (
-                <div
-                  key={area}
-                  className="flex items-center gap-4"
-                >
-                  <span className="w-1/3 text-sm text-muted-foreground">
-                    {area}
-                  </span>
+                if (
+                  !log
+                ) {
+                  return null;
+                }
 
-                  <input
-                    type="range"
-                    min="0"
-                    max="10"
-                    value={
-                      painAreas[
-                        area
-                      ] ?? 0
+                return (
+                  <ExerciseRow
+                    key={
+                      exercise.id
+                    }
+                    exercise={
+                      exercise
+                    }
+                    defaults={
+                      data.exerciseDefaults[
+                        exercise.id
+                      ] ??
+                      exercise.defaultValues
+                    }
+                    log={
+                      log
                     }
                     onChange={(
-                      event,
+                      updatedLog,
                     ) =>
-                      setPainAreas(
-                        (
-                          previous,
-                        ) => ({
-                          ...previous,
-
-                          [area]:
-                            Number(
-                              event
-                                .target
-                                .value,
-                            ),
-                        }),
+                      updateExerciseLog(
+                        exercise.id,
+                        updatedLog,
                       )
                     }
-                    className="flex-1 accent-white"
-                  />
-
-                  <span className="w-4 text-right font-mono text-xs">
-                    {
-                      painAreas[
-                        area
-                      ] ?? 0
+                    onUpdateDefault={() => {
+                      /*
+                       * Les changements effectués pendant
+                       * une séance restent temporaires.
+                       */
+                    }}
+                    isPainful={
+                      painfulExerciseIds.has(
+                        exercise.id,
+                      )
                     }
-                  </span>
-                </div>
-              ),
+                  />
+                );
+              },
             )}
-          </div>
-        </div>
+          </section>
+        ) : (
+          <section className="rounded-2xl border border-border bg-card py-16 text-center">
+            <ClipboardList
+              size={38}
+              className="mx-auto mb-3 text-muted-foreground/30"
+            />
 
-        <textarea
-          className="min-h-[100px] w-full resize-none rounded-xl border border-border bg-card p-4 text-white"
-          placeholder="Comment s’est passée la séance ?"
-          value={note}
-          onChange={(
-            event,
-          ) =>
-            setNote(
-              event.target.value,
-            )
-          }
-        />
+            <p className="font-bold text-muted-foreground">
+              Aucun exercice visible.
+            </p>
+
+            <p className="mt-1 text-xs text-muted-foreground/70">
+              Vérifier les exercices associés à cette séance dans les réglages.
+            </p>
+          </section>
+        )}
+
+        <section className="overflow-hidden rounded-2xl border border-border bg-card">
+          <button
+            type="button"
+            onClick={() =>
+              setShowPainSection(
+                (previous) =>
+                  !previous,
+              )
+            }
+            className="flex w-full items-center justify-between gap-4 p-4 text-left active:bg-white/[0.03]"
+          >
+            <div className="min-w-0">
+              <h2 className="text-sm font-black text-white">
+                Douleur pendant la séance
+              </h2>
+
+              <p className="mt-1 text-xs text-muted-foreground">
+                Ajouter une douleur ressentie pendant cet entraînement.
+              </p>
+            </div>
+
+            <span className="flex-shrink-0 rounded-full border border-border bg-background px-3 py-1.5 font-mono text-xs text-muted-foreground">
+              {
+                painCount
+              }{" "}
+              zone
+              {painCount >
+              1
+                ? "s"
+                : ""}
+            </span>
+          </button>
+
+          {showPainSection && (
+            <div className="space-y-4 border-t border-border bg-[#151515] p-4">
+              {PAIN_AREAS.map(
+                (area) => {
+                  const value =
+                    pain[
+                      area
+                    ] ??
+                    0;
+
+                  return (
+                    <div
+                      key={
+                        area
+                      }
+                      className="space-y-2"
+                    >
+                      <div className="flex items-center justify-between gap-3">
+                        <label className="text-sm font-bold text-white">
+                          {
+                            area
+                          }
+                        </label>
+
+                        <span
+                          className={cn(
+                            "min-w-12 rounded-full px-2.5 py-1 text-center font-mono text-xs font-black",
+
+                            value >=
+                              7 &&
+                              "bg-destructive/15 text-destructive",
+
+                            value >=
+                              4 &&
+                              value <
+                                7 &&
+                              "bg-orange-500/15 text-orange-400",
+
+                            value >
+                              0 &&
+                              value <
+                                4 &&
+                              "bg-white/10 text-white",
+
+                            value ===
+                              0 &&
+                              "bg-background text-muted-foreground",
+                          )}
+                        >
+                          {
+                            value
+                          }
+                          /10
+                        </span>
+                      </div>
+
+                      <input
+                        type="range"
+                        min="0"
+                        max="10"
+                        step="1"
+                        value={
+                          value
+                        }
+                        onChange={(
+                          event,
+                        ) =>
+                          updatePain(
+                            area,
+                            Number.parseInt(
+                              event.target.value,
+                              10,
+                            ),
+                          )
+                        }
+                        className="w-full accent-white"
+                      />
+                    </div>
+                  );
+                },
+              )}
+            </div>
+          )}
+        </section>
+
+        <section className="space-y-2">
+          <label className="text-xs font-black uppercase tracking-wider text-muted-foreground">
+            Ajouter une note
+          </label>
+
+          <textarea
+            value={
+              note
+            }
+            onChange={(
+              event,
+            ) =>
+              setNote(
+                event.target.value,
+              )
+            }
+            placeholder="Noter les sensations, la forme, une douleur, un progrès ou une difficulté…"
+            className="min-h-28 w-full resize-none rounded-2xl border border-border bg-card p-4 text-sm leading-relaxed text-white outline-none focus:border-white/40"
+          />
+        </section>
       </main>
 
-      <div className="fixed bottom-0 left-0 right-0 border-t border-border bg-background/90 p-4 pb-safe backdrop-blur-md">
+      <div className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-background/95 px-5 pb-[calc(env(safe-area-inset-bottom)+16px)] pt-4 backdrop-blur-md">
         <button
           type="button"
           onClick={
-            handleFinish
+            saveSession
           }
-          className="w-full rounded-xl bg-white py-4 text-lg font-bold text-black"
+          disabled={
+            completedCount ===
+            0
+          }
+          className="flex w-full items-center justify-center gap-2 rounded-xl bg-white py-4 text-sm font-black text-black transition-transform active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40"
         >
-          Terminer la séance
+          <Save
+            size={18}
+          />
+
+          Enregistrer la séance
         </button>
       </div>
     </div>

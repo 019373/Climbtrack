@@ -1,294 +1,295 @@
-import { SessionLog } from "../context/ClimbTrackContext";
+import type {
+  ExerciseLog,
+  SessionLog,
+} from "@/context/ClimbTrackContext";
+
 import {
   BADGES,
-  BadgeDef,
-  BadgeLevel,
-  BadgeLevelDef,
-} from "../data/badges";
+  BADGE_BY_ID,
+  BADGE_LEVEL_ORDER,
+} from "@/data/badges";
 
-const ASSISTANCE_INDEX: Record<string, number> = {
-  "Deux pieds au sol, appui fort": 0,
-  "Deux pieds au sol, appui moyen": 1,
-  "Deux pieds au sol, appui léger": 2,
-  "Un pied au sol": 3,
-  "Pointes des pieds": 4,
-  "Sans assistance": 5,
-  "Lesté": 6,
-};
+import type {
+  BadgeDefinition,
+  BadgeLevel,
+  BadgeLevelDefinition,
+} from "@/data/badges";
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Types
+// ─────────────────────────────────────────────────────────────────────────────
 
 export type EarnedBadgeEntry = {
   level: BadgeLevel;
   earnedAt: string;
 };
 
-export function computeBest(
-  badge: BadgeDef,
-  sessionLogs: SessionLog[],
+export type EarnedBadges = Record<
+  string,
+  EarnedBadgeEntry[]
+>;
+
+export type BadgeUnlock = {
+  badgeId: string;
+  level: BadgeLevel;
+};
+
+type HistoricalExercisePoint = {
+  timestamp: number;
+  exerciseId: string;
+  log: ExerciseLog;
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Helpers — dates
+// ─────────────────────────────────────────────────────────────────────────────
+
+function getSessionTimestamp(
+  log: SessionLog,
 ): number {
   if (
-    !badge.exerciseId &&
-    badge.metric !== "records" &&
-    badge.metric !== "kilter-angle" &&
-    badge.metric !== "climbing-color"
+    log.completedAt
   ) {
-    return -Infinity;
+    const timestamp =
+      new Date(
+        log.completedAt,
+      ).getTime();
+
+    if (
+      !Number.isNaN(
+        timestamp,
+      )
+    ) {
+      return timestamp;
+    }
   }
 
-  const allExerciseLogs = sessionLogs.flatMap(
-    (sessionLog) => sessionLog.exerciseLogs,
-  );
+  return new Date(
+    `${log.date}T12:00:00`,
+  ).getTime();
+}
 
-  const completedLogs = badge.exerciseId
-    ? allExerciseLogs.filter(
+function createEarnedAt(
+  date: string,
+): string {
+  const timestamp =
+    new Date(
+      `${date}T12:00:00`,
+    );
+
+  if (
+    Number.isNaN(
+      timestamp.getTime(),
+    )
+  ) {
+    return new Date().toISOString();
+  }
+
+  return timestamp.toISOString();
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Helpers — exercices
+// ─────────────────────────────────────────────────────────────────────────────
+
+function isCompletedExercise(
+  exerciseLog: ExerciseLog,
+): boolean {
+  /*
+   * Compatibilité historique :
+   *
+   * les anciennes sauvegardes peuvent ne pas
+   * avoir la propriété completed.
+   *
+   * Seul false signifie explicitement
+   * "non réalisé".
+   */
+  return (
+    exerciseLog.completed !==
+    false
+  );
+}
+
+function getExerciseLogs(
+  badge: BadgeDefinition,
+  logs: SessionLog[],
+): ExerciseLog[] {
+  if (
+    !badge.exerciseId
+  ) {
+    return [];
+  }
+
+  return logs.flatMap(
+    (session) =>
+      session.exerciseLogs.filter(
         (exerciseLog) =>
           exerciseLog.exerciseId ===
             badge.exerciseId &&
-          exerciseLog.completed,
-      )
-    : [];
-
-  switch (badge.metric) {
-    case "weight":
-      if (completedLogs.length === 0) {
-        return -Infinity;
-      }
-
-      return Math.max(
-        ...completedLogs.map(
-          (exerciseLog) =>
-            exerciseLog.weight ?? 0,
-        ),
-      );
-
-    case "duration":
-      if (completedLogs.length === 0) {
-        return -Infinity;
-      }
-
-      return Math.max(
-        ...completedLogs.map(
-          (exerciseLog) =>
-            exerciseLog.duration ?? 0,
-        ),
-      );
-
-    case "reps":
-      if (completedLogs.length === 0) {
-        return -Infinity;
-      }
-
-      return Math.max(
-        ...completedLogs.map(
-          (exerciseLog) =>
-            exerciseLog.reps ?? 0,
-        ),
-      );
-
-    case "sets":
-      if (completedLogs.length === 0) {
-        return -Infinity;
-      }
-
-      return Math.max(
-        ...completedLogs.map(
-          (exerciseLog) =>
-            exerciseLog.sets ?? 0,
-        ),
-      );
-
-    case "sessions": {
-      if (!badge.exerciseId) {
-        return -Infinity;
-      }
-
-      const completedSessions =
-        sessionLogs.filter((sessionLog) =>
-          sessionLog.exerciseLogs.some(
-            (exerciseLog) =>
-              exerciseLog.exerciseId ===
-                badge.exerciseId &&
-              exerciseLog.completed,
+          isCompletedExercise(
+            exerciseLog,
           ),
-        ).length;
-
-      return completedSessions > 0
-        ? completedSessions
-        : -Infinity;
-    }
-
-    case "first":
-      return completedLogs.length > 0
-        ? 1
-        : -Infinity;
-
-    case "no-assistance-duration": {
-      const noAssistanceLogs =
-        completedLogs.filter(
-          (exerciseLog) =>
-            exerciseLog.assistance ===
-              "Sans assistance" ||
-            exerciseLog.assistance === "Lesté",
-        );
-
-      if (noAssistanceLogs.length === 0) {
-        return -Infinity;
-      }
-
-      return Math.max(
-        ...noAssistanceLogs.map(
-          (exerciseLog) =>
-            exerciseLog.duration ?? 1,
-        ),
-      );
-    }
-
-    case "assistance-min": {
-      if (completedLogs.length === 0) {
-        return -Infinity;
-      }
-
-      const sessionsWithoutAssistance =
-        sessionLogs.filter((sessionLog) =>
-          sessionLog.exerciseLogs.some(
-            (exerciseLog) =>
-              exerciseLog.exerciseId ===
-                badge.exerciseId &&
-              exerciseLog.completed &&
-              (
-                exerciseLog.assistance ===
-                  "Sans assistance" ||
-                exerciseLog.assistance ===
-                  "Lesté"
-              ),
-          ),
-        ).length;
-
-      if (sessionsWithoutAssistance >= 3) {
-        return 50;
-      }
-
-      return Math.max(
-        ...completedLogs.map(
-          (exerciseLog) =>
-            ASSISTANCE_INDEX[
-              exerciseLog.assistance ?? ""
-            ] ?? 0,
-        ),
-      );
-    }
-
-    case "sloper-duration":
-      if (completedLogs.length === 0) {
-        return -Infinity;
-      }
-
-      /*
-       * Pour l’affichage du record, on montre la meilleure
-       * durée, tous angles confondus.
-       *
-       * Le déblocage vérifie ensuite précisément l’angle
-       * et le nombre de séries.
-       */
-      return Math.max(
-        ...completedLogs.map(
-          (exerciseLog) =>
-            exerciseLog.duration ?? 0,
-        ),
-      );
-
-      case "kilter-angle": {
-        const grade = badge.levels[0]?.grade;
-
-        if (grade === undefined) {
-          return -Infinity;
-        }
-
-        const successfulEntries = sessionLogs.flatMap(
-          (sessionLog) =>
-            (sessionLog.kilterEntries ?? []).filter(
-              (entry) =>
-                entry.result === "reussi" &&
-                entry.grade === grade,
-            ),
-        );
-
-        if (successfulEntries.length === 0) {
-          return -Infinity;
-        }
-
-        return Math.max(
-          ...successfulEntries.map(
-            (entry) => entry.angle,
-          ),
-        );
-      }
-
-      case "climbing-color": {
-        if (!badge.climbingColor) {
-          return -Infinity;
-        }
-
-        const succeeded = sessionLogs.some(
-          (sessionLog) =>
-            (
-              sessionLog.climbingColorsSucceeded ??
-              []
-            ).includes(
-              badge.climbingColor!,
-            ),
-        );
-
-        return succeeded
-          ? 1
-          : -Infinity;
-      }
-      
-    case "records":
-      return countAllTimeRecords(sessionLogs);
-
-    default:
-      return -Infinity;
-  }
-}
-
-function isSloperLevelUnlocked(
-  badge: BadgeDef,
-  levelDefinition: BadgeLevelDef,
-  sessionLogs: SessionLog[],
-): boolean {
-  if (!badge.exerciseId) return false;
-
-  return sessionLogs.some((sessionLog) =>
-    sessionLog.exerciseLogs.some(
-      (exerciseLog) =>
-        exerciseLog.exerciseId ===
-          badge.exerciseId &&
-        exerciseLog.completed &&
-        (exerciseLog.sets ?? 0) >=
-          (levelDefinition.minSets ?? 0) &&
-        (exerciseLog.duration ?? 0) >=
-          levelDefinition.threshold &&
-        exerciseLog.progressionValue ===
-          levelDefinition.angle,
-    ),
+      ),
   );
 }
-function isKilterLevelUnlocked(
-  badge: BadgeDef,
-  levelDefinition: BadgeLevelDef,
-  sessionLogs: SessionLog[],
-): boolean {
-  const grade =
-    levelDefinition.grade;
 
-  if (grade === undefined) {
+/**
+ * Certains exercices ont plusieurs variantes
+ * qu'il ne faut surtout pas mélanger.
+ *
+ * Exemple :
+ * suspension-slopers à 35°, 38° ou 43°.
+ */
+function getRelevantExerciseLogs(
+  badge: BadgeDefinition,
+  logs: SessionLog[],
+): ExerciseLog[] {
+  const exerciseLogs =
+    getExerciseLogs(
+      badge,
+      logs,
+    );
+
+  if (
+    badge.targetAngle ===
+    undefined
+  ) {
+    return exerciseLogs;
+  }
+
+  return exerciseLogs.filter(
+    (exerciseLog) =>
+      exerciseLog.progressionValue ===
+      badge.targetAngle,
+  );
+}
+
+function matchesRequiredAssistance(
+  exerciseLog: ExerciseLog,
+  levelDefinition: BadgeLevelDefinition,
+): boolean {
+  if (
+    !levelDefinition.requiredAssistance
+  ) {
+    return true;
+  }
+
+  return (
+    exerciseLog.assistance ===
+    levelDefinition.requiredAssistance
+  );
+}
+
+function matchesMinimumSets(
+  exerciseLog: ExerciseLog,
+  levelDefinition: BadgeLevelDefinition,
+): boolean {
+  if (
+    levelDefinition.minimumSets ===
+    undefined
+  ) {
+    return true;
+  }
+
+  return (
+    exerciseLog.sets >=
+    levelDefinition.minimumSets
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Helpers — couleurs de blocs
+// ─────────────────────────────────────────────────────────────────────────────
+
+function hasClimbingColor(
+  badge: BadgeDefinition,
+  logs: SessionLog[],
+): boolean {
+  if (
+    !badge.climbingColor
+  ) {
     return false;
   }
 
-  return sessionLogs.some(
-    (sessionLog) =>
+  return logs.some(
+    (log) =>
       (
-        sessionLog.kilterEntries ??
+        log.climbingColorsSucceeded ??
+        []
+      ).includes(
+        badge.climbingColor!,
+      ),
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Helpers — Kilter
+// ─────────────────────────────────────────────────────────────────────────────
+
+function hasExactKilterGrade(
+  grade: number,
+  logs: SessionLog[],
+): boolean {
+  return logs.some(
+    (log) =>
+      (
+        log.kilterEntries ??
+        []
+      ).some(
+        (entry) =>
+          entry.result ===
+            "reussi" &&
+          entry.grade ===
+            grade,
+      ),
+  );
+}
+
+function getBestKilterAngle(
+  grade: number,
+  logs: SessionLog[],
+): number {
+  let best =
+    -Infinity;
+
+  logs.forEach(
+    (log) => {
+      (
+        log.kilterEntries ??
+        []
+      ).forEach(
+        (entry) => {
+          if (
+            entry.result !==
+              "reussi" ||
+            entry.grade !==
+              grade
+          ) {
+            return;
+          }
+
+          best =
+            Math.max(
+              best,
+              entry.angle,
+            );
+        },
+      );
+    },
+  );
+
+  return best;
+}
+
+function hasExactKilterGradeAndAngle(
+  grade: number,
+  angle: number,
+  logs: SessionLog[],
+): boolean {
+  return logs.some(
+    (log) =>
+      (
+        log.kilterEntries ??
         []
       ).some(
         (entry) =>
@@ -296,365 +297,1289 @@ function isKilterLevelUnlocked(
             "reussi" &&
           entry.grade ===
             grade &&
-          entry.angle >=
-            levelDefinition.threshold,
+          entry.angle ===
+            angle,
       ),
   );
 }
-function isStandardLevelUnlocked(
-  badge: BadgeDef,
-  levelDefinition: BadgeLevelDef,
-  sessionLogs: SessionLog[],
-): boolean {
-  const best = computeBest(badge, sessionLogs);
 
-  if (best === -Infinity) return false;
-  if (best < levelDefinition.threshold) return false;
+// ─────────────────────────────────────────────────────────────────────────────
+// Helpers — voies
+// ─────────────────────────────────────────────────────────────────────────────
+
+function hasExactRouteSuccess(
+  badge: BadgeDefinition,
+  level: BadgeLevel,
+  logs: SessionLog[],
+): boolean {
+  const levelDefinition =
+    badge.levels.find(
+      (definition) =>
+        definition.level ===
+        level,
+    );
+
+  const targetGrade =
+    levelDefinition?.routeGrade;
+
+  const targetMode =
+    levelDefinition?.routeMode;
 
   if (
-    !badge.exerciseId ||
-    levelDefinition.minSets === undefined
+    !targetGrade ||
+    !targetMode
   ) {
-    return true;
+    return false;
   }
 
-  return sessionLogs.some((sessionLog) =>
-    sessionLog.exerciseLogs.some(
-      (exerciseLog) =>
-        exerciseLog.exerciseId ===
-          badge.exerciseId &&
-        exerciseLog.completed &&
-        (exerciseLog.sets ?? 0) >=
-          levelDefinition.minSets! &&
-        (
-          badge.metric !== "reps" ||
-          (exerciseLog.reps ?? 0) >=
-            levelDefinition.threshold
-        ),
-    ),
+  return logs.some(
+    (log) =>
+      (
+        log.routeClimbingEntries ??
+        []
+      ).some(
+        (entry) => {
+          /*
+           * Toujours exiger EXACTEMENT
+           * la cotation du badge.
+           */
+          if (
+            entry.result !==
+              "reussi" ||
+            entry.grade !==
+              targetGrade
+          ) {
+            return false;
+          }
+
+          /*
+           * Une réussite en tête valide aussi
+           * le niveau moulinette.
+           */
+          if (
+            targetMode ===
+            "moulinette"
+          ) {
+            return (
+              entry.mode ===
+                "moulinette" ||
+              entry.mode ===
+                "tete"
+            );
+          }
+
+          return (
+            entry.mode ===
+            "tete"
+          );
+        },
+      ),
   );
 }
 
-export function getUnlockedLevels(
-  badge: BadgeDef,
-  sessionLogs: SessionLog[],
-): BadgeLevel[] {
-  /*
-   * Cas spécial des slopers :
-   * les niveaux 30° et 45° sont deux progressions séparées.
-   */
-  if (badge.metric === "sloper-duration") {
-    const unlocked: BadgeLevel[] = [];
+// ─────────────────────────────────────────────────────────────────────────────
+// Helpers — ancienne progression exacte
+// ─────────────────────────────────────────────────────────────────────────────
 
-    const levels30 = badge.levels.filter(
-      (level) => level.angle === 30,
+function hasExactProgressionValue(
+  badge: BadgeDefinition,
+  level: BadgeLevel,
+  logs: SessionLog[],
+): boolean {
+  const levelDefinition =
+    badge.levels.find(
+      (definition) =>
+        definition.level ===
+        level,
     );
 
-    const levels45 = badge.levels.filter(
-      (level) => level.angle === 45,
-    );
+  const targetAngle =
+    levelDefinition?.angle;
 
-    let highest30Index = -1;
-
-    levels30.forEach((level, index) => {
-      if (
-        isSloperLevelUnlocked(
-          badge,
-          level,
-          sessionLogs,
-        )
-      ) {
-        highest30Index = Math.max(
-          highest30Index,
-          index,
-        );
-      }
-    });
-
-    if (highest30Index >= 0) {
-      unlocked.push(
-        ...levels30
-          .slice(0, highest30Index + 1)
-          .map((level) => level.level),
-      );
-    }
-
-    let highest45Index = -1;
-
-    levels45.forEach((level, index) => {
-      if (
-        isSloperLevelUnlocked(
-          badge,
-          level,
-          sessionLogs,
-        )
-      ) {
-        highest45Index = Math.max(
-          highest45Index,
-          index,
-        );
-      }
-    });
-
-    if (highest45Index >= 0) {
-      unlocked.push(
-        ...levels45
-          .slice(0, highest45Index + 1)
-          .map((level) => level.level),
-      );
-    }
-
-    return unlocked;
-  }
   if (
-    badge.metric ===
-    "kilter-angle"
+    targetAngle ===
+    undefined
   ) {
-    let highestUnlockedIndex =
-      -1;
-
-    badge.levels.forEach(
-      (
-        levelDefinition,
-        index,
-      ) => {
-        if (
-          isKilterLevelUnlocked(
-            badge,
-            levelDefinition,
-            sessionLogs,
-          )
-        ) {
-          highestUnlockedIndex =
-            Math.max(
-              highestUnlockedIndex,
-              index,
-            );
-        }
-      },
-    );
-
-    if (
-      highestUnlockedIndex ===
-      -1
-    ) {
-      return [];
-    }
-
-    return badge.levels
-      .slice(
-        0,
-        highestUnlockedIndex + 1,
-      )
-      .map(
-        (level) =>
-          level.level,
-      );
+    return false;
   }
-  /*
-   * Tous les autres badges restent cumulatifs normalement.
-   */
-  let highestUnlockedIndex = -1;
 
-  badge.levels.forEach(
-    (levelDefinition, index) => {
+  return getExerciseLogs(
+    badge,
+    logs,
+  ).some(
+    (exerciseLog) =>
+      exerciseLog.progressionValue ===
+      targetAngle,
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Helpers — records personnels
+// ─────────────────────────────────────────────────────────────────────────────
+
+function getPrimaryPerformance(
+  log: ExerciseLog,
+): {
+  key: string;
+  value: number;
+} | null {
+  /*
+   * Une seule métrique principale par exercice.
+   *
+   * On privilégie les métriques de force,
+   * puis durée, répétitions et progression.
+   */
+
+  if (
+    typeof log.weight ===
+      "number"
+  ) {
+    return {
+      key:
+        "weight",
+
+      value:
+        log.weight,
+    };
+  }
+
+  if (
+    typeof log.duration ===
+      "number"
+  ) {
+    return {
+      key:
+        "duration",
+
+      value:
+        log.duration,
+    };
+  }
+
+  if (
+    typeof log.reps ===
+      "number"
+  ) {
+    return {
+      key:
+        "reps",
+
+      value:
+        log.reps,
+    };
+  }
+
+  if (
+    typeof log.progressionValue ===
+      "number"
+  ) {
+    return {
+      key:
+        "progression",
+
+      value:
+        log.progressionValue,
+    };
+  }
+
+  if (
+    typeof log.leftHandJumps ===
+      "number" &&
+    typeof log.rightHandJumps ===
+      "number"
+  ) {
+    return {
+      key:
+        "left-right",
+
+      value:
+        Math.min(
+          log.leftHandJumps,
+          log.rightHandJumps,
+        ),
+    };
+  }
+
+  return null;
+}
+
+function countPersonalRecords(
+  logs: SessionLog[],
+): number {
+  const history:
+    HistoricalExercisePoint[] = [];
+
+  logs.forEach(
+    (session) => {
+      const timestamp =
+        getSessionTimestamp(
+          session,
+        );
+
+      session.exerciseLogs.forEach(
+        (exerciseLog) => {
+          if (
+            !isCompletedExercise(
+              exerciseLog,
+            )
+          ) {
+            return;
+          }
+
+          history.push({
+            timestamp,
+
+            exerciseId:
+              exerciseLog.exerciseId,
+
+            log:
+              exerciseLog,
+          });
+        },
+      );
+    },
+  );
+
+  history.sort(
+    (
+      first,
+      second,
+    ) =>
+      first.timestamp -
+      second.timestamp,
+  );
+
+  /*
+   * Clé :
+   * exercice + type de mesure.
+   *
+   * Cela évite par exemple qu'un changement
+   * de suivi durée → charge crée un faux record.
+   */
+  const bestByMetric =
+    new Map<
+      string,
+      number
+    >();
+
+  let records =
+    0;
+
+  history.forEach(
+    (point) => {
+      const performance =
+        getPrimaryPerformance(
+          point.log,
+        );
+
       if (
-        isStandardLevelUnlocked(
-          badge,
-          levelDefinition,
-          sessionLogs,
+        !performance ||
+        !Number.isFinite(
+          performance.value,
         )
       ) {
-        highestUnlockedIndex = Math.max(
-          highestUnlockedIndex,
-          index,
+        return;
+      }
+
+      const key =
+        `${point.exerciseId}:${performance.key}`;
+
+      const previousBest =
+        bestByMetric.get(
+          key,
+        );
+
+      /*
+       * La toute première performance établit
+       * le record de référence mais ne compte
+       * pas comme "record battu".
+       */
+      if (
+        previousBest ===
+        undefined
+      ) {
+        bestByMetric.set(
+          key,
+          performance.value,
+        );
+
+        return;
+      }
+
+      if (
+        performance.value >
+        previousBest
+      ) {
+        records +=
+          1;
+
+        bestByMetric.set(
+          key,
+          performance.value,
         );
       }
     },
   );
 
-  if (highestUnlockedIndex === -1) {
-    return [];
+  return records;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Helpers — badges standards par niveau
+// ─────────────────────────────────────────────────────────────────────────────
+
+function hasStandardLevelPerformance(
+  badge: BadgeDefinition,
+  levelDefinition: BadgeLevelDefinition,
+  logs: SessionLog[],
+): boolean {
+  const exerciseLogs =
+    getRelevantExerciseLogs(
+      badge,
+      logs,
+    );
+
+  return exerciseLogs.some(
+    (exerciseLog) => {
+      if (
+        !matchesRequiredAssistance(
+          exerciseLog,
+          levelDefinition,
+        )
+      ) {
+        return false;
+      }
+
+      if (
+        !matchesMinimumSets(
+          exerciseLog,
+          levelDefinition,
+        )
+      ) {
+        return false;
+      }
+
+      if (
+        badge.metric ===
+        "weight"
+      ) {
+        return (
+          typeof exerciseLog.weight ===
+            "number" &&
+          exerciseLog.weight >=
+            levelDefinition.threshold
+        );
+      }
+
+      if (
+        badge.metric ===
+        "duration"
+      ) {
+        return (
+          typeof exerciseLog.duration ===
+            "number" &&
+          exerciseLog.duration >=
+            levelDefinition.threshold
+        );
+      }
+
+      if (
+        badge.metric ===
+        "reps"
+      ) {
+        return (
+          typeof exerciseLog.reps ===
+            "number" &&
+          exerciseLog.reps >=
+            levelDefinition.threshold
+        );
+      }
+
+      if (
+        badge.metric ===
+        "sets"
+      ) {
+        return (
+          exerciseLog.sets >=
+          levelDefinition.threshold
+        );
+      }
+
+      if (
+        badge.metric ===
+        "sets-reps"
+      ) {
+        return (
+          typeof exerciseLog.reps ===
+            "number" &&
+          exerciseLog.reps >=
+            levelDefinition.threshold &&
+          exerciseLog.sets >=
+            (
+              levelDefinition.minimumSets ??
+              1
+            )
+        );
+      }
+
+      if (
+        badge.metric ===
+        "progression"
+      ) {
+        return (
+          typeof exerciseLog.progressionValue ===
+            "number" &&
+          exerciseLog.progressionValue >=
+            levelDefinition.threshold
+        );
+      }
+
+      if (
+        badge.metric ===
+        "left-right"
+      ) {
+        const left =
+          exerciseLog.leftHandJumps;
+
+        const right =
+          exerciseLog.rightHandJumps;
+
+        return (
+          typeof left ===
+            "number" &&
+          typeof right ===
+            "number" &&
+          Math.min(
+            left,
+            right,
+          ) >=
+            levelDefinition.threshold
+        );
+      }
+
+      if (
+        badge.metric ===
+        "assistance"
+      ) {
+        return (
+          typeof exerciseLog.reps ===
+            "number" &&
+          exerciseLog.reps >=
+            levelDefinition.threshold
+        );
+      }
+
+      if (
+        badge.metric ===
+        "dips-reps"
+      ) {
+        return (
+          typeof exerciseLog.reps ===
+            "number" &&
+          exerciseLog.reps >=
+            levelDefinition.threshold &&
+          exerciseLog.sets >=
+            (
+              levelDefinition.minimumSets ??
+              3
+            )
+        );
+      }
+
+      return false;
+    },
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Calcul du meilleur résultat
+// ─────────────────────────────────────────────────────────────────────────────
+
+export function computeBest(
+  badge: BadgeDefinition,
+  logs: SessionLog[],
+): number {
+  // Ancienne compatibilité.
+
+  if (
+    badge.metric ===
+    "first"
+  ) {
+    return logs.length >
+      0
+      ? 1
+      : -Infinity;
   }
 
-  return badge.levels
-    .slice(0, highestUnlockedIndex + 1)
-    .map((level) => level.level);
-}
+  // Couleur de bloc.
 
-export function countAllTimeRecords(
-  sessionLogs: SessionLog[],
-): number {
-  const sortedLogs = [...sessionLogs].sort(
-    (first, second) =>
-      first.date.localeCompare(second.date),
-  );
+  if (
+    badge.metric ===
+    "climbing-color"
+  ) {
+    return hasClimbingColor(
+      badge,
+      logs,
+    )
+      ? 1
+      : -Infinity;
+  }
 
-  const personalRecords: Record<
-    string,
-    number
-  > = {};
+  // Kilter V précis.
 
-  let recordCount = 0;
+  if (
+    badge.metric ===
+    "kilter-grade"
+  ) {
+    const grade =
+      badge.levels[0]
+        ?.grade;
 
-  sortedLogs.forEach((sessionLog) => {
-    sessionLog.exerciseLogs.forEach(
-      (exerciseLog) => {
-        if (!exerciseLog.completed) return;
+    if (
+      grade ===
+      undefined
+    ) {
+      return -Infinity;
+    }
 
-        let value: number | null = null;
+    return hasExactKilterGrade(
+      grade,
+      logs,
+    )
+      ? grade
+      : -Infinity;
+  }
 
-        if ((exerciseLog.weight ?? 0) > 0) {
-          value = exerciseLog.weight ?? 0;
-        } else if (
-          (exerciseLog.duration ?? 0) > 0
-        ) {
-          value = exerciseLog.duration ?? 0;
-        } else if (
-          (exerciseLog.reps ?? 0) > 0
-        ) {
-          value = exerciseLog.reps ?? 0;
-        }
+  // Kilter inclinaison.
 
-        if (value === null) return;
+  if (
+    badge.metric ===
+    "kilter-angle"
+  ) {
+    const grade =
+      badge.levels[0]
+        ?.grade;
 
-        const previousRecord =
-          personalRecords[
-            exerciseLog.exerciseId
-          ];
+    if (
+      grade ===
+      undefined
+    ) {
+      return -Infinity;
+    }
+
+    return getBestKilterAngle(
+      grade,
+      logs,
+    );
+  }
+
+  // Voies.
+
+  if (
+    badge.metric ===
+    "route-grade"
+  ) {
+    const targetGrade =
+      badge.levels[0]
+        ?.routeGrade;
+
+    if (
+      !targetGrade
+    ) {
+      return -Infinity;
+    }
+
+    const success =
+      logs.some(
+        (log) =>
+          (
+            log.routeClimbingEntries ??
+            []
+          ).some(
+            (entry) =>
+              entry.grade ===
+                targetGrade &&
+              entry.result ===
+                "reussi",
+          ),
+      );
+
+    return success
+      ? 1
+      : -Infinity;
+  }
+
+  // Records personnels.
+
+  if (
+    badge.metric ===
+    "records"
+  ) {
+    const records =
+      countPersonalRecords(
+        logs,
+      );
+
+    return records >
+      0
+      ? records
+      : -Infinity;
+  }
+
+  const exerciseLogs =
+    getRelevantExerciseLogs(
+      badge,
+      logs,
+    );
+
+  if (
+    exerciseLogs.length ===
+    0
+  ) {
+    return -Infinity;
+  }
+
+  let best =
+    -Infinity;
+
+  exerciseLogs.forEach(
+    (exerciseLog) => {
+      if (
+        badge.metric ===
+          "weight" &&
+        typeof exerciseLog.weight ===
+          "number"
+      ) {
+        best =
+          Math.max(
+            best,
+            exerciseLog.weight,
+          );
+      }
+
+      if (
+        badge.metric ===
+          "duration" &&
+        typeof exerciseLog.duration ===
+          "number"
+      ) {
+        best =
+          Math.max(
+            best,
+            exerciseLog.duration,
+          );
+      }
+
+      if (
+        badge.metric ===
+          "reps" &&
+        typeof exerciseLog.reps ===
+          "number"
+      ) {
+        best =
+          Math.max(
+            best,
+            exerciseLog.reps,
+          );
+      }
+
+      if (
+        badge.metric ===
+        "sets"
+      ) {
+        best =
+          Math.max(
+            best,
+            exerciseLog.sets,
+          );
+      }
+
+      if (
+        badge.metric ===
+          "sets-reps" &&
+        typeof exerciseLog.reps ===
+          "number"
+      ) {
+        best =
+          Math.max(
+            best,
+            exerciseLog.reps,
+          );
+      }
+
+      if (
+        badge.metric ===
+          "progression" &&
+        typeof exerciseLog.progressionValue ===
+          "number"
+      ) {
+        best =
+          Math.max(
+            best,
+            exerciseLog.progressionValue,
+          );
+      }
+
+      if (
+        badge.metric ===
+        "left-right"
+      ) {
+        const left =
+          exerciseLog.leftHandJumps;
+
+        const right =
+          exerciseLog.rightHandJumps;
 
         if (
-          previousRecord === undefined ||
-          value > previousRecord
+          typeof left ===
+            "number" &&
+          typeof right ===
+            "number"
         ) {
-          personalRecords[
-            exerciseLog.exerciseId
-          ] = value;
-
-          if (previousRecord !== undefined) {
-            recordCount += 1;
-          }
+          best =
+            Math.max(
+              best,
+              Math.min(
+                left,
+                right,
+              ),
+            );
         }
-      },
-    );
-  });
+      }
 
-  return recordCount;
+      if (
+        badge.metric ===
+        "assistance" &&
+        typeof exerciseLog.reps ===
+          "number"
+      ) {
+        best =
+          Math.max(
+            best,
+            exerciseLog.reps,
+          );
+      }
+
+      if (
+        badge.metric ===
+        "dips-reps" &&
+        exerciseLog.sets >=
+          3 &&
+        typeof exerciseLog.reps ===
+          "number"
+      ) {
+        best =
+          Math.max(
+            best,
+            exerciseLog.reps,
+          );
+      }
+    },
+  );
+
+  return best;
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Évaluation d'un niveau
+// ─────────────────────────────────────────────────────────────────────────────
+
+function isLevelUnlocked(
+  badge: BadgeDefinition,
+  level: BadgeLevel,
+  logs: SessionLog[],
+): boolean {
+  const levelDefinition =
+    badge.levels.find(
+      (definition) =>
+        definition.level ===
+        level,
+    );
+
+  if (
+    !levelDefinition
+  ) {
+    return false;
+  }
+
+  // ── Couleur de bloc ──────────────────────────────────────────────────────
+
+  if (
+    badge.metric ===
+    "climbing-color"
+  ) {
+    return hasClimbingColor(
+      badge,
+      logs,
+    );
+  }
+
+  // ── Voies ────────────────────────────────────────────────────────────────
+
+  if (
+    badge.metric ===
+    "route-grade"
+  ) {
+    return hasExactRouteSuccess(
+      badge,
+      level,
+      logs,
+    );
+  }
+
+  // ── Kilter V ─────────────────────────────────────────────────────────────
+
+  if (
+    badge.metric ===
+    "kilter-grade"
+  ) {
+    const targetGrade =
+      levelDefinition.grade;
+
+    return (
+      targetGrade !==
+        undefined &&
+      hasExactKilterGrade(
+        targetGrade,
+        logs,
+      )
+    );
+  }
+
+  // ── Kilter V + angle exact ───────────────────────────────────────────────
+
+  if (
+    badge.metric ===
+    "kilter-angle"
+  ) {
+    const targetGrade =
+      levelDefinition.grade;
+
+    const targetAngle =
+      levelDefinition.angle ??
+      levelDefinition.threshold;
+
+    if (
+      targetGrade ===
+      undefined
+    ) {
+      return false;
+    }
+
+    return hasExactKilterGradeAndAngle(
+      targetGrade,
+      targetAngle,
+      logs,
+    );
+  }
+
+  // ── Ancienne progression exacte ─────────────────────────────────────────
+
+  if (
+    badge.metric ===
+      "progression" &&
+    levelDefinition.angle !==
+      undefined
+  ) {
+    return hasExactProgressionValue(
+      badge,
+      level,
+      logs,
+    );
+  }
+
+  // ── Compteur de records ─────────────────────────────────────────────────
+
+  if (
+    badge.metric ===
+    "records"
+  ) {
+    return (
+      countPersonalRecords(
+        logs,
+      ) >=
+      levelDefinition.threshold
+    );
+  }
+
+  // ── Exercices standards ─────────────────────────────────────────────────
+
+  return hasStandardLevelPerformance(
+    badge,
+    levelDefinition,
+    logs,
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Évaluer un badge
+// ─────────────────────────────────────────────────────────────────────────────
+
+export function evaluateBadge(
+  badge: BadgeDefinition,
+  logs: SessionLog[],
+): BadgeLevel[] {
+  return badge.levels
+    .filter(
+      (
+        levelDefinition,
+      ) =>
+        isLevelUnlocked(
+          badge,
+          levelDefinition.level,
+          logs,
+        ),
+    )
+    .map(
+      (
+        levelDefinition,
+      ) =>
+        levelDefinition.level,
+    );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Évaluer tous les badges
+// ─────────────────────────────────────────────────────────────────────────────
+
 export function evaluateAllBadges(
-  sessionLogs: SessionLog[],
-): Record<string, BadgeLevel[]> {
+  logs: SessionLog[],
+): Record<
+  string,
+  BadgeLevel[]
+> {
   const result: Record<
     string,
     BadgeLevel[]
   > = {};
 
-  BADGES.forEach((badge) => {
-    result[badge.id] = getUnlockedLevels(
-      badge,
-      sessionLogs,
-    );
-  });
+  BADGES.forEach(
+    (badge) => {
+      const levels =
+        evaluateBadge(
+          badge,
+          logs,
+        );
+
+      if (
+        levels.length >
+        0
+      ) {
+        result[
+          badge.id
+        ] = levels;
+      }
+    },
+  );
 
   return result;
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Nouveaux déblocages
+// ─────────────────────────────────────────────────────────────────────────────
+
 export function findNewlyUnlocked(
-  sessionLogs: SessionLog[],
-  earnedBadges: Record<
-    string,
-    EarnedBadgeEntry[]
-  >,
-): {
-  badgeId: string;
-  level: BadgeLevel;
-}[] {
-  const newUnlocks: {
-    badgeId: string;
-    level: BadgeLevel;
-  }[] = [];
+  logs: SessionLog[],
+  earnedBadges: EarnedBadges,
+): BadgeUnlock[] {
+  const evaluated =
+    evaluateAllBadges(
+      logs,
+    );
 
-  const current =
-    evaluateAllBadges(sessionLogs);
+  const unlocks:
+    BadgeUnlock[] = [];
 
-  Object.entries(current).forEach(
-    ([badgeId, levels]) => {
-      const alreadyEarned = new Set(
-        (earnedBadges[badgeId] ?? []).map(
-          (entry) => entry.level,
-        ),
+  Object.entries(
+    evaluated,
+  ).forEach(
+    (
+      [
+        badgeId,
+        levels,
+      ],
+    ) => {
+      const alreadyEarned =
+        new Set(
+          (
+            earnedBadges[
+              badgeId
+            ] ?? []
+          ).map(
+            (entry) =>
+              entry.level,
+          ),
+        );
+
+      levels.forEach(
+        (level) => {
+          if (
+            !alreadyEarned.has(
+              level,
+            )
+          ) {
+            unlocks.push({
+              badgeId,
+
+              level,
+            });
+          }
+        },
       );
-
-      levels.forEach((level) => {
-        if (!alreadyEarned.has(level)) {
-          newUnlocks.push({
-            badgeId,
-            level,
-          });
-        }
-      });
     },
   );
 
-  return newUnlocks;
+  unlocks.sort(
+    (
+      first,
+      second,
+    ) => {
+      const firstBadgeIndex =
+        BADGES.findIndex(
+          (badge) =>
+            badge.id ===
+            first.badgeId,
+        );
+
+      const secondBadgeIndex =
+        BADGES.findIndex(
+          (badge) =>
+            badge.id ===
+            second.badgeId,
+        );
+
+      const badgeDifference =
+        firstBadgeIndex -
+        secondBadgeIndex;
+
+      if (
+        badgeDifference !==
+        0
+      ) {
+        return badgeDifference;
+      }
+
+      const firstLevelIndex =
+        BADGE_LEVEL_ORDER.indexOf(
+          first.level,
+        );
+
+      const secondLevelIndex =
+        BADGE_LEVEL_ORDER.indexOf(
+          second.level,
+        );
+
+      /*
+       * Un vieux niveau Platine n'existe plus
+       * dans BADGE_LEVEL_ORDER.
+       *
+       * Le placer simplement après les niveaux actuels
+       * s'il apparaît dans une ancienne sauvegarde.
+       */
+      const safeFirstIndex =
+        firstLevelIndex ===
+        -1
+          ? BADGE_LEVEL_ORDER.length
+          : firstLevelIndex;
+
+      const safeSecondIndex =
+        secondLevelIndex ===
+        -1
+          ? BADGE_LEVEL_ORDER.length
+          : secondLevelIndex;
+
+      return (
+        safeFirstIndex -
+        safeSecondIndex
+      );
+    },
+  );
+
+  return unlocks;
 }
 
-export function applyNewUnlocks(
-  earnedBadges: Record<
-    string,
-    EarnedBadgeEntry[]
-  >,
-  newUnlocks: {
-    badgeId: string;
-    level: BadgeLevel;
-  }[],
-  date: string,
-): Record<string, EarnedBadgeEntry[]> {
-  const updated = { ...earnedBadges };
+// ─────────────────────────────────────────────────────────────────────────────
+// Ajouter les nouveaux déblocages
+// ─────────────────────────────────────────────────────────────────────────────
 
-  newUnlocks.forEach(
-    ({ badgeId, level }) => {
-      updated[badgeId] = [
-        ...(updated[badgeId] ?? []),
-        {
-          level,
-          earnedAt: date,
-        },
+export function applyNewUnlocks(
+  earnedBadges: EarnedBadges,
+  unlocks: BadgeUnlock[],
+  date: string,
+): EarnedBadges {
+  const result:
+    EarnedBadges = {};
+
+  /*
+   * Copier absolument toutes les anciennes données.
+   *
+   * Ainsi, même un ancien niveau Platine ou
+   * un badge retiré reste conservé dans la sauvegarde.
+   */
+  Object.entries(
+    earnedBadges,
+  ).forEach(
+    (
+      [
+        badgeId,
+        entries,
+      ],
+    ) => {
+      result[
+        badgeId
+      ] = [
+        ...entries,
       ];
     },
   );
 
-  return updated;
+  unlocks.forEach(
+    ({
+      badgeId,
+      level,
+    }) => {
+      const current =
+        result[
+          badgeId
+        ] ??
+        [];
+
+      if (
+        current.some(
+          (entry) =>
+            entry.level ===
+            level,
+        )
+      ) {
+        return;
+      }
+
+      result[
+        badgeId
+      ] = [
+        ...current,
+
+        {
+          level,
+
+          earnedAt:
+            createEarnedAt(
+              date,
+            ),
+        },
+      ].sort(
+        (
+          first,
+          second,
+        ) => {
+          const firstIndex =
+            BADGE_LEVEL_ORDER.indexOf(
+              first.level,
+            );
+
+          const secondIndex =
+            BADGE_LEVEL_ORDER.indexOf(
+              second.level,
+            );
+
+          const safeFirstIndex =
+            firstIndex ===
+            -1
+              ? BADGE_LEVEL_ORDER.length
+              : firstIndex;
+
+          const safeSecondIndex =
+            secondIndex ===
+            -1
+              ? BADGE_LEVEL_ORDER.length
+              : secondIndex;
+
+          return (
+            safeFirstIndex -
+            safeSecondIndex
+          );
+        },
+      );
+    },
+  );
+
+  return result;
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Niveau le plus élevé
+// ─────────────────────────────────────────────────────────────────────────────
 
 export function getHighestLevel(
   badgeId: string,
-  earnedBadges: Record<
-    string,
-    EarnedBadgeEntry[]
-  >,
+  earnedBadges: EarnedBadges,
 ): BadgeLevel | null {
-  const earned =
-    earnedBadges[badgeId] ?? [];
+  const badge =
+    BADGE_BY_ID[
+      badgeId
+    ];
 
-  if (earned.length === 0) return null;
+  const entries =
+    earnedBadges[
+      badgeId
+    ] ?? [];
 
-  const order: Record<
-    BadgeLevel,
-    number
-  > = {
-    bronze: 0,
-    silver: 1,
-    gold: 2,
-    diamond: 3,
-  };
+  if (
+    !badge ||
+    entries.length ===
+      0
+  ) {
+    return null;
+  }
 
-  return earned.reduce(
-    (best, entry) =>
-      order[entry.level] >
-      order[best.level]
-        ? entry
-        : best,
-  ).level;
+  const validBadgeLevels =
+    new Set(
+      badge.levels.map(
+        (
+          levelDefinition,
+        ) =>
+          levelDefinition.level,
+      ),
+    );
+
+  const earnedLevels =
+    new Set(
+      entries
+        .filter(
+          (entry) =>
+            validBadgeLevels.has(
+              entry.level,
+            ),
+        )
+        .map(
+          (entry) =>
+            entry.level,
+        ),
+    );
+
+  for (
+    let index =
+      BADGE_LEVEL_ORDER.length -
+      1;
+    index >=
+      0;
+    index -=
+      1
+  ) {
+    const level =
+      BADGE_LEVEL_ORDER[
+        index
+      ];
+
+    if (
+      earnedLevels.has(
+        level,
+      )
+    ) {
+      return level;
+    }
+  }
+
+  return null;
 }

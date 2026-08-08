@@ -1,47 +1,147 @@
-import { SESSIONS, SessionDef } from "@/data/sessions";
-import { useClimbTrack } from "@/context/ClimbTrackContext";
-import { formatDistanceToNow, parseISO } from "date-fns";
-import { fr } from "date-fns/locale";
+import {
+  formatDistanceToNow,
+} from "date-fns";
+
+import {
+  fr,
+} from "date-fns/locale";
+
+import {
+  ChevronRight,
+} from "lucide-react";
+
+import {
+  useClimbTrack,
+} from "@/context/ClimbTrackContext";
+
+import type {
+  SessionDef,
+} from "@/data/sessions";
+
+import {
+  getExercisesForSession,
+} from "@/utils/exercises";
 
 interface SessionCardProps {
   session: SessionDef;
   onClick: () => void;
 }
 
-export function SessionCard({ session, onClick }: SessionCardProps) {
-  const { data } = useClimbTrack();
-  
-  // Find last time this session was completed
-  const logs = data.sessionLogs
-    .filter(log => log.sessionId === session.id)
-    .sort((a, b) => b.date.localeCompare(a.date));
-    
-  const lastPerformed = logs.length > 0 ? logs[0].date : null;
-  const timeAgo = lastPerformed 
-    ? formatDistanceToNow(parseISO(lastPerformed), { addSuffix: true, locale: fr })
-    : "Jamais réalisée";
+function getSessionTimestamp(
+  date: string,
+  completedAt?: string,
+): number {
+  if (completedAt) {
+    const timestamp =
+      new Date(
+        completedAt,
+      ).getTime();
+
+    if (
+      !Number.isNaN(
+        timestamp,
+      )
+    ) {
+      return timestamp;
+    }
+  }
+
+  return new Date(
+    `${date}T12:00:00`,
+  ).getTime();
+}
+
+export function SessionCard({
+  session,
+  onClick,
+}: SessionCardProps) {
+  const {
+    data,
+  } = useClimbTrack();
+
+  const logs =
+    data.sessionLogs
+      .filter(
+        (log) =>
+          log.sessionId ===
+          session.id,
+      )
+      .sort(
+        (
+          first,
+          second,
+        ) =>
+          getSessionTimestamp(
+            second.date,
+            second.completedAt,
+          ) -
+          getSessionTimestamp(
+            first.date,
+            first.completedAt,
+          ),
+      );
+
+  const lastPerformed =
+    logs[0] ?? null;
+
+  const timeAgo =
+    lastPerformed
+      ? formatDistanceToNow(
+          new Date(
+            getSessionTimestamp(
+              lastPerformed.date,
+              lastPerformed.completedAt,
+            ),
+          ),
+          {
+            addSuffix: true,
+            locale: fr,
+          },
+        )
+      : "Jamais réalisée";
+
+  const visibleExerciseCount =
+    getExercisesForSession(
+      session.id,
+      data,
+    ).length;
 
   return (
-    <div 
+    <button
+      type="button"
       onClick={onClick}
-      className="bg-card border border-card-border rounded-xl p-5 cursor-pointer active:scale-[0.98] transition-transform flex flex-col gap-2 relative overflow-hidden group"
+      className="group relative flex w-full cursor-pointer flex-col gap-2 overflow-hidden rounded-xl border border-card-border bg-card p-5 text-left transition-transform active:scale-[0.98]"
     >
-      <div className="flex justify-between items-start gap-4">
-        <h3 className="text-lg font-bold leading-tight tracking-tight">{session.name}</h3>
-        <span className="text-xs font-mono bg-border px-2 py-1 rounded text-muted-foreground whitespace-nowrap">
-          {session.exercises.length} ex.
+      <div className="flex items-start justify-between gap-4">
+        <div className="min-w-0 flex-1">
+          <h3 className="text-lg font-bold leading-tight tracking-tight text-white">
+            {session.name}
+          </h3>
+
+          <p className="mt-1 line-clamp-2 text-sm leading-relaxed text-muted-foreground">
+            {session.moment}
+          </p>
+        </div>
+
+        <div className="flex flex-shrink-0 items-center gap-2">
+          <span className="whitespace-nowrap rounded bg-border px-2 py-1 font-mono text-xs text-muted-foreground">
+            {visibleExerciseCount} ex.
+          </span>
+
+          <ChevronRight
+            size={18}
+            className="text-muted-foreground transition-transform group-active:translate-x-0.5"
+          />
+        </div>
+      </div>
+
+      <div className="mt-2 flex items-center justify-between border-t border-border pt-3">
+        <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+          {lastPerformed
+            ? `Dernière : ${timeAgo}`
+            : timeAgo}
         </span>
       </div>
-      
-      <p className="text-sm text-muted-foreground line-clamp-2 leading-relaxed">
-        {session.moment}
-      </p>
-      
-      <div className="mt-2 pt-3 border-t border-border flex justify-between items-center">
-        <span className="text-xs text-muted-foreground font-medium uppercase tracking-wider">
-          {lastPerformed ? `Dernière: ${timeAgo}` : timeAgo}
-        </span>
-      </div>
-    </div>
+    </button>
   );
 }

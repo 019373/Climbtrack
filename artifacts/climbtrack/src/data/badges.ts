@@ -1,87 +1,31 @@
+import type {
+  RouteGrade,
+} from "@/context/ClimbTrackContext";
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Types
+// ─────────────────────────────────────────────────────────────────────────────
+
 export type BadgeLevel =
   | "bronze"
   | "silver"
   | "gold"
-  | "diamond";
 
-export const BADGE_LEVELS: BadgeLevel[] = [
-  "bronze",
-  "silver",
-  "gold",
-  "diamond",
-];
-
-export const BADGE_LEVEL_META: Record<
-  BadgeLevel,
-  {
-    label: string;
-    border: string;
-    glow: string;
-    shadow: string;
-  }
-> = {
-  bronze: {
-    label: "Bronze",
-    border: "#CD7F32",
-    glow: "rgba(205,127,50,0.35)",
-    shadow: "rgba(205,127,50,0.6)",
-  },
-
-  silver: {
-    label: "Argent",
-    border: "#A8A8A8",
-    glow: "rgba(168,168,168,0.35)",
-    shadow: "rgba(168,168,168,0.6)",
-  },
-
-  gold: {
-    label: "Or",
-    border: "#FFD700",
-    glow: "rgba(255,215,0,0.35)",
-    shadow: "rgba(255,215,0,0.6)",
-  },
-
-  diamond: {
-    label: "Diamant",
-    border: "#67E8F9",
-    glow: "rgba(103,232,249,0.35)",
-    shadow: "rgba(103,232,249,0.6)",
-  },
-};
-
-export type BadgeMetric =
-  | "weight"
-  | "duration"
-  | "reps"
-  | "sets"
-  | "sessions"
-  | "first"
-  | "no-assistance-duration"
-  | "assistance-min"
-  | "sloper-duration"
-  | "bilateral-jumps"
-  | "records"
-  | "kilter-angle"
-  | "climbing-color";
-
-export interface BadgeLevelDef {
-  level: BadgeLevel;
-  description: string;
-  threshold: number;
-  minSets?: number;
-  angle?: 30 | 45;
-
-  /**
-   * Cotation exacte utilisée pour les badges Kilter.
-   * Réussir une V5 ne débloque jamais V0 à V4.
+  /*
+   * Conservé uniquement pour la compatibilité
+   * avec d'anciennes sauvegardes.
+   *
+   * Aucun badge actuel ne génère de niveau Platine.
    */
-  grade?: number;
-}
+  | "platinum"
+
+  | "diamond";
 
 export type BadgeKind =
   | "standard"
+  | "climbing-color"
   | "kilter"
-  | "climbing-color";
+  | "route";
 
 export type ClimbingColor =
   | "rose"
@@ -94,942 +38,1817 @@ export type ClimbingColor =
   | "noir"
   | "blanc";
 
-export interface BadgeDef {
+export type BadgeMetric =
+  | "first"
+  | "weight"
+  | "duration"
+  | "reps"
+  | "sets"
+  | "sets-reps"
+  | "assistance"
+  | "progression"
+  | "records"
+  | "left-right"
+  | "climbing-color"
+  | "kilter-grade"
+  | "kilter-angle"
+  | "route-grade"
+  | "dips-reps";
+
+export type BadgeLevelDefinition = {
+  level: BadgeLevel;
+
+  threshold: number;
+
+  description: string;
+
+  /**
+   * Cotation Kilter précise.
+   */
+  grade?: number;
+
+  /**
+   * Angle précis.
+   */
+  angle?: number;
+
+  /**
+   * Cotation précise de voie.
+   */
+  routeGrade?: RouteGrade;
+
+  /**
+   * Mode nécessaire pour le badge de voie.
+   */
+  routeMode?:
+    | "moulinette"
+    | "tete";
+
+  /**
+   * Assistance éventuellement exigée.
+   *
+   * Exemple :
+   * les badges 20 mm doivent être réalisés
+   * sans assistance.
+   */
+  requiredAssistance?: string;
+
+  /**
+   * Nombre minimum de séries nécessaire.
+   */
+  minimumSets?: number;
+};
+
+export type BadgeDefinition = {
   id: string;
+
   name: string;
+
   subtitle: string;
-  icon: string;
+
   category: string;
-  exerciseId?: string;
+
+  icon: string;
+
+  kind: BadgeKind;
+
   metric: BadgeMetric;
-  unit: string;
-  levels: BadgeLevelDef[];
 
-  /**
-   * Permet à la page des badges d’utiliser
-   * un affichage particulier.
-   */
-  kind?: BadgeKind;
+  exerciseId?: string;
 
-  /**
-   * Couleur visuelle du badge de bloc.
-   */
+  unit?: string;
+
+  climbingColor?: ClimbingColor;
+
   visualColor?: string;
 
   /**
-   * Couleur de bloc exacte à réussir.
+   * Angle spécifique à tout le badge.
+   *
+   * Utile pour les trois badges 35 / 38 / 43°.
    */
-  climbingColor?: ClimbingColor;
+  targetAngle?: number;
+
+  levels: BadgeLevelDefinition[];
 
   /**
-   * Les badges de couleurs ne doivent pas afficher
-   * Bronze, Argent, Or ou Diamant.
+   * Ne pas afficher Bronze / Argent / Or / Diamant
+   * sous les badges à objectif unique.
    */
   hideLevelLabel?: boolean;
-}
+};
 
-  const STANDARD_BADGES: BadgeDef[] = [
+// ─────────────────────────────────────────────────────────────────────────────
+// Niveaux
+// ─────────────────────────────────────────────────────────────────────────────
+
+/*
+ * Ordre ACTUEL.
+ *
+ * Platine n'en fait plus partie.
+ */
+export const BADGE_LEVEL_ORDER: BadgeLevel[] = [
+  "bronze",
+  "silver",
+  "gold",
+  "diamond",
+];
+
+export const BADGE_LEVEL_META: Record<
+  BadgeLevel,
   {
-    id: "suspension-20mm",
-    name: "Suspension 20 mm",
-    subtitle: "Réglette 20 mm sans assistance",
-    icon: "fingerboard-20",
-    category: "Force doigts",
-    exerciseId: "suspension-20mm",
-    metric: "no-assistance-duration",
-    unit: "s",
+    label: string;
+    border: string;
+    glow: string;
+  }
+> = {
+  bronze: {
+    label:
+      "Bronze",
 
-    levels: [
-      {
-        level: "bronze",
-        description: "15 secondes sans assistance",
-        threshold: 15,
-      },
-      {
-        level: "silver",
-        description: "25 secondes sans assistance",
-        threshold: 25,
-      },
-      {
-        level: "gold",
-        description: "35 secondes sans assistance",
-        threshold: 35,
-      },
-      {
-        level: "diamond",
-        description: "50 secondes sans assistance",
-        threshold: 50,
-      },
-    ],
+    border:
+      "#CD7F32",
+
+    glow:
+      "#CD7F32",
+  },
+
+  silver: {
+    label:
+      "Argent",
+
+    border:
+      "#C7CCD3",
+
+    glow:
+      "#C7CCD3",
+  },
+
+  gold: {
+    label:
+      "Or",
+
+    border:
+      "#FFD700",
+
+    glow:
+      "#FFD700",
+  },
+
+  /*
+   * Compatibilité uniquement.
+   *
+   * Ne fait plus partie de BADGE_LEVEL_ORDER
+   * et n'est utilisé par aucun badge actuel.
+   */
+  platinum: {
+    label:
+      "Platine",
+
+    border:
+      "#D9F3F5",
+
+    glow:
+      "#A7F3F7",
+  },
+
+  diamond: {
+    label:
+      "Diamant",
+
+    border:
+      "#67E8F9",
+
+    glow:
+      "#67E8F9",
+  },
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Helper quatre niveaux
+// ─────────────────────────────────────────────────────────────────────────────
+
+const STANDARD_LEVELS = (
+  values: [
+    number,
+    number,
+    number,
+    number,
+  ],
+
+  descriptions: [
+    string,
+    string,
+    string,
+    string,
+  ],
+): BadgeLevelDefinition[] => [
+  {
+    level:
+      "bronze",
+
+    threshold:
+      values[0],
+
+    description:
+      descriptions[0],
   },
 
   {
-    id: "dead-hang",
-    name: "Suspension 25 mm",
-    subtitle: "Suspension bras tendus sur une prise de 25 mm",
-    icon: "fingerboard-25",
-    category: "Force doigts",
-    exerciseId: "dead-hang",
-    metric: "duration",
-    unit: "s",
+    level:
+      "silver",
 
-    levels: [
-      {
-        level: "bronze",
-        description: "30 secondes",
-        threshold: 30,
-      },
-      {
-        level: "silver",
-        description: "45 secondes",
-        threshold: 45,
-      },
-      {
-        level: "gold",
-        description: "60 secondes",
-        threshold: 60,
-      },
-      {
-        level: "diamond",
-        description: "90 secondes",
-        threshold: 90,
-      },
-    ],
+    threshold:
+      values[1],
+
+    description:
+      descriptions[1],
   },
 
   {
-    id: "suspension-slopers",
-    name: "Suspensions sur slopers",
-    subtitle: "Suspension sur prises arrondies",
-    icon: "sloper",
-    category: "Force doigts",
-    exerciseId: "suspension-slopers",
-    metric: "sloper-duration",
-    unit: "s",
+    level:
+      "gold",
 
-    levels: [
-      {
-        level: "bronze",
-        description:
-          "6 séries de 15 secondes sur 30°",
-        threshold: 15,
-        minSets: 6,
-        angle: 30,
-      },
-      {
-        level: "silver",
-        description:
-          "6 séries de 30 secondes sur 30°",
-        threshold: 30,
-        minSets: 6,
-        angle: 30,
-      },
-      {
-        level: "gold",
-        description:
-          "6 séries de 20 secondes sur 45°",
-        threshold: 20,
-        minSets: 6,
-        angle: 45,
-      },
-      {
-        level: "diamond",
-        description:
-          "6 séries de 40 secondes sur 45°",
-        threshold: 40,
-        minSets: 6,
-        angle: 45,
-      },
-    ],
+    threshold:
+      values[2],
+
+    description:
+      descriptions[2],
   },
 
   {
-    id: "pince-disque",
-    name: "Pince disque",
-    subtitle: "Maintenir un disque en pince",
-    icon: "pinch",
-    category: "Force doigts",
-    exerciseId: "pince-disque",
-    metric: "weight",
-    unit: "kg",
+    level:
+      "diamond",
 
-    levels: [
-      {
-        level: "bronze",
-        description: "25 kg",
-        threshold: 25,
-      },
-      {
-        level: "silver",
-        description: "30 kg",
-        threshold: 30,
-      },
-      {
-        level: "gold",
-        description: "40 kg",
-        threshold: 40,
-      },
-      {
-        level: "diamond",
-        description: "50 kg",
-        threshold: 50,
-      },
-    ],
+    threshold:
+      values[3],
+
+    description:
+      descriptions[3],
+  },
+];
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Couleurs de blocs
+// ─────────────────────────────────────────────────────────────────────────────
+
+const CLIMBING_COLOR_META: Record<
+  ClimbingColor,
+  {
+    label: string;
+    color: string;
+  }
+> = {
+  rose: {
+    label:
+      "Rose",
+
+    color:
+      "#EC4899",
   },
 
+  jaune: {
+    label:
+      "Jaune",
+
+    color:
+      "#FACC15",
+  },
+
+  vert: {
+    label:
+      "Vert",
+
+    color:
+      "#22C55E",
+  },
+
+  turquoise: {
+    label:
+      "Turquoise",
+
+    color:
+      "#2DD4BF",
+  },
+
+  bleu: {
+    label:
+      "Bleu",
+
+    color:
+      "#3B82F6",
+  },
+
+  orange: {
+    label:
+      "Orange",
+
+    color:
+      "#F97316",
+  },
+
+  rouge: {
+    label:
+      "Rouge",
+
+    color:
+      "#EF4444",
+  },
+
+  noir: {
+    label:
+      "Noir",
+
+    color:
+      "#171717",
+  },
+
+  blanc: {
+    label:
+      "Blanc",
+
+    color:
+      "#F5F5F5",
+  },
+};
+
+const CLIMBING_COLOR_BADGES: BadgeDefinition[] =
+  (
+    Object.keys(
+      CLIMBING_COLOR_META,
+    ) as ClimbingColor[]
+  ).map(
+    (
+      color,
+    ) => {
+      const metadata =
+        CLIMBING_COLOR_META[
+          color
+        ];
+
+      return {
+        id:
+          `bloc-${color}`,
+
+        name:
+          `Bloc ${metadata.label}`,
+
+        subtitle:
+          `Réussir au moins un bloc ${metadata.label.toLowerCase()}`,
+
+        category:
+          "Couleurs de blocs",
+
+        icon:
+          "hold",
+
+        kind:
+          "climbing-color",
+
+        metric:
+          "climbing-color",
+
+        climbingColor:
+          color,
+
+        visualColor:
+          metadata.color,
+
+        hideLevelLabel:
+          true,
+
+        levels: [
+          {
+            level:
+              "gold",
+
+            threshold:
+              1,
+
+            description:
+              `Réussir au moins un bloc ${metadata.label.toLowerCase()}.`,
+          },
+        ],
+      };
+    },
+  );
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Kilterboard
+// ─────────────────────────────────────────────────────────────────────────────
+
+/*
+ * Même fonctionnement que dans la version de base :
+ *
+ * chaque cotation V0 → V17 possède son propre badge.
+ *
+ * Bronze  : 30°
+ * Argent  : 35°
+ * Or      : 40°
+ * Diamant : 45°
+ */
+const KILTER_BADGES: BadgeDefinition[] =
+  Array.from(
+    {
+      length:
+        18,
+    },
+
+    (
+      _,
+      grade,
+    ) => ({
+      id:
+        `kilter-v${grade}`,
+
+      name:
+        `Kilter V${grade}`,
+
+      subtitle:
+        `Réussir V${grade} à différentes inclinaisons`,
+
+      category:
+        "Kilterboard",
+
+      icon:
+        "kilter",
+
+      kind:
+        "kilter" as const,
+
+      metric:
+        "kilter-angle" as const,
+
+      unit:
+        "°",
+
+      levels: [
+        {
+          level:
+            "bronze" as const,
+
+          threshold:
+            30,
+
+          grade,
+
+          angle:
+            30,
+
+          description:
+            `Réussir exactement un bloc V${grade} à 30°.`,
+        },
+
+        {
+          level:
+            "silver" as const,
+
+          threshold:
+            35,
+
+          grade,
+
+          angle:
+            35,
+
+          description:
+            `Réussir exactement un bloc V${grade} à 35°.`,
+        },
+
+        {
+          level:
+            "gold" as const,
+
+          threshold:
+            40,
+
+          grade,
+
+          angle:
+            40,
+
+          description:
+            `Réussir exactement un bloc V${grade} à 40°.`,
+        },
+
+        {
+          level:
+            "diamond" as const,
+
+          threshold:
+            45,
+
+          grade,
+
+          angle:
+            45,
+
+          description:
+            `Réussir exactement un bloc V${grade} à 45°.`,
+        },
+      ],
+    }),
+  );
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Voies
+// ─────────────────────────────────────────────────────────────────────────────
+
+const ROUTE_GRADES: RouteGrade[] = [
+  "3a",
+  "3a+",
+  "3b",
+  "3b+",
+  "3c",
+  "3c+",
+
+  "4a",
+  "4a+",
+  "4b",
+  "4b+",
+  "4c",
+  "4c+",
+
+  "5a",
+  "5a+",
+  "5b",
+  "5b+",
+  "5c",
+  "5c+",
+
+  "6a",
+  "6a+",
+  "6b",
+  "6b+",
+  "6c",
+  "6c+",
+
+  "7a",
+  "7a+",
+  "7b",
+  "7b+",
+  "7c",
+  "7c+",
+
+  "8a",
+  "8a+",
+  "8b",
+  "8b+",
+  "8c",
+  "8c+",
+
+  "9a",
+  "9a+",
+  "9b",
+  "9b+",
+  "9c",
+];
+
+const ROUTE_BADGES: BadgeDefinition[] =
+  ROUTE_GRADES.map(
+    (
+      grade,
+    ) => ({
+      id:
+        `voie-${grade}`,
+
+      name:
+        `Voie ${grade}`,
+
+      subtitle:
+        `Réussir précisément une voie ${grade}`,
+
+      category:
+        "Escalade en voie",
+
+      icon:
+        "route-wall",
+
+      kind:
+        "route",
+
+      metric:
+        "route-grade",
+
+      levels: [
+        {
+          level:
+            "gold",
+
+          threshold:
+            1,
+
+          routeGrade:
+            grade,
+
+          routeMode:
+            "moulinette",
+
+          description:
+            `Réussir exactement une voie ${grade} en moulinette ou en tête.`,
+        },
+
+        {
+          level:
+            "diamond",
+
+          threshold:
+            1,
+
+          routeGrade:
+            grade,
+
+          routeMode:
+            "tete",
+
+          description:
+            `Réussir exactement une voie ${grade} en tête.`,
+        },
+      ],
+    }),
+  );
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Badges
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const BADGES: BadgeDefinition[] = [
+  // ═══════════════════════════════════════════════════════════════════════════
+  // FORCE DOIGTS
+  // ═══════════════════════════════════════════════════════════════════════════
+
   {
-    id: "repeaters",
-    name: "Repeaters",
+    id:
+      "suspension-20mm",
+
+    name:
+      "Suspension 20 mm",
+
     subtitle:
-      "7 secondes suspendu / 3 secondes de repos",
-    icon: "repeaters",
-    category: "Force doigts",
-    exerciseId: "repeaters-7-3",
-    metric: "sets",
-    unit: "séries",
+      "Suspension sans assistance",
+
+    category:
+      "Force doigts",
+
+    icon:
+      "fingerboard-20",
+
+    kind:
+      "standard",
+
+    metric:
+      "duration",
+
+    exerciseId:
+      "suspension-20mm",
+
+    unit:
+      "s",
 
     levels: [
       {
-        level: "bronze",
-        description: "3 séries",
-        threshold: 3,
+        level:
+          "bronze",
+
+        threshold:
+          15,
+
+        requiredAssistance:
+          "Sans assistance",
+
+        description:
+          "Tenir 15 secondes sans assistance.",
       },
+
       {
-        level: "silver",
-        description: "5 séries",
-        threshold: 5,
+        level:
+          "silver",
+
+        threshold:
+          25,
+
+        requiredAssistance:
+          "Sans assistance",
+
+        description:
+          "Tenir 25 secondes sans assistance.",
       },
+
       {
-        level: "gold",
-        description: "7 séries",
-        threshold: 7,
+        level:
+          "gold",
+
+        threshold:
+          35,
+
+        requiredAssistance:
+          "Sans assistance",
+
+        description:
+          "Tenir 35 secondes sans assistance.",
       },
+
       {
-        level: "diamond",
-        description: "10 séries",
-        threshold: 10,
+        level:
+          "diamond",
+
+        threshold:
+          50,
+
+        requiredAssistance:
+          "Sans assistance",
+
+        description:
+          "Tenir 50 secondes sans assistance.",
       },
     ],
   },
 
   {
-    id: "sauts",
-    name: "Sauts pour prise",
+    id:
+      "suspension-25mm",
+
+    name:
+      "Suspension 25 mm",
+
     subtitle:
-      "Monter de prise en prise avec chaque main",
-    icon: "jump",
-    category: "Force doigts",
-    exerciseId: "sauts-prise",
-    metric: "bilateral-jumps",
-    unit: "prises",
+      "Suspension bras tendus sur une prise de 25 mm",
 
-    levels: [
-      {
-        level: "bronze",
-        description:
-          "Sauter 4 prises avec chaque main",
-        threshold: 4,
-      },
-      {
-        level: "silver",
-        description:
-          "Sauter 5 prises avec chaque main",
-        threshold: 5,
-      },
-      {
-        level: "gold",
-        description:
-          "Sauter 6 prises avec chaque main",
-        threshold: 6,
-      },
-      {
-        level: "diamond",
-        description:
-          "Sauter 7 prises avec chaque main",
-        threshold: 7,
-      },
-    ],
+    category:
+      "Force doigts",
+
+    icon:
+      "fingerboard-25",
+
+    kind:
+      "standard",
+
+    metric:
+      "duration",
+
+    exerciseId:
+      "dead-hang",
+
+    unit:
+      "s",
+
+    levels:
+      STANDARD_LEVELS(
+        [
+          30,
+          45,
+          60,
+          90,
+        ],
+
+        [
+          "Tenir 30 secondes.",
+          "Tenir 45 secondes.",
+          "Tenir 60 secondes.",
+          "Tenir 90 secondes.",
+        ],
+      ),
+  },
+
+  /*
+   * Le nouvel exercice utilise 35 / 38 / 43°.
+   *
+   * On sépare les trois angles pour ne jamais
+   * comparer une durée facile à une durée plus difficile.
+   *
+   * Les seuils sont volontairement plus exigeants
+   * que les premières valeurs utilisées précédemment.
+   */
+
+  {
+    id:
+      "sloper-35",
+
+    name:
+      "Sloper 35°",
+
+    subtitle:
+      "Maîtriser le plat à 35°",
+
+    category:
+      "Force doigts",
+
+    icon:
+      "sloper",
+
+    kind:
+      "standard",
+
+    metric:
+      "duration",
+
+    exerciseId:
+      "suspension-slopers",
+
+    targetAngle:
+      35,
+
+    unit:
+      "s",
+
+    levels:
+      STANDARD_LEVELS(
+        [
+          15,
+          25,
+          35,
+          50,
+        ],
+
+        [
+          "Tenir 15 secondes sur le sloper 35°.",
+          "Tenir 25 secondes sur le sloper 35°.",
+          "Tenir 35 secondes sur le sloper 35°.",
+          "Tenir 50 secondes sur le sloper 35°.",
+        ],
+      ),
   },
 
   {
-    id: "lourd-leger",
-    name: "Lourd-léger",
+    id:
+      "sloper-38",
+
+    name:
+      "Sloper 38°",
+
+    subtitle:
+      "Maîtriser le plat à 38°",
+
+    category:
+      "Force doigts",
+
+    icon:
+      "sloper",
+
+    kind:
+      "standard",
+
+    metric:
+      "duration",
+
+    exerciseId:
+      "suspension-slopers",
+
+    targetAngle:
+      38,
+
+    unit:
+      "s",
+
+    levels:
+      STANDARD_LEVELS(
+        [
+          12,
+          20,
+          30,
+          40,
+        ],
+
+        [
+          "Tenir 12 secondes sur le sloper 38°.",
+          "Tenir 20 secondes sur le sloper 38°.",
+          "Tenir 30 secondes sur le sloper 38°.",
+          "Tenir 40 secondes sur le sloper 38°.",
+        ],
+      ),
+  },
+
+  {
+    id:
+      "sloper-43",
+
+    name:
+      "Sloper 43°",
+
+    subtitle:
+      "Maîtriser le plat à 43°",
+
+    category:
+      "Force doigts",
+
+    icon:
+      "sloper",
+
+    kind:
+      "standard",
+
+    metric:
+      "duration",
+
+    exerciseId:
+      "suspension-slopers",
+
+    targetAngle:
+      43,
+
+    unit:
+      "s",
+
+    levels:
+      STANDARD_LEVELS(
+        [
+          8,
+          15,
+          25,
+          35,
+        ],
+
+        [
+          "Tenir 8 secondes sur le sloper 43°.",
+          "Tenir 15 secondes sur le sloper 43°.",
+          "Tenir 25 secondes sur le sloper 43°.",
+          "Tenir 35 secondes sur le sloper 43°.",
+        ],
+      ),
+  },
+
+  {
+    id:
+      "pince-disque",
+
+    name:
+      "Pince disque",
+
+    subtitle:
+      "Maintenir un disque en pince",
+
+    category:
+      "Force doigts",
+
+    icon:
+      "pinch",
+
+    kind:
+      "standard",
+
+    metric:
+      "weight",
+
+    exerciseId:
+      "pince-disque",
+
+    unit:
+      "kg",
+
+    levels:
+      STANDARD_LEVELS(
+        [
+          25,
+          30,
+          40,
+          50,
+        ],
+
+        [
+          "Maintenir 25 kg.",
+          "Maintenir 30 kg.",
+          "Maintenir 40 kg.",
+          "Maintenir 50 kg.",
+        ],
+      ),
+  },
+
+  {
+    id:
+      "repeaters-7-3",
+
+    name:
+      "Repeaters",
+
+    subtitle:
+      "Compléter davantage de séries",
+
+    category:
+      "Force doigts",
+
+    icon:
+      "repeaters",
+
+    kind:
+      "standard",
+
+    metric:
+      "sets",
+
+    exerciseId:
+      "repeaters-7-3",
+
+    unit:
+      "séries",
+
+    levels:
+      STANDARD_LEVELS(
+        [
+          3,
+          5,
+          7,
+          10,
+        ],
+
+        [
+          "Compléter 3 séries.",
+          "Compléter 5 séries.",
+          "Compléter 7 séries.",
+          "Compléter 10 séries.",
+        ],
+      ),
+  },
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // TRACTIONS / PUISSANCE
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  {
+    id:
+      "lourd-leger",
+
+    name:
+      "Lourd-léger",
+
     subtitle:
       "Tractions lourdes puis explosives",
-    icon: "heavy-light",
-    category: "Force doigts",
-    exerciseId: "lourd-leger",
-    metric: "weight",
-    unit: "kg",
 
-    levels: [
-      {
-        level: "bronze",
-        description: "+20 kg de lest",
-        threshold: 20,
-      },
-      {
-        level: "silver",
-        description: "+30 kg de lest",
-        threshold: 30,
-      },
-      {
-        level: "gold",
-        description: "+40 kg de lest",
-        threshold: 40,
-      },
-      {
-        level: "diamond",
-        description: "+50 kg de lest",
-        threshold: 50,
-      },
-    ],
+    category:
+      "Tractions",
+
+    icon:
+      "pullup",
+
+    kind:
+      "standard",
+
+    metric:
+      "weight",
+
+    exerciseId:
+      "lourd-leger",
+
+    unit:
+      "kg",
+
+    levels:
+      STANDARD_LEVELS(
+        [
+          20,
+          30,
+          40,
+          50,
+        ],
+
+        [
+          "Réaliser le lourd-léger avec +20 kg de lest.",
+          "Réaliser le lourd-léger avec +30 kg de lest.",
+          "Réaliser le lourd-léger avec +40 kg de lest.",
+          "Réaliser le lourd-léger avec +50 kg de lest.",
+        ],
+      ),
   },
 
   {
-    id: "tractions-lestees",
-    name: "Tractions lestées",
+    id:
+      "sauts-prise",
+
+    name:
+      "Sauts pour prise",
+
     subtitle:
-      "Tractions avec un poids supplémentaire",
-    icon: "pullup",
-    category: "Tractions",
-    exerciseId: "tractions-lestees",
-    metric: "weight",
-    unit: "kg",
+      "Monter de prise en prise avec chaque main",
 
-    levels: [
-      {
-        level: "bronze",
-        description: "+12,5 kg",
-        threshold: 12.5,
-      },
-      {
-        level: "silver",
-        description: "+20 kg",
-        threshold: 20,
-      },
-      {
-        level: "gold",
-        description: "+30 kg",
-        threshold: 30,
-      },
-      {
-        level: "diamond",
-        description: "+40 kg",
-        threshold: 40,
-      },
-    ],
+    category:
+      "Tractions",
+
+    icon:
+      "jump",
+
+    kind:
+      "standard",
+
+    metric:
+      "left-right",
+
+    exerciseId:
+      "sauts-prise",
+
+    unit:
+      "prises",
+
+    levels:
+      STANDARD_LEVELS(
+        [
+          4,
+          5,
+          6,
+          7,
+        ],
+
+        [
+          "Sauter 4 prises avec chaque main.",
+          "Sauter 5 prises avec chaque main.",
+          "Sauter 6 prises avec chaque main.",
+          "Sauter 7 prises avec chaque main.",
+        ],
+      ),
   },
 
   {
-    id: "developpe-militaire",
-    name: "Développé militaire",
+    id:
+      "tractions-lestees",
+
+    name:
+      "Tractions lestées",
+
     subtitle:
-      "Barre poussée au-dessus de la tête",
-    icon: "barbell",
-    category: "Musculation",
-    exerciseId: "developpe-militaire",
-    metric: "weight",
-    unit: "kg",
+      "Augmenter la charge ajoutée",
 
-    levels: [
-      {
-        level: "bronze",
-        description: "30 kg",
-        threshold: 30,
-      },
-      {
-        level: "silver",
-        description: "40 kg",
-        threshold: 40,
-      },
-      {
-        level: "gold",
-        description: "50 kg",
-        threshold: 50,
-      },
-      {
-        level: "diamond",
-        description: "60 kg",
-        threshold: 60,
-      },
-    ],
+    category:
+      "Tractions",
+
+    icon:
+      "pullup",
+
+    kind:
+      "standard",
+
+    metric:
+      "weight",
+
+    exerciseId:
+      "tractions-lestees",
+
+    unit:
+      "kg",
+
+    levels:
+      STANDARD_LEVELS(
+        [
+          12.5,
+          20,
+          30,
+          40,
+        ],
+
+        [
+          "Réaliser les séries avec +12,5 kg.",
+          "Réaliser les séries avec +20 kg.",
+          "Réaliser les séries avec +30 kg.",
+          "Réaliser les séries avec +40 kg.",
+        ],
+      ),
   },
 
+  // ═══════════════════════════════════════════════════════════════════════════
+  // MUSCULATION
+  // ═══════════════════════════════════════════════════════════════════════════
+
   {
-    id: "rowing",
-    name: "Rowing haltère",
+    id:
+      "developpe-militaire",
+
+    name:
+      "Développé militaire",
+
     subtitle:
-      "Tirage unilatéral avec haltère",
-    icon: "dumbbell",
-    category: "Musculation",
-    exerciseId: "rowing-haltere",
-    metric: "weight",
-    unit: "kg",
+      "Augmenter la charge",
 
-    levels: [
-      {
-        level: "bronze",
-        description: "20 kg",
-        threshold: 20,
-      },
-      {
-        level: "silver",
-        description: "25 kg",
-        threshold: 25,
-      },
-      {
-        level: "gold",
-        description: "32,5 kg",
-        threshold: 32.5,
-      },
-      {
-        level: "diamond",
-        description: "40 kg",
-        threshold: 40,
-      },
-    ],
+    category:
+      "Musculation",
+
+    icon:
+      "barbell",
+
+    kind:
+      "standard",
+
+    metric:
+      "weight",
+
+    exerciseId:
+      "developpe-militaire",
+
+    unit:
+      "kg",
+
+    levels:
+      STANDARD_LEVELS(
+        [
+          30,
+          40,
+          50,
+          60,
+        ],
+
+        [
+          "Réaliser les séries à 30 kg.",
+          "Réaliser les séries à 40 kg.",
+          "Réaliser les séries à 50 kg.",
+          "Réaliser les séries à 60 kg.",
+        ],
+      ),
   },
 
   {
-    id: "face-pull",
-    name: "Face Pull",
+    id:
+      "rowing-haltere",
+
+    name:
+      "Rowing haltère",
+
     subtitle:
-      "Tirage à la poulie vers le visage",
-    icon: "pulley",
-    category: "Musculation",
-    exerciseId: "facepull",
-    metric: "weight",
-    unit: "kg",
+      "Augmenter la charge",
+
+    category:
+      "Musculation",
+
+    icon:
+      "barbell",
+
+    kind:
+      "standard",
+
+    metric:
+      "weight",
+
+    exerciseId:
+      "rowing-haltere",
+
+    unit:
+      "kg",
+
+    levels:
+      STANDARD_LEVELS(
+        [
+          20,
+          25,
+          32.5,
+          40,
+        ],
+
+        [
+          "Réaliser les séries à 20 kg.",
+          "Réaliser les séries à 25 kg.",
+          "Réaliser les séries à 32,5 kg.",
+          "Réaliser les séries à 40 kg.",
+        ],
+      ),
+  },
+
+  {
+    id:
+      "facepull",
+
+    name:
+      "Face Pull",
+
+    subtitle:
+      "Augmenter la charge",
+
+    category:
+      "Musculation",
+
+    icon:
+      "barbell",
+
+    kind:
+      "standard",
+
+    metric:
+      "weight",
+
+    exerciseId:
+      "facepull",
+
+    unit:
+      "kg",
+
+    levels:
+      STANDARD_LEVELS(
+        [
+          40,
+          50,
+          60,
+          70,
+        ],
+
+        [
+          "Réaliser les séries à 40 kg.",
+          "Réaliser les séries à 50 kg.",
+          "Réaliser les séries à 60 kg.",
+          "Réaliser les séries à 70 kg.",
+        ],
+      ),
+  },
+
+  /*
+   * Nouvel objectif conservé pour le développé couché.
+   *
+   * Le réglage de base étant déjà 30 kg,
+   * le premier badge ne se débloque pas automatiquement.
+   */
+  {
+    id:
+      "developpe-couche",
+
+    name:
+      "Développé couché",
+
+    subtitle:
+      "Augmenter la charge totale",
+
+    category:
+      "Musculation",
+
+    icon:
+      "barbell",
+
+    kind:
+      "standard",
+
+    metric:
+      "weight",
+
+    exerciseId:
+      "developpe-couche",
+
+    unit:
+      "kg",
+
+    levels:
+      STANDARD_LEVELS(
+        [
+          40,
+          50,
+          60,
+          75,
+        ],
+
+        [
+          "Réaliser les séries à 40 kg.",
+          "Réaliser les séries à 50 kg.",
+          "Réaliser les séries à 60 kg.",
+          "Réaliser les séries à 75 kg.",
+        ],
+      ),
+  },
+
+  {
+    id:
+      "dips",
+
+    name:
+      "Dips",
+
+    subtitle:
+      "Réaliser au moins trois séries",
+
+    category:
+      "Musculation",
+
+    icon:
+      "dips",
+
+    kind:
+      "standard",
+
+    metric:
+      "dips-reps",
+
+    exerciseId:
+      "dips",
+
+    unit:
+      "reps",
 
     levels: [
       {
-        level: "bronze",
-        description: "40 kg",
-        threshold: 40,
+        level:
+          "bronze",
+
+        threshold:
+          8,
+
+        minimumSets:
+          3,
+
+        description:
+          "Réussir au moins 3 séries de 8 dips.",
       },
+
       {
-        level: "silver",
-        description: "50 kg",
-        threshold: 50,
+        level:
+          "silver",
+
+        threshold:
+          12,
+
+        minimumSets:
+          3,
+
+        description:
+          "Réussir au moins 3 séries de 12 dips.",
       },
+
       {
-        level: "gold",
-        description: "60 kg",
-        threshold: 60,
+        level:
+          "gold",
+
+        threshold:
+          16,
+
+        minimumSets:
+          3,
+
+        description:
+          "Réussir au moins 3 séries de 16 dips.",
       },
+
       {
-        level: "diamond",
-        description: "70 kg",
-        threshold: 70,
+        level:
+          "diamond",
+
+        threshold:
+          20,
+
+        minimumSets:
+          3,
+
+        description:
+          "Réussir au moins 3 séries de 20 dips.",
       },
     ],
   },
 
+  // ═══════════════════════════════════════════════════════════════════════════
+  // GAINAGE
+  // ═══════════════════════════════════════════════════════════════════════════
+
   {
-    id: "planche",
-    name: "Planche",
+    id:
+      "planche",
+
+    name:
+      "Planche",
+
     subtitle:
       "Gainage sur les avant-bras",
-    icon: "plank",
-    category: "Gainage",
-    exerciseId: "planche",
-    metric: "duration",
-    unit: "s",
 
-    levels: [
-      {
-        level: "bronze",
-        description: "1 minute 30",
-        threshold: 90,
-      },
-      {
-        level: "silver",
-        description: "2 minutes 30",
-        threshold: 150,
-      },
-      {
-        level: "gold",
-        description: "4 minutes",
-        threshold: 240,
-      },
-      {
-        level: "diamond",
-        description: "6 minutes",
-        threshold: 360,
-      },
-    ],
+    category:
+      "Gainage",
+
+    icon:
+      "chart",
+
+    kind:
+      "standard",
+
+    metric:
+      "duration",
+
+    exerciseId:
+      "planche",
+
+    unit:
+      "s",
+
+    levels:
+      STANDARD_LEVELS(
+        [
+          90,
+          150,
+          240,
+          360,
+        ],
+
+        [
+          "Tenir 1 minute 30.",
+          "Tenir 2 minutes 30.",
+          "Tenir 4 minutes.",
+          "Tenir 6 minutes.",
+        ],
+      ),
   },
 
   {
-    id: "planche-laterale",
-    name: "Planche latérale",
+    id:
+      "planche-laterale",
+
+    name:
+      "Planche latérale",
+
     subtitle:
       "Gainage latéral des obliques",
-    icon: "side-plank",
-    category: "Gainage",
-    exerciseId: "planche-laterale",
-    metric: "duration",
-    unit: "s",
 
-    levels: [
-      {
-        level: "bronze",
-        description: "1 minute 15",
-        threshold: 75,
-      },
-      {
-        level: "silver",
-        description: "2 minutes",
-        threshold: 120,
-      },
-      {
-        level: "gold",
-        description: "3 minutes",
-        threshold: 180,
-      },
-      {
-        level: "diamond",
-        description: "4 minutes",
-        threshold: 240,
-      },
-    ],
+    category:
+      "Gainage",
+
+    icon:
+      "chart",
+
+    kind:
+      "standard",
+
+    metric:
+      "duration",
+
+    exerciseId:
+      "planche-laterale",
+
+    unit:
+      "s",
+
+    levels:
+      STANDARD_LEVELS(
+        [
+          75,
+          120,
+          180,
+          240,
+        ],
+
+        [
+          "Tenir 1 minute 15.",
+          "Tenir 2 minutes.",
+          "Tenir 3 minutes.",
+          "Tenir 4 minutes.",
+        ],
+      ),
   },
 
-  {
-    id: "squat",
-    name: "Squat",
-    subtitle: "Squats au poids du corps",
-    icon: "squat",
-    category: "Jambes",
-    exerciseId: "squat",
-    metric: "reps",
-    unit: "rép./série",
-
-    levels: [
-      {
-        level: "bronze",
-        description:
-          "3 séries de 15 répétitions",
-        threshold: 15,
-        minSets: 3,
-      },
-      {
-        level: "silver",
-        description:
-          "3 séries de 30 répétitions",
-        threshold: 30,
-        minSets: 3,
-      },
-      {
-        level: "gold",
-        description:
-          "3 séries de 50 répétitions",
-        threshold: 50,
-        minSets: 3,
-      },
-      {
-        level: "diamond",
-        description:
-          "3 séries de 65 répétitions",
-        threshold: 65,
-        minSets: 3,
-      },
-    ],
-  },
+  // ═══════════════════════════════════════════════════════════════════════════
+  // JAMBES
+  // ═══════════════════════════════════════════════════════════════════════════
 
   {
-    id: "fentes-bulgares",
-    name: "Fentes bulgares",
+    id:
+      "squat",
+
+    name:
+      "Squat",
+
     subtitle:
-      "Fentes avec le pied arrière surélevé",
-    icon: "lunge",
-    category: "Jambes",
-    exerciseId: "fentes-bulgares",
-    metric: "weight",
-    unit: "kg",
+      "Squats au poids du corps",
+
+    category:
+      "Jambes",
+
+    icon:
+      "lunge",
+
+    kind:
+      "standard",
+
+    metric:
+      "sets-reps",
+
+    exerciseId:
+      "squat",
+
+    unit:
+      "reps/série",
 
     levels: [
       {
-        level: "bronze",
-        description: "18 kg",
-        threshold: 18,
+        level:
+          "bronze",
+
+        threshold:
+          15,
+
+        minimumSets:
+          3,
+
+        description:
+          "Réaliser 3 séries de 15 répétitions.",
       },
+
       {
-        level: "silver",
-        description: "24 kg",
-        threshold: 24,
+        level:
+          "silver",
+
+        threshold:
+          30,
+
+        minimumSets:
+          3,
+
+        description:
+          "Réaliser 3 séries de 30 répétitions.",
       },
+
       {
-        level: "gold",
-        description: "30 kg",
-        threshold: 30,
+        level:
+          "gold",
+
+        threshold:
+          50,
+
+        minimumSets:
+          3,
+
+        description:
+          "Réaliser 3 séries de 50 répétitions.",
       },
+
       {
-        level: "diamond",
-        description: "36 kg",
-        threshold: 36,
+        level:
+          "diamond",
+
+        threshold:
+          65,
+
+        minimumSets:
+          3,
+
+        description:
+          "Réaliser 3 séries de 65 répétitions.",
       },
     ],
   },
 
   {
-    id: "mollets",
-    name: "Élévations mollets",
+    id:
+      "fentes-bulgares",
+
+    name:
+      "Fentes bulgares",
+
+    subtitle:
+      "Augmenter la charge totale",
+
+    category:
+      "Jambes",
+
+    icon:
+      "lunge",
+
+    kind:
+      "standard",
+
+    metric:
+      "weight",
+
+    exerciseId:
+      "fentes-bulgares",
+
+    unit:
+      "kg",
+
+    levels:
+      STANDARD_LEVELS(
+        [
+          18,
+          24,
+          30,
+          36,
+        ],
+
+        [
+          "Réaliser les séries avec 18 kg au total.",
+          "Réaliser les séries avec 24 kg au total.",
+          "Réaliser les séries avec 30 kg au total.",
+          "Réaliser les séries avec 36 kg au total.",
+        ],
+      ),
+  },
+
+  {
+    id:
+      "mollets",
+
+    name:
+      "Élévations mollets",
+
     subtitle:
       "Extension sur la pointe des pieds",
-    icon: "calf",
-    category: "Jambes",
-    exerciseId: "mollets-debout",
-    metric: "weight",
-    unit: "kg",
 
-    levels: [
-      {
-        level: "bronze",
-        description: "15 kg",
-        threshold: 15,
-      },
-      {
-        level: "silver",
-        description: "25 kg",
-        threshold: 25,
-      },
-      {
-        level: "gold",
-        description: "35 kg",
-        threshold: 35,
-      },
-      {
-        level: "diamond",
-        description: "50 kg",
-        threshold: 50,
-      },
-    ],
+    category:
+      "Jambes",
+
+    icon:
+      "calf",
+
+    kind:
+      "standard",
+
+    metric:
+      "weight",
+
+    exerciseId:
+      "mollets-debout",
+
+    unit:
+      "kg",
+
+    levels:
+      STANDARD_LEVELS(
+        [
+          15,
+          25,
+          35,
+          50,
+        ],
+
+        [
+          "Réaliser les séries avec 15 kg.",
+          "Réaliser les séries avec 25 kg.",
+          "Réaliser les séries avec 35 kg.",
+          "Réaliser les séries avec 50 kg.",
+        ],
+      ),
   },
 
+  // ═══════════════════════════════════════════════════════════════════════════
+  // PROGRESSION GLOBALE
+  // ═══════════════════════════════════════════════════════════════════════════
+
   {
-    id: "progression-generale",
-    name: "Progression",
+    id:
+      "progression-records",
+
+    name:
+      "Progression",
+
     subtitle:
       "Records personnels battus",
-    icon: "chart",
-    category: "Global",
-    metric: "records",
-    unit: "PR",
 
-    levels: [
-      {
-        level: "bronze",
-        description:
-          "10 records personnels battus",
-        threshold: 10,
-      },
-      {
-        level: "silver",
-        description:
-          "25 records personnels battus",
-        threshold: 25,
-      },
-      {
-        level: "gold",
-        description:
-          "50 records personnels battus",
-        threshold: 50,
-      },
-      {
-        level: "diamond",
-        description:
-          "100 records personnels battus",
-        threshold: 100,
-      },
-    ],
-  },
-];
-const CLIMBING_COLOR_BADGES: BadgeDef[] = [
-  {
-    id: "bloc-rose",
-    name: "Bloc rose",
-    subtitle: "Réussir au moins un bloc rose",
-    icon: "climbing-hold",
-    category: "Couleurs de blocs",
-    metric: "climbing-color",
-    unit: "bloc",
-    kind: "climbing-color",
-    climbingColor: "rose",
-    visualColor: "#EC4899",
-    hideLevelLabel: true,
+    category:
+      "Progression",
 
-    levels: [
-      {
-        level: "diamond",
-        description: "Réussir un bloc rose",
-        threshold: 1,
-      },
-    ],
+    icon:
+      "chart",
+
+    kind:
+      "standard",
+
+    metric:
+      "records",
+
+    unit:
+      "PR",
+
+    levels:
+      STANDARD_LEVELS(
+        [
+          10,
+          25,
+          50,
+          100,
+        ],
+
+        [
+          "Battre 10 records personnels.",
+          "Battre 25 records personnels.",
+          "Battre 50 records personnels.",
+          "Battre 100 records personnels.",
+        ],
+      ),
   },
 
-  {
-    id: "bloc-jaune",
-    name: "Bloc jaune",
-    subtitle: "Réussir au moins un bloc jaune",
-    icon: "climbing-hold",
-    category: "Couleurs de blocs",
-    metric: "climbing-color",
-    unit: "bloc",
-    kind: "climbing-color",
-    climbingColor: "jaune",
-    visualColor: "#FACC15",
-    hideLevelLabel: true,
+  // ═══════════════════════════════════════════════════════════════════════════
+  // ESCALADE
+  // ═══════════════════════════════════════════════════════════════════════════
 
-    levels: [
-      {
-        level: "diamond",
-        description: "Réussir un bloc jaune",
-        threshold: 1,
-      },
-    ],
-  },
-
-  {
-    id: "bloc-vert",
-    name: "Bloc vert",
-    subtitle: "Réussir au moins un bloc vert",
-    icon: "climbing-hold",
-    category: "Couleurs de blocs",
-    metric: "climbing-color",
-    unit: "bloc",
-    kind: "climbing-color",
-    climbingColor: "vert",
-    visualColor: "#22C55E",
-    hideLevelLabel: true,
-
-    levels: [
-      {
-        level: "diamond",
-        description: "Réussir un bloc vert",
-        threshold: 1,
-      },
-    ],
-  },
-
-  {
-    id: "bloc-turquoise",
-    name: "Bloc turquoise",
-    subtitle: "Réussir au moins un bloc turquoise",
-    icon: "climbing-hold",
-    category: "Couleurs de blocs",
-    metric: "climbing-color",
-    unit: "bloc",
-    kind: "climbing-color",
-    climbingColor: "turquoise",
-    visualColor: "#2DD4BF",
-    hideLevelLabel: true,
-
-    levels: [
-      {
-        level: "diamond",
-        description: "Réussir un bloc turquoise",
-        threshold: 1,
-      },
-    ],
-  },
-
-  {
-    id: "bloc-bleu",
-    name: "Bloc bleu",
-    subtitle: "Réussir au moins un bloc bleu",
-    icon: "climbing-hold",
-    category: "Couleurs de blocs",
-    metric: "climbing-color",
-    unit: "bloc",
-    kind: "climbing-color",
-    climbingColor: "bleu",
-    visualColor: "#3B82F6",
-    hideLevelLabel: true,
-
-    levels: [
-      {
-        level: "diamond",
-        description: "Réussir un bloc bleu",
-        threshold: 1,
-      },
-    ],
-  },
-
-  {
-    id: "bloc-orange",
-    name: "Bloc orange",
-    subtitle: "Réussir au moins un bloc orange",
-    icon: "climbing-hold",
-    category: "Couleurs de blocs",
-    metric: "climbing-color",
-    unit: "bloc",
-    kind: "climbing-color",
-    climbingColor: "orange",
-    visualColor: "#F97316",
-    hideLevelLabel: true,
-
-    levels: [
-      {
-        level: "diamond",
-        description: "Réussir un bloc orange",
-        threshold: 1,
-      },
-    ],
-  },
-
-  {
-    id: "bloc-rouge",
-    name: "Bloc rouge",
-    subtitle: "Réussir au moins un bloc rouge",
-    icon: "climbing-hold",
-    category: "Couleurs de blocs",
-    metric: "climbing-color",
-    unit: "bloc",
-    kind: "climbing-color",
-    climbingColor: "rouge",
-    visualColor: "#EF4444",
-    hideLevelLabel: true,
-
-    levels: [
-      {
-        level: "diamond",
-        description: "Réussir un bloc rouge",
-        threshold: 1,
-      },
-    ],
-  },
-
-  {
-    id: "bloc-noir",
-    name: "Bloc noir",
-    subtitle: "Réussir au moins un bloc noir",
-    icon: "climbing-hold",
-    category: "Couleurs de blocs",
-    metric: "climbing-color",
-    unit: "bloc",
-    kind: "climbing-color",
-    climbingColor: "noir",
-    visualColor: "#171717",
-    hideLevelLabel: true,
-
-    levels: [
-      {
-        level: "diamond",
-        description: "Réussir un bloc noir",
-        threshold: 1,
-      },
-    ],
-  },
-
-  {
-    id: "bloc-blanc",
-    name: "Bloc blanc",
-    subtitle: "Réussir au moins un bloc blanc",
-    icon: "climbing-hold",
-    category: "Couleurs de blocs",
-    metric: "climbing-color",
-    unit: "bloc",
-    kind: "climbing-color",
-    climbingColor: "blanc",
-    visualColor: "#F5F5F5",
-    hideLevelLabel: true,
-
-    levels: [
-      {
-        level: "diamond",
-        description: "Réussir un bloc blanc",
-        threshold: 1,
-      },
-    ],
-  },
-];
-
-const KILTER_BADGES: BadgeDef[] = Array.from(
-  {
-    length: 18,
-  },
-  (_, grade) => ({
-    id: `kilter-v${grade}`,
-
-    name: `Kilter V${grade}`,
-
-    subtitle: `Meilleure inclinaison réussie en V${grade}`,
-
-    icon: "kilter-hold",
-
-    category: "Kilterboard",
-
-    metric: "kilter-angle" as const,
-
-    unit: "°",
-
-    kind: "kilter" as const,
-
-    levels: [
-      {
-        level: "bronze" as const,
-
-        description: `Réussir une V${grade} à 30°`,
-
-        threshold: 30,
-
-        grade,
-      },
-
-      {
-        level: "silver" as const,
-
-        description: `Réussir une V${grade} à 35°`,
-
-        threshold: 35,
-
-        grade,
-      },
-
-      {
-        level: "gold" as const,
-
-        description: `Réussir une V${grade} à 40°`,
-
-        threshold: 40,
-
-        grade,
-      },
-
-      {
-        level: "diamond" as const,
-
-        description: `Réussir une V${grade} à 45°`,
-
-        threshold: 45,
-
-        grade,
-      },
-    ],
-  }),
-);
-
-export const BADGES: BadgeDef[] = [
-  ...STANDARD_BADGES,
   ...CLIMBING_COLOR_BADGES,
+
   ...KILTER_BADGES,
+
+  ...ROUTE_BADGES,
 ];
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Catégories
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const BADGE_CATEGORIES = [
+  "Force doigts",
+  "Tractions",
+  "Musculation",
+  "Gainage",
+  "Jambes",
+  "Progression",
+  "Couleurs de blocs",
+  "Kilterboard",
+  "Escalade en voie",
+];
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Accès rapide par ID
+// ─────────────────────────────────────────────────────────────────────────────
+
 export const BADGE_BY_ID: Record<
   string,
-  BadgeDef
+  BadgeDefinition
 > = Object.fromEntries(
-  BADGES.map((badge) => [
-    badge.id,
-    badge,
-  ]),
-);
-
-export const BADGE_CATEGORIES: string[] = [
-  ...new Set(
-    BADGES.map(
-      (badge) => badge.category,
-    ),
+  BADGES.map(
+    (
+      badge,
+    ) => [
+      badge.id,
+      badge,
+    ],
   ),
-];
+);

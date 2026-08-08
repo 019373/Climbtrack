@@ -1,109 +1,425 @@
-import { useMemo, useState } from "react";
 import {
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
+
+import {
+  Activity,
   CalendarDays,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
+  ChevronUp,
   Clock3,
   Dumbbell,
   Mountain,
+  Route,
   Trash2,
-  X,
 } from "lucide-react";
 
-import { useClimbTrack } from "@/context/ClimbTrackContext";
-import type { SessionLog } from "@/context/ClimbTrackContext";
-import { SESSIONS } from "@/data/sessions";
-import { cn } from "@/lib/utils";
-import { getTodayLocalDate } from "@/utils/dailySuggestion";
+import {
+  addMonths,
+  eachDayOfInterval,
+  endOfMonth,
+  endOfWeek,
+  format,
+  formatDistanceToNow,
+  isSameDay,
+  isSameMonth,
+  parseISO,
+  startOfMonth,
+  startOfWeek,
+} from "date-fns";
 
-const WEEK_DAYS = [
-  "Lun",
-  "Mar",
-  "Mer",
-  "Jeu",
-  "Ven",
-  "Sam",
-  "Dim",
-];
+import {
+  fr,
+} from "date-fns/locale";
 
-function padNumber(value: number): string {
-  return String(value).padStart(2, "0");
-}
+import {
+  useClimbTrack,
+} from "@/context/ClimbTrackContext";
 
-function createLocalDateString(
-  year: number,
-  month: number,
-  day: number,
-): string {
-  return `${year}-${padNumber(month + 1)}-${padNumber(day)}`;
-}
+import type {
+  AppData,
+  ExerciseLog,
+  SessionLog,
+} from "@/context/ClimbTrackContext";
 
-function formatLongDate(date: string): string {
-  return new Date(`${date}T12:00:00`).toLocaleDateString("fr-CH", {
-    weekday: "long",
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-  });
-}
+import {
+  SESSIONS,
+} from "@/data/sessions";
 
-function formatMonth(year: number, month: number): string {
-  const value = new Date(year, month, 1).toLocaleDateString("fr-CH", {
-    month: "long",
-    year: "numeric",
-  });
+import {
+  getExerciseById,
+} from "@/utils/exercises";
 
-  return value.charAt(0).toUpperCase() + value.slice(1);
-}
+import {
+  cn,
+} from "@/lib/utils";
 
-function getSessionName(sessionId: string): string {
-  if (sessionId === "grimpe-libre") {
-    return "Grimpe libre";
+// ─────────────────────────────────────────────────────────────────────────────
+// Compatibilité avec les anciens exercices
+// ─────────────────────────────────────────────────────────────────────────────
+
+const LEGACY_EXERCISE_NAMES: Record<
+  string,
+  string
+> = {
+  "repeaters-6-4":
+    "Repeaters faciles 6/4",
+
+  "facepull-leger":
+    "Face pull léger",
+
+  "stretch-poignets-sol":
+    "Étirement poignets au sol",
+
+  "bras-au-dessus-tete":
+    "Bras au-dessus de la tête",
+
+  "stretch-trapezes":
+    "Épaules / trapèzes",
+
+  "open-book":
+    "Open book",
+
+  "rotation-assise":
+    "Rotation assise",
+
+  "rotation-thoracique-sol":
+    "Rotation thoracique au sol",
+
+  "squat-profond-tenu":
+    "Squat profond tenu",
+
+  "genou-vers-poitrine":
+    "Genou vers la poitrine",
+
+  "stretch-quadriceps-couche":
+    "Étirement quadriceps couché",
+
+  "jambe-tendue-sol":
+    "Jambe tendue au sol",
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Helpers
+// ─────────────────────────────────────────────────────────────────────────────
+
+function getSessionTimestamp(
+  log: SessionLog,
+): number {
+  if (
+    log.completedAt
+  ) {
+    const exactTimestamp =
+      new Date(
+        log.completedAt,
+      ).getTime();
+
+    if (
+      !Number.isNaN(
+        exactTimestamp,
+      )
+    ) {
+      return exactTimestamp;
+    }
   }
 
-  if (sessionId === "kilter") {
+  return new Date(
+    `${log.date}T12:00:00`,
+  ).getTime();
+}
+
+function formatNumber(
+  value?: number,
+): string {
+  if (
+    typeof value !==
+      "number" ||
+    !Number.isFinite(
+      value,
+    )
+  ) {
+    return "—";
+  }
+
+  return Number.isInteger(
+    value,
+  )
+    ? String(
+        value,
+      )
+    : String(
+        Math.round(
+          value * 100,
+        ) / 100,
+      ).replace(
+        ".",
+        ",",
+      );
+}
+
+function getSessionName(
+  log: SessionLog,
+): string {
+  if (
+    log.sessionId ===
+    "kilter"
+  ) {
     return "Kilterboard";
   }
 
+  if (
+    log.sessionId ===
+    "route"
+  ) {
+    return "Escalade en voie";
+  }
+
+  if (
+    log.sessionId ===
+    "grimpe-libre"
+  ) {
+    return "Bloc libre";
+  }
+
   return (
-    SESSIONS.find((session) => session.id === sessionId)?.name ??
+    SESSIONS.find(
+      (session) =>
+        session.id ===
+        log.sessionId,
+    )?.name ??
     "Séance"
   );
 }
 
-function getExerciseName(exerciseId: string): string {
-  const exercise = SESSIONS.flatMap(
-    (session) => session.exercises,
-  ).find((item) => item.id === exerciseId);
+function getExerciseName(
+  exerciseId: string,
+  data: AppData,
+): string {
+  const exercise =
+    getExerciseById(
+      exerciseId,
+      data,
+    );
 
-  return exercise?.name ?? exerciseId;
+  if (
+    exercise
+  ) {
+    return exercise.name;
+  }
+
+  if (
+    LEGACY_EXERCISE_NAMES[
+      exerciseId
+    ]
+  ) {
+    return LEGACY_EXERCISE_NAMES[
+      exerciseId
+    ];
+  }
+
+  return exerciseId;
 }
 
-function getKilterTotalDuration(log: SessionLog): number {
-  return (log.kilterEntries ?? []).reduce(
-    (total, entry) => total + (entry.durationMinutes ?? 0),
-    0,
+function getExerciseSummary(
+  log: ExerciseLog,
+  data: AppData,
+): string {
+  const definition =
+    getExerciseById(
+      log.exerciseId,
+      data,
+    );
+
+  const values:
+    string[] = [];
+
+  if (
+    log.sets >
+    0
+  ) {
+    values.push(
+      `${log.sets} série${
+        log.sets >
+        1
+          ? "s"
+          : ""
+      }`,
+    );
+  }
+
+  if (
+    typeof log.reps ===
+    "number"
+  ) {
+    if (
+      typeof log.secondaryReps ===
+      "number"
+    ) {
+      values.push(
+        `${log.reps} + ${log.secondaryReps} reps`,
+      );
+    } else {
+      values.push(
+        `${log.reps} reps`,
+      );
+    }
+  }
+
+  if (
+    typeof log.duration ===
+    "number"
+  ) {
+    values.push(
+      `${formatNumber(
+        log.duration,
+      )} s`,
+    );
+  }
+
+  if (
+    typeof log.weight ===
+    "number"
+  ) {
+    if (
+      typeof log.secondaryWeight ===
+      "number"
+    ) {
+      values.push(
+        `${formatNumber(
+          log.weight,
+        )} + ${formatNumber(
+          log.secondaryWeight,
+        )} kg`,
+      );
+    } else {
+      values.push(
+        `${formatNumber(
+          log.weight,
+        )} kg`,
+      );
+    }
+  }
+
+  if (
+    log.assistance
+  ) {
+    values.push(
+      log.assistance,
+    );
+  }
+
+  if (
+    typeof log.progressionValue ===
+    "number"
+  ) {
+    if (
+      log.exerciseId ===
+      "suspension-slopers"
+    ) {
+      values.push(
+        `${formatNumber(
+          log.progressionValue,
+        )}°`,
+      );
+    } else if (
+      log.exerciseId ===
+      "croise-dynamique-19-30"
+    ) {
+      values.push(
+        `prise cible ${formatNumber(
+          log.progressionValue,
+        )}`,
+      );
+    } else {
+      values.push(
+        `progression ${formatNumber(
+          log.progressionValue,
+        )}`,
+      );
+    }
+  }
+
+  if (
+    typeof log.leftHandJumps ===
+      "number" ||
+    typeof log.rightHandJumps ===
+      "number"
+  ) {
+    values.push(
+      `G ${formatNumber(
+        log.leftHandJumps,
+      )} · D ${formatNumber(
+        log.rightHandJumps,
+      )}`,
+    );
+  }
+
+  if (
+    log.variant
+  ) {
+    values.push(
+      log.variant,
+    );
+  }
+
+  if (
+    log.bandColor
+  ) {
+    values.push(
+      `élastique ${log.bandColor}`,
+    );
+  }
+
+  if (
+    typeof log.bandStretch ===
+      "number" &&
+    log.bandStretch >
+      0
+  ) {
+    values.push(
+      `repère ${formatNumber(
+        log.bandStretch,
+      )}`,
+    );
+  }
+
+  if (
+    definition?.perSide
+  ) {
+    values.push(
+      "par côté",
+    );
+  }
+
+  return values.join(
+    " • ",
   );
 }
 
-function getActivityDuration(log: SessionLog): number | null {
-  if (log.sessionId === "grimpe-libre") {
-    return log.climbingDurationMinutes ?? null;
-  }
-
-  if (log.sessionId === "kilter") {
-    const duration = getKilterTotalDuration(log);
-
-    return duration > 0 ? duration : null;
-  }
-
-  return null;
-}
-
-function getActivityIcon(log: SessionLog) {
+function getSessionIcon(
+  log: SessionLog,
+) {
   if (
-    log.sessionId === "grimpe-libre" ||
-    log.sessionId === "kilter"
+    log.sessionId ===
+    "route"
+  ) {
+    return Route;
+  }
+
+  if (
+    log.sessionId ===
+    "kilter"
+  ) {
+    return Activity;
+  }
+
+  if (
+    log.sessionId ===
+    "grimpe-libre"
   ) {
     return Mountain;
   }
@@ -111,646 +427,1304 @@ function getActivityIcon(log: SessionLog) {
   return Dumbbell;
 }
 
-function formatKilterResult(result: string): string {
-  if (result === "reussi") {
-    return "Réussi";
-  }
-
-  if (result === "echoue") {
-    return "Échoué";
-  }
-
-  return "Travaillé";
-}
-
-function formatIntensity(intensity?: string): string {
-  if (!intensity) {
-    return "Non renseignée";
-  }
-
-  return intensity.charAt(0).toUpperCase() + intensity.slice(1);
-}
-
-export function HistoriquePage() {
-  const {
-    data,
-    deleteSessionLog,
-  } = useClimbTrack();
-
-  const today = getTodayLocalDate();
-  const todayDate = new Date(`${today}T12:00:00`);
-
-  const [displayedYear, setDisplayedYear] = useState(
-    todayDate.getFullYear(),
-  );
-
-  const [displayedMonth, setDisplayedMonth] = useState(
-    todayDate.getMonth(),
-  );
-
-  const [selectedDate, setSelectedDate] = useState(today);
-
-  const [selectedLog, setSelectedLog] =
-    useState<SessionLog | null>(null);
-
-  const [showDeleteConfirmation, setShowDeleteConfirmation] =
-    useState(false);
-
-  const calendarDays = useMemo(() => {
-    const firstDay = new Date(
-      displayedYear,
-      displayedMonth,
-      1,
+function getLogDate(
+  log: SessionLog,
+): Date {
+  const parsed =
+    parseISO(
+      log.date,
     );
 
-    const daysInMonth = new Date(
-      displayedYear,
-      displayedMonth + 1,
-      0,
-    ).getDate();
+  if (
+    Number.isNaN(
+      parsed.getTime(),
+    )
+  ) {
+    return new Date(
+      getSessionTimestamp(
+        log,
+      ),
+    );
+  }
 
-    const emptyDaysBeforeMonth =
-      (firstDay.getDay() + 6) % 7;
+  return parsed;
+}
 
-    const days: Array<number | null> = [];
+function getLogsForDay(
+  logs: SessionLog[],
+  date: Date,
+): SessionLog[] {
+  return logs.filter(
+    (log) =>
+      isSameDay(
+        getLogDate(
+          log,
+        ),
+        date,
+      ),
+  );
+}
 
-    for (
-      let index = 0;
-      index < emptyDaysBeforeMonth;
-      index += 1
-    ) {
-      days.push(null);
-    }
+// ─────────────────────────────────────────────────────────────────────────────
+// Calendrier
+// ─────────────────────────────────────────────────────────────────────────────
 
-    for (let day = 1; day <= daysInMonth; day += 1) {
-      days.push(day);
-    }
+function MonthlyCalendar({
+  logs,
+  month,
+  selectedDate,
+  onPreviousMonth,
+  onNextMonth,
+  onSelectDate,
+}: {
+  logs: SessionLog[];
 
-    while (days.length % 7 !== 0) {
-      days.push(null);
-    }
+  month: Date;
 
-    return days;
-  }, [displayedYear, displayedMonth]);
+  selectedDate: Date | null;
 
-  const logsByDate = useMemo(() => {
-    const result: Record<string, SessionLog[]> = {};
+  onPreviousMonth: () => void;
 
-    data.sessionLogs.forEach((log) => {
-      if (!result[log.date]) {
-        result[log.date] = [];
-      }
+  onNextMonth: () => void;
 
-      result[log.date].push(log);
+  onSelectDate: (
+    date: Date,
+  ) => void;
+}) {
+  const monthStart =
+    startOfMonth(
+      month,
+    );
+
+  const monthEnd =
+    endOfMonth(
+      month,
+    );
+
+  const calendarStart =
+    startOfWeek(
+      monthStart,
+      {
+        weekStartsOn:
+          1,
+      },
+    );
+
+  const calendarEnd =
+    endOfWeek(
+      monthEnd,
+      {
+        weekStartsOn:
+          1,
+      },
+    );
+
+  const days =
+    eachDayOfInterval({
+      start:
+        calendarStart,
+
+      end:
+        calendarEnd,
     });
 
-    return result;
-  }, [data.sessionLogs]);
-
-  const selectedDayLogs = useMemo(() => {
-    return [...(logsByDate[selectedDate] ?? [])].reverse();
-  }, [logsByDate, selectedDate]);
-
-  function previousMonth() {
-    if (displayedMonth === 0) {
-      setDisplayedMonth(11);
-      setDisplayedYear((year) => year - 1);
-      return;
-    }
-
-    setDisplayedMonth((month) => month - 1);
-  }
-
-  function nextMonth() {
-    if (displayedMonth === 11) {
-      setDisplayedMonth(0);
-      setDisplayedYear((year) => year + 1);
-      return;
-    }
-
-    setDisplayedMonth((month) => month + 1);
-  }
-
-  function closeDetails() {
-    setSelectedLog(null);
-    setShowDeleteConfirmation(false);
-  }
-
-  function confirmDelete() {
-    if (!selectedLog) {
-      return;
-    }
-
-    deleteSessionLog(selectedLog.id);
-    closeDetails();
-  }
+  const weekLabels = [
+    "L",
+    "M",
+    "M",
+    "J",
+    "V",
+    "S",
+    "D",
+  ];
 
   return (
-    <div className="min-h-screen bg-background pb-24 pt-safe">
-      <header className="sticky top-0 z-10 border-b border-border bg-background/95 px-5 py-6 backdrop-blur-md">
-        <h1 className="text-3xl font-extrabold text-white">
-          Historique
-        </h1>
+    <section className="w-full overflow-hidden rounded-[22px] border border-border bg-card">
+      {/* Mois + flèches */}
 
-        <p className="mt-1 text-sm text-muted-foreground">
-          Calendrier de tes entraînements
-        </p>
-      </header>
+      <div className="flex items-center justify-between px-5 pb-3 pt-5">
+        <button
+          type="button"
+          onClick={
+            onPreviousMonth
+          }
+          className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full border border-border bg-background text-white transition-transform active:scale-90"
+          aria-label="Afficher le mois précédent"
+        >
+          <ChevronLeft
+            size={19}
+          />
+        </button>
 
-      <main className="space-y-5 p-5">
-        <section className="rounded-2xl border border-border bg-card p-4">
-          <div className="mb-5 flex items-center justify-between">
-            <button
-              type="button"
-              onClick={previousMonth}
-              className="flex h-10 w-10 items-center justify-center rounded-full border border-border"
-            >
-              <ChevronLeft size={20} />
-            </button>
+        <h2 className="min-w-0 px-3 text-center text-lg font-black capitalize text-white">
+          {format(
+            month,
+            "MMMM yyyy",
+            {
+              locale:
+                fr,
+            },
+          )}
+        </h2>
 
-            <h2 className="font-extrabold text-white">
-              {formatMonth(displayedYear, displayedMonth)}
-            </h2>
+        <button
+          type="button"
+          onClick={
+            onNextMonth
+          }
+          className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full border border-border bg-background text-white transition-transform active:scale-90"
+          aria-label="Afficher le mois suivant"
+        >
+          <ChevronRight
+            size={19}
+          />
+        </button>
+      </div>
 
-            <button
-              type="button"
-              onClick={nextMonth}
-              className="flex h-10 w-10 items-center justify-center rounded-full border border-border"
-            >
-              <ChevronRight size={20} />
-            </button>
-          </div>
+      <div className="px-3 pb-4">
+        {/* Jours de la semaine */}
 
-          <div className="grid grid-cols-7 gap-1">
-            {WEEK_DAYS.map((day) => (
+        <div className="mb-2 grid grid-cols-7">
+          {weekLabels.map(
+            (
+              label,
+              index,
+            ) => (
               <div
-                key={day}
-                className="pb-2 text-center text-[10px] font-bold uppercase text-muted-foreground"
+                key={`${label}-${index}`}
+                className="py-2 text-center text-[10px] font-black uppercase tracking-wider text-muted-foreground"
               >
-                {day}
+                {
+                  label
+                }
               </div>
-            ))}
+            ),
+          )}
+        </div>
 
-            {calendarDays.map((day, index) => {
-              if (day === null) {
-                return (
-                  <div
-                    key={`empty-${index}`}
-                    className="aspect-square"
-                  />
+        {/* Jours */}
+
+        <div className="grid grid-cols-7 gap-y-1.5">
+          {days.map(
+            (day) => {
+              const inMonth =
+                isSameMonth(
+                  day,
+                  month,
                 );
-              }
 
-              const date = createLocalDateString(
-                displayedYear,
-                displayedMonth,
-                day,
-              );
+              const dayLogs =
+                getLogsForDay(
+                  logs,
+                  day,
+                );
 
-              const dayLogs = logsByDate[date] ?? [];
-              const hasActivity = dayLogs.length > 0;
-              const isSelected = selectedDate === date;
-              const isToday = today === date;
+              const hasLogs =
+                dayLogs.length >
+                0;
+
+              const selected =
+                selectedDate
+                  ? isSameDay(
+                      day,
+                      selectedDate,
+                    )
+                  : false;
+
+              const today =
+                isSameDay(
+                  day,
+                  new Date(),
+                );
 
               return (
                 <button
-                  key={date}
+                  key={
+                    day.toISOString()
+                  }
                   type="button"
-                  onClick={() => setSelectedDate(date)}
+                  onClick={() =>
+                    onSelectDate(
+                      day,
+                    )
+                  }
                   className={cn(
-                    "relative flex aspect-square items-center justify-center rounded-xl border text-sm font-bold",
-                    isSelected
-                      ? "border-white bg-white text-black"
-                      : "border-transparent bg-white/[0.03] text-white",
-                    isToday &&
-                      !isSelected &&
-                      "border-white/40",
+                    "relative mx-auto flex h-11 w-11 max-w-full flex-col items-center justify-center rounded-xl transition-all active:scale-90",
+
+                    !inMonth &&
+                      "opacity-25",
+
+                    selected &&
+                      "bg-white text-black",
+
+                    !selected &&
+                      hasLogs &&
+                      "text-white",
+
+                    !selected &&
+                      !hasLogs &&
+                      "text-muted-foreground",
+
+                    today &&
+                      !selected &&
+                      "border border-white/35",
                   )}
                 >
-                  {day}
+                  <span className="text-sm font-bold">
+                    {format(
+                      day,
+                      "d",
+                    )}
+                  </span>
 
-                  {hasActivity && (
+                  {hasLogs && (
                     <span
                       className={cn(
-                        "absolute bottom-1 h-1.5 w-1.5 rounded-full",
-                        isSelected ? "bg-black" : "bg-white",
+                        "absolute bottom-[4px] h-1 w-1 rounded-full",
+
+                        selected
+                          ? "bg-black"
+                          : "bg-white",
                       )}
                     />
                   )}
                 </button>
               );
-            })}
-          </div>
-        </section>
+            },
+          )}
+        </div>
+      </div>
+    </section>
+  );
+}
 
-        <section>
-          <div className="mb-3 flex items-center gap-2">
-            <CalendarDays size={18} />
+// ─────────────────────────────────────────────────────────────────────────────
+// Exercices historiques
+// ─────────────────────────────────────────────────────────────────────────────
 
-            <h2 className="font-extrabold capitalize text-white">
-              {formatLongDate(selectedDate)}
+function CompletedExerciseRow({
+  exercise,
+  data,
+}: {
+  exercise: ExerciseLog;
+
+  data: AppData;
+}) {
+  return (
+    <div className="w-full overflow-hidden rounded-xl border border-border bg-background p-3">
+      <div className="flex min-w-0 items-start gap-2">
+        <div className="mt-1.5 h-2 w-2 flex-shrink-0 rounded-full bg-success" />
+
+        <div className="min-w-0">
+          <p className="break-words text-sm font-bold text-white">
+            {getExerciseName(
+              exercise.exerciseId,
+              data,
+            )}
+          </p>
+
+          <p className="mt-1 break-words text-xs leading-relaxed text-muted-foreground">
+            {getExerciseSummary(
+              exercise,
+              data,
+            ) ||
+              "Exercice réalisé"}
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function IncompleteExerciseRow({
+  exercise,
+  data,
+}: {
+  exercise: ExerciseLog;
+
+  data: AppData;
+}) {
+  return (
+    <div className="w-full overflow-hidden rounded-xl border border-border bg-background/60 p-3">
+      <div className="flex min-w-0 items-center gap-2">
+        <div className="h-2 w-2 flex-shrink-0 rounded-full border border-muted-foreground" />
+
+        <p className="min-w-0 break-words text-sm font-bold text-muted-foreground">
+          {getExerciseName(
+            exercise.exerciseId,
+            data,
+          )}
+        </p>
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Carte de séance
+// ─────────────────────────────────────────────────────────────────────────────
+
+function HistorySessionCard({
+  log,
+  data,
+  onDelete,
+}: {
+  log: SessionLog;
+
+  data: AppData;
+
+  onDelete: () => void;
+}) {
+  const [
+    isExpanded,
+    setIsExpanded,
+  ] =
+    useState(false);
+
+  const Icon =
+    getSessionIcon(
+      log,
+    );
+
+  const timestamp =
+    getSessionTimestamp(
+      log,
+    );
+
+  const dateObject =
+    new Date(
+      timestamp,
+    );
+
+  const relativeDate =
+    formatDistanceToNow(
+      dateObject,
+      {
+        addSuffix:
+          true,
+
+        locale:
+          fr,
+      },
+    );
+
+  /*
+   * Les ExerciseLog sauvegardés sont la source
+   * de vérité historique.
+   *
+   * Ne jamais reconstruire une ancienne séance
+   * avec la définition actuelle.
+   */
+  const completedExercises =
+    log.exerciseLogs.filter(
+      (exercise) =>
+        exercise.completed,
+    );
+
+  const incompleteExercises =
+    log.exerciseLogs.filter(
+      (exercise) =>
+        !exercise.completed,
+    );
+
+  const successfulKilterEntries =
+    (
+      log.kilterEntries ??
+      []
+    ).filter(
+      (entry) =>
+        entry.result ===
+        "reussi",
+    );
+
+  const successfulRouteEntries =
+    (
+      log.routeClimbingEntries ??
+      []
+    ).filter(
+      (entry) =>
+        entry.result ===
+        "reussi",
+    );
+
+  return (
+    <article className="w-full overflow-hidden rounded-2xl border border-border bg-card">
+      <button
+        type="button"
+        onClick={() =>
+          setIsExpanded(
+            (previous) =>
+              !previous,
+          )
+        }
+        className="flex w-full min-w-0 items-start gap-4 p-4 text-left"
+      >
+        <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl border border-border bg-background">
+          <Icon
+            size={20}
+            className="text-white"
+          />
+        </div>
+
+        <div className="min-w-0 flex-1">
+          <div className="flex min-w-0 items-start justify-between gap-3">
+            <h2 className="min-w-0 break-words font-black leading-tight text-white">
+              {getSessionName(
+                log,
+              )}
             </h2>
+
+            {isExpanded ? (
+              <ChevronUp
+                size={18}
+                className="flex-shrink-0 text-muted-foreground"
+              />
+            ) : (
+              <ChevronDown
+                size={18}
+                className="flex-shrink-0 text-muted-foreground"
+              />
+            )}
           </div>
 
-          {selectedDayLogs.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-border p-6 text-center">
-              <p className="font-bold text-white">
-                Aucune séance enregistrée
-              </p>
+          <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+            <span className="flex items-center gap-1">
+              <CalendarDays
+                size={12}
+              />
 
-              <p className="mt-1 text-sm text-muted-foreground">
-                Cette date reste vide tant qu’aucune activité n’a
-                réellement été terminée.
-              </p>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {selectedDayLogs.map((log) => {
-                const Icon = getActivityIcon(log);
-                const duration = getActivityDuration(log);
+              {format(
+                dateObject,
+                "d MMMM yyyy",
+                {
+                  locale:
+                    fr,
+                },
+              )}
+            </span>
 
-                return (
-                  <button
-                    key={log.id}
-                    type="button"
-                    onClick={() => {
-                      setSelectedLog(log);
-                      setShowDeleteConfirmation(false);
-                    }}
-                    className="flex w-full items-center gap-3 rounded-2xl border border-border bg-card p-4 text-left"
-                  >
-                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white/10">
-                      <Icon size={21} />
-                    </div>
+            {log.completedAt && (
+              <span className="flex items-center gap-1">
+                <Clock3
+                  size={12}
+                />
 
-                    <div className="min-w-0 flex-1">
-                      <h3 className="font-bold text-white">
-                        {getSessionName(log.sessionId)}
-                      </h3>
+                {format(
+                  dateObject,
+                  "HH:mm",
+                  {
+                    locale:
+                      fr,
+                  },
+                )}
+              </span>
+            )}
+          </div>
 
-                      <p className="mt-1 text-xs text-muted-foreground">
-                        Toucher pour voir les détails
-                      </p>
-                    </div>
+          {(completedExercises.length >
+            0 ||
+            incompleteExercises.length >
+              0) && (
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              {completedExercises.length >
+                0 && (
+                <span className="rounded-full bg-success/10 px-2 py-1 text-[10px] font-bold text-success">
+                  {
+                    completedExercises.length
+                  }{" "}
+                  réalisé
+                  {completedExercises.length >
+                  1
+                    ? "s"
+                    : ""}
+                </span>
+              )}
 
-                    {duration !== null && (
-                      <div className="flex items-center gap-1 text-xs font-bold text-muted-foreground">
-                        <Clock3 size={14} />
-                        {duration} min
-                      </div>
-                    )}
-
-                    <ChevronRight size={18} />
-                  </button>
-                );
-              })}
+              {incompleteExercises.length >
+                0 && (
+                <span className="rounded-full bg-white/5 px-2 py-1 text-[10px] font-bold text-muted-foreground">
+                  {
+                    incompleteExercises.length
+                  }{" "}
+                  non réalisé
+                  {incompleteExercises.length >
+                  1
+                    ? "s"
+                    : ""}
+                </span>
+              )}
             </div>
           )}
-        </section>
-      </main>
 
-      {selectedLog && (
-        <div className="fixed inset-0 z-[9999] flex items-end bg-black/75">
-          <button
-            type="button"
-            className="absolute inset-0"
-            onClick={closeDetails}
-          />
+          <p className="mt-2 text-xs font-medium text-muted-foreground">
+            {
+              relativeDate
+            }
+          </p>
+        </div>
+      </button>
 
-          <div className="relative z-10 max-h-[92dvh] w-full overflow-y-auto rounded-t-3xl border-t border-border bg-background p-5 pb-10">
-            <div className="mb-5 flex items-start justify-between gap-4">
-              <div>
-                <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
-                  {formatLongDate(selectedLog.date)}
-                </p>
+      {isExpanded && (
+        <div className="w-full space-y-5 overflow-x-hidden border-t border-border bg-[#151515] p-4">
+          {/* Exercices réalisés */}
 
-                <h2 className="mt-1 text-2xl font-extrabold text-white">
-                  {getSessionName(selectedLog.sessionId)}
-                </h2>
+          {completedExercises.length >
+            0 && (
+            <section className="space-y-2">
+              <div className="flex items-center justify-between">
+                <h3 className="text-xs font-black uppercase tracking-wider text-white">
+                  Exercices réalisés
+                </h3>
+
+                <span className="text-xs font-bold text-success">
+                  {
+                    completedExercises.length
+                  }
+                </span>
               </div>
 
-              <button
-                type="button"
-                onClick={closeDetails}
-                className="flex h-10 w-10 items-center justify-center rounded-full border border-border"
-              >
-                <X size={20} />
-              </button>
-            </div>
+              {completedExercises.map(
+                (
+                  exercise,
+                  index,
+                ) => (
+                  <CompletedExerciseRow
+                    key={`${exercise.exerciseId}-${index}`}
+                    exercise={
+                      exercise
+                    }
+                    data={
+                      data
+                    }
+                  />
+                ),
+              )}
+            </section>
+          )}
 
-            {selectedLog.sessionId === "grimpe-libre" && (
-              <div className="space-y-3">
-                <div className="rounded-xl border border-border bg-card p-4">
-                  <p className="text-xs font-bold uppercase text-muted-foreground">
+          {/* Exercices non réalisés */}
+
+          {incompleteExercises.length >
+            0 && (
+            <section className="space-y-2">
+              <div className="flex items-center justify-between">
+                <h3 className="text-xs font-black uppercase tracking-wider text-muted-foreground">
+                  Exercices non réalisés
+                </h3>
+
+                <span className="text-xs font-bold text-muted-foreground">
+                  {
+                    incompleteExercises.length
+                  }
+                </span>
+              </div>
+
+              {incompleteExercises.map(
+                (
+                  exercise,
+                  index,
+                ) => (
+                  <IncompleteExerciseRow
+                    key={`${exercise.exerciseId}-${index}`}
+                    exercise={
+                      exercise
+                    }
+                    data={
+                      data
+                    }
+                  />
+                ),
+              )}
+            </section>
+          )}
+
+          {/* Bloc libre */}
+
+          {log.sessionId ===
+            "grimpe-libre" && (
+            <section className="space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="min-w-0 rounded-xl border border-border bg-background p-3">
+                  <p className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">
                     Durée
                   </p>
 
-                  <p className="mt-1 text-lg font-bold text-white">
-                    {selectedLog.climbingDurationMinutes ?? "—"} min
+                  <p className="mt-1 font-mono text-lg font-black text-white">
+                    {typeof log.climbingDurationMinutes ===
+                    "number"
+                      ? `${formatNumber(
+                          log.climbingDurationMinutes,
+                        )} min`
+                      : "—"}
                   </p>
                 </div>
 
-                <div className="rounded-xl border border-border bg-card p-4">
-                  <p className="text-xs font-bold uppercase text-muted-foreground">
+                <div className="min-w-0 rounded-xl border border-border bg-background p-3">
+                  <p className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">
                     Intensité
                   </p>
 
-                  <p className="mt-1 text-lg font-bold text-white">
-                    {formatIntensity(selectedLog.climbingIntensity)}
+                  <p className="mt-1 break-words text-lg font-black capitalize text-white">
+                    {log.climbingIntensity ??
+                      "—"}
                   </p>
                 </div>
               </div>
-            )}
 
-            {selectedLog.sessionId === "kilter" && (
-              <div className="space-y-3">
-                {(selectedLog.kilterEntries ?? []).map(
-                  (entry, index) => (
-                    <div
-                      key={entry.id ?? `${entry.angle}-${index}`}
-                      className="rounded-xl border border-border bg-card p-4"
-                    >
-                      <div className="mb-3 flex items-center justify-between">
-                        <h3 className="font-bold text-white">
-                          Partie {index + 1}
-                        </h3>
-
-                        <span className="rounded-full border border-border px-3 py-1 text-xs font-bold">
-                          {entry.angle}° · V{entry.grade}
-                        </span>
-                      </div>
-
-                      <div className="grid grid-cols-3 gap-2 text-center">
-                        <div className="rounded-lg bg-black/20 p-2">
-                          <p className="text-[10px] uppercase text-muted-foreground">
-                            Résultat
-                          </p>
-
-                          <p className="mt-1 text-xs font-bold text-white">
-                            {formatKilterResult(entry.result)}
-                          </p>
-                        </div>
-
-                        <div className="rounded-lg bg-black/20 p-2">
-                          <p className="text-[10px] uppercase text-muted-foreground">
-                            Essais
-                          </p>
-
-                          <p className="mt-1 text-xs font-bold text-white">
-                            {entry.attempts ?? "—"}
-                          </p>
-                        </div>
-
-                        <div className="rounded-lg bg-black/20 p-2">
-                          <p className="text-[10px] uppercase text-muted-foreground">
-                            Durée
-                          </p>
-
-                          <p className="mt-1 text-xs font-bold text-white">
-                            {entry.durationMinutes ?? "—"} min
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  ),
-                )}
-
-                <div className="rounded-xl border border-border bg-card p-4">
-                  <p className="text-xs font-bold uppercase text-muted-foreground">
-                    Durée totale
+              {(
+                log.climbingColorsSucceeded ??
+                []
+              ).length >
+                0 && (
+                <div>
+                  <p className="mb-2 text-xs font-black uppercase tracking-wider text-muted-foreground">
+                    Couleurs réussies
                   </p>
 
-                  <p className="mt-1 text-lg font-bold text-white">
-                    {getKilterTotalDuration(selectedLog)} min
-                  </p>
-                </div>
-              </div>
-            )}
-
-            {selectedLog.sessionId !== "grimpe-libre" &&
-              selectedLog.sessionId !== "kilter" && (
-                <div className="space-y-3">
-                  {selectedLog.exerciseLogs.length === 0 ? (
-                    <p className="rounded-xl border border-border bg-card p-4 text-sm text-muted-foreground">
-                      Aucun exercice renseigné.
-                    </p>
-                  ) : (
-                    selectedLog.exerciseLogs.map((exerciseLog) => (
-                      <div
-                        key={exerciseLog.exerciseId}
-                        className="rounded-xl border border-border bg-card p-4"
-                      >
-                        <div className="flex items-start justify-between gap-3">
-                          <div>
-                            <h3 className="font-bold text-white">
-                              {getExerciseName(exerciseLog.exerciseId)}
-                            </h3>
-
-                            <p className="mt-1 text-xs text-muted-foreground">
-                              {exerciseLog.completed
-                                ? "Exercice effectué"
-                                : "Non terminé"}
-                            </p>
-                          </div>
-
-                          <span
-                            className={cn(
-                              "rounded-full px-3 py-1 text-xs font-bold",
-                              exerciseLog.completed
-                                ? "bg-white text-black"
-                                : "border border-border text-muted-foreground",
-                            )}
-                          >
-                            {exerciseLog.completed ? "Fait" : "Non fait"}
-                          </span>
-                        </div>
-
-                        <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
-                          {exerciseLog.sets !== undefined && (
-                            <div className="rounded-lg bg-black/20 p-3">
-                              <p className="text-[10px] uppercase text-muted-foreground">
-                                Séries
-                              </p>
-
-                              <p className="mt-1 font-bold text-white">
-                                {exerciseLog.sets}
-                              </p>
-                            </div>
-                          )}
-
-                          {exerciseLog.reps !== undefined && (
-                            <div className="rounded-lg bg-black/20 p-3">
-                              <p className="text-[10px] uppercase text-muted-foreground">
-                                Répétitions
-                              </p>
-
-                              <p className="mt-1 font-bold text-white">
-                                {exerciseLog.reps}
-                              </p>
-                            </div>
-                          )}
-
-                          {exerciseLog.duration !== undefined && (
-                            <div className="rounded-lg bg-black/20 p-3">
-                              <p className="text-[10px] uppercase text-muted-foreground">
-                                Durée
-                              </p>
-
-                              <p className="mt-1 font-bold text-white">
-                                {exerciseLog.duration}
-                              </p>
-                            </div>
-                          )}
-
-                          {exerciseLog.weight !== undefined && (
-                            <div className="rounded-lg bg-black/20 p-3">
-                              <p className="text-[10px] uppercase text-muted-foreground">
-                                Poids
-                              </p>
-
-                              <p className="mt-1 font-bold text-white">
-                                {exerciseLog.weight} kg
-                              </p>
-                            </div>
-                          )}
-
-                          {exerciseLog.assistance !== undefined && (
-                            <div className="rounded-lg bg-black/20 p-3">
-                              <p className="text-[10px] uppercase text-muted-foreground">
-                                Assistance
-                              </p>
-
-                              <p className="mt-1 font-bold text-white">
-                                {exerciseLog.assistance}
-                              </p>
-                            </div>
-                          )}
-
-                          {exerciseLog.progressionValue !== undefined && (
-                            <div className="rounded-lg bg-black/20 p-3">
-                              <p className="text-[10px] uppercase text-muted-foreground">
-                                Progression
-                              </p>
-
-                              <p className="mt-1 font-bold text-white">
-                                {exerciseLog.progressionValue}
-                              </p>
-                            </div>
-                          )}
-
-                          {exerciseLog.leftHandJumps !== undefined && (
-                            <div className="rounded-lg bg-black/20 p-3">
-                              <p className="text-[10px] uppercase text-muted-foreground">
-                                Main gauche
-                              </p>
-
-                              <p className="mt-1 font-bold text-white">
-                                {exerciseLog.leftHandJumps}
-                              </p>
-                            </div>
-                          )}
-
-                          {exerciseLog.rightHandJumps !== undefined && (
-                            <div className="rounded-lg bg-black/20 p-3">
-                              <p className="text-[10px] uppercase text-muted-foreground">
-                                Main droite
-                              </p>
-
-                              <p className="mt-1 font-bold text-white">
-                                {exerciseLog.rightHandJumps}
-                              </p>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    ))
-                  )}
-                </div>
-              )}
-
-            {selectedLog.pain &&
-              Object.entries(selectedLog.pain).some(
-                ([, value]) => value > 0,
-              ) && (
-                <div className="mt-5 rounded-xl border border-border bg-card p-4">
-                  <h3 className="font-bold text-white">
-                    Douleurs et gênes
-                  </h3>
-
-                  <div className="mt-3 space-y-2">
-                    {Object.entries(selectedLog.pain)
-                      .filter(([, value]) => value > 0)
-                      .map(([area, value]) => (
-                        <div
-                          key={area}
-                          className="flex items-center justify-between text-sm"
+                  <div className="flex flex-wrap gap-2">
+                    {log.climbingColorsSucceeded?.map(
+                      (color) => (
+                        <span
+                          key={
+                            color
+                          }
+                          className="rounded-full border border-border bg-background px-3 py-1.5 text-xs font-bold capitalize text-white"
                         >
-                          <span className="text-muted-foreground">
-                            {area}
-                          </span>
-
-                          <span className="font-bold text-white">
-                            {value}/10
-                          </span>
-                        </div>
-                      ))}
+                          {
+                            color
+                          }
+                        </span>
+                      ),
+                    )}
                   </div>
                 </div>
               )}
+            </section>
+          )}
 
-            {selectedLog.note && (
-              <div className="mt-5 rounded-xl border border-border bg-card p-4">
-                <p className="text-xs font-bold uppercase text-muted-foreground">
-                  Note
+          {/* Kilter */}
+
+          {log.sessionId ===
+            "kilter" && (
+            <section className="space-y-3">
+              <div className="rounded-xl border border-border bg-background p-3">
+                <p className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">
+                  Durée totale
                 </p>
 
-                <p className="mt-2 whitespace-pre-wrap text-sm text-white">
-                  {selectedLog.note}
+                <p className="mt-1 font-mono text-lg font-black text-white">
+                  {typeof log.climbingDurationMinutes ===
+                  "number"
+                    ? `${formatNumber(
+                        log.climbingDurationMinutes,
+                      )} min`
+                    : "—"}
                 </p>
               </div>
-            )}
 
-            {!showDeleteConfirmation ? (
-              <button
-                type="button"
-                onClick={() => setShowDeleteConfirmation(true)}
-                className="mt-6 flex w-full items-center justify-center gap-2 rounded-xl border border-red-500/50 bg-red-500/10 py-4 font-bold text-red-300"
-              >
-                <Trash2 size={18} />
-                Supprimer la séance
-              </button>
-            ) : (
-              <div className="mt-6 rounded-xl border border-red-500/50 bg-red-500/10 p-4">
-                <p className="font-bold text-red-200">
-                  Supprimer définitivement cette séance ?
+              <div className="space-y-2">
+                {(
+                  log.kilterEntries ??
+                  []
+                ).map(
+                  (entry) => (
+                    <div
+                      key={
+                        entry.id
+                      }
+                      className="flex min-w-0 items-center justify-between gap-3 rounded-xl border border-border bg-background p-3"
+                    >
+                      <div className="min-w-0">
+                        <p className="break-words text-sm font-black text-white">
+                          V
+                          {
+                            entry.grade
+                          }{" "}
+                          à{" "}
+                          {
+                            entry.angle
+                          }
+                          °
+                        </p>
+
+                        <p className="mt-0.5 text-xs text-muted-foreground">
+                          {entry.attempts ??
+                            1}{" "}
+                          essai
+                          {(entry.attempts ??
+                            1) >
+                          1
+                            ? "s"
+                            : ""}
+                        </p>
+                      </div>
+
+                      <span
+                        className={cn(
+                          "flex-shrink-0 rounded-full px-2.5 py-1 text-[10px] font-black uppercase",
+
+                          entry.result ===
+                            "reussi" &&
+                            "bg-success/15 text-success",
+
+                          entry.result ===
+                            "travaille" &&
+                            "bg-white/10 text-white",
+
+                          entry.result ===
+                            "echoue" &&
+                            "bg-destructive/15 text-destructive",
+                        )}
+                      >
+                        {entry.result ===
+                        "reussi"
+                          ? "Réussi"
+                          : entry.result ===
+                              "travaille"
+                            ? "Travaillé"
+                            : "Échoué"}
+                      </span>
+                    </div>
+                  ),
+                )}
+              </div>
+
+              {successfulKilterEntries.length >
+                0 && (
+                <p className="text-xs text-success">
+                  {
+                    successfulKilterEntries.length
+                  }{" "}
+                  bloc
+                  {successfulKilterEntries.length >
+                  1
+                    ? "s"
+                    : ""}{" "}
+                  réussi
+                  {successfulKilterEntries.length >
+                  1
+                    ? "s"
+                    : ""}
+                  .
+                </p>
+              )}
+            </section>
+          )}
+
+          {/* Voies */}
+
+          {log.sessionId ===
+            "route" && (
+            <section className="space-y-3">
+              <div className="rounded-xl border border-border bg-background p-3">
+                <p className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">
+                  Durée totale
                 </p>
 
-                <p className="mt-1 text-sm text-red-200/70">
-                  Cette action ne pourra pas être annulée.
+                <p className="mt-1 font-mono text-lg font-black text-white">
+                  {typeof log.routeClimbingDurationMinutes ===
+                  "number"
+                    ? `${formatNumber(
+                        log.routeClimbingDurationMinutes,
+                      )} min`
+                    : "—"}
                 </p>
+              </div>
 
-                <div className="mt-4 grid grid-cols-2 gap-3">
-                  <button
-                    type="button"
-                    onClick={() => setShowDeleteConfirmation(false)}
-                    className="rounded-xl border border-border py-3 font-bold text-white"
-                  >
-                    Annuler
-                  </button>
+              <div className="space-y-2">
+                {(
+                  log.routeClimbingEntries ??
+                  []
+                ).map(
+                  (entry) => (
+                    <div
+                      key={
+                        entry.id
+                      }
+                      className="flex min-w-0 items-center justify-between gap-3 rounded-xl border border-border bg-background p-3"
+                    >
+                      <div className="min-w-0">
+                        <p className="break-words text-sm font-black text-white">
+                          Voie{" "}
+                          {
+                            entry.grade
+                          }
+                        </p>
 
-                  <button
-                    type="button"
-                    onClick={confirmDelete}
-                    className="rounded-xl bg-red-500 py-3 font-bold text-white"
-                  >
-                    Supprimer
-                  </button>
+                        <p className="mt-0.5 break-words text-xs text-muted-foreground">
+                          {entry.mode ===
+                          "tete"
+                            ? "En tête"
+                            : "Moulinette"}{" "}
+                          •{" "}
+                          {entry.attempts ??
+                            1}{" "}
+                          essai
+                          {(entry.attempts ??
+                            1) >
+                          1
+                            ? "s"
+                            : ""}
+                        </p>
+                      </div>
+
+                      <span
+                        className={cn(
+                          "flex-shrink-0 rounded-full px-2.5 py-1 text-[10px] font-black uppercase",
+
+                          entry.result ===
+                            "reussi" &&
+                            "bg-success/15 text-success",
+
+                          entry.result ===
+                            "travaille" &&
+                            "bg-white/10 text-white",
+
+                          entry.result ===
+                            "echoue" &&
+                            "bg-destructive/15 text-destructive",
+                        )}
+                      >
+                        {entry.result ===
+                        "reussi"
+                          ? "Réussie"
+                          : entry.result ===
+                              "travaille"
+                            ? "Travaillée"
+                            : "Échouée"}
+                      </span>
+                    </div>
+                  ),
+                )}
+              </div>
+
+              {successfulRouteEntries.length >
+                0 && (
+                <p className="text-xs text-success">
+                  {
+                    successfulRouteEntries.length
+                  }{" "}
+                  voie
+                  {successfulRouteEntries.length >
+                  1
+                    ? "s"
+                    : ""}{" "}
+                  réussie
+                  {successfulRouteEntries.length >
+                  1
+                    ? "s"
+                    : ""}
+                  .
+                </p>
+              )}
+            </section>
+          )}
+
+          {/* Douleurs */}
+
+          {log.pain &&
+            Object.keys(
+              log.pain,
+            ).length >
+              0 && (
+              <section>
+                <h3 className="mb-2 text-xs font-black uppercase tracking-wider text-muted-foreground">
+                  Douleur pendant la séance
+                </h3>
+
+                <div className="flex flex-wrap gap-2">
+                  {Object.entries(
+                    log.pain,
+                  )
+                    .filter(
+                      (
+                        [
+                          ,
+                          level,
+                        ],
+                      ) =>
+                        level >
+                        0,
+                    )
+                    .map(
+                      (
+                        [
+                          area,
+                          level,
+                        ],
+                      ) => (
+                        <span
+                          key={
+                            area
+                          }
+                          className={cn(
+                            "max-w-full rounded-full border px-3 py-1.5 text-xs font-bold",
+
+                            level >=
+                              7
+                              ? "border-destructive/40 bg-destructive/10 text-destructive"
+                              : level >=
+                                  4
+                                ? "border-orange-500/40 bg-orange-500/10 text-orange-400"
+                                : "border-border bg-background text-muted-foreground",
+                          )}
+                        >
+                          {
+                            area
+                          }{" "}
+                          :{" "}
+                          {
+                            level
+                          }
+                          /10
+                        </span>
+                      ),
+                    )}
                 </div>
-              </div>
+              </section>
             )}
-          </div>
+
+          {/* Note */}
+
+          {log.note && (
+            <section className="w-full overflow-hidden rounded-xl border border-border bg-background p-3">
+              <p className="text-xs font-black uppercase tracking-wider text-muted-foreground">
+                Note
+              </p>
+
+              <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-relaxed text-white">
+                {
+                  log.note
+                }
+              </p>
+            </section>
+          )}
+
+          <button
+            type="button"
+            onClick={
+              onDelete
+            }
+            className="flex w-full items-center justify-center gap-2 rounded-xl border border-destructive/30 py-3 text-sm font-bold text-destructive active:scale-[0.99]"
+          >
+            <Trash2
+              size={16}
+            />
+
+            Supprimer la séance
+          </button>
         </div>
       )}
+    </article>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Page
+// ─────────────────────────────────────────────────────────────────────────────
+
+export function HistoriquePage() {
+  const {
+    data,
+    deleteSessionLog,
+  } =
+    useClimbTrack();
+
+  /*
+   * Toujours ouvrir l'onglet Historique depuis le haut.
+   */
+  useEffect(
+    () => {
+      window.scrollTo({
+        top: 0,
+        left: 0,
+        behavior: "auto",
+      });
+    },
+    [],
+  );
+
+  const [
+    displayedMonth,
+    setDisplayedMonth,
+  ] =
+    useState(
+      startOfMonth(
+        new Date(),
+      ),
+    );
+
+  const [
+    selectedDate,
+    setSelectedDate,
+  ] =
+    useState<Date | null>(
+      null,
+    );
+
+  const sortedLogs =
+    useMemo(
+      () =>
+        [
+          ...data.sessionLogs,
+        ].sort(
+          (
+            first,
+            second,
+          ) =>
+            getSessionTimestamp(
+              second,
+            ) -
+            getSessionTimestamp(
+              first,
+            ),
+        ),
+      [
+        data.sessionLogs,
+      ],
+    );
+
+  const visibleLogs =
+    useMemo(
+      () => {
+        if (
+          !selectedDate
+        ) {
+          return sortedLogs;
+        }
+
+        return sortedLogs.filter(
+          (log) =>
+            isSameDay(
+              getLogDate(
+                log,
+              ),
+              selectedDate,
+            ),
+        );
+      },
+      [
+        sortedLogs,
+        selectedDate,
+      ],
+    );
+
+  function selectCalendarDate(
+    date: Date,
+  ) {
+    /*
+     * Toucher une deuxième fois le même jour
+     * enlève le filtre.
+     */
+    if (
+      selectedDate &&
+      isSameDay(
+        selectedDate,
+        date,
+      )
+    ) {
+      setSelectedDate(
+        null,
+      );
+
+      return;
+    }
+
+    /*
+     * Les jours du mois précédent/suivant
+     * restent cliquables.
+     */
+    if (
+      !isSameMonth(
+        date,
+        displayedMonth,
+      )
+    ) {
+      setDisplayedMonth(
+        startOfMonth(
+          date,
+        ),
+      );
+    }
+
+    setSelectedDate(
+      date,
+    );
+  }
+
+  function handleDelete(
+    log: SessionLog,
+  ) {
+    const confirmed =
+      window.confirm(
+        `Supprimer la séance « ${getSessionName(
+          log,
+        )} » ?`,
+      );
+
+    if (
+      confirmed
+    ) {
+      deleteSessionLog(
+        log.id,
+      );
+    }
+  }
+
+  return (
+    <div className="min-h-screen w-full overflow-x-hidden bg-background pb-24 pt-safe">
+      <header className="border-b border-border px-5 py-6">
+        <h1 className="text-3xl font-extrabold tracking-tight text-white">
+          Historique
+        </h1>
+      </header>
+
+      <main className="w-full space-y-5 overflow-x-hidden p-5">
+        <MonthlyCalendar
+          logs={
+            sortedLogs
+          }
+          month={
+            displayedMonth
+          }
+          selectedDate={
+            selectedDate
+          }
+          onPreviousMonth={() => {
+            setDisplayedMonth(
+              (
+                previous,
+              ) =>
+                addMonths(
+                  previous,
+                  -1,
+                ),
+            );
+
+            setSelectedDate(
+              null,
+            );
+          }}
+          onNextMonth={() => {
+            setDisplayedMonth(
+              (
+                previous,
+              ) =>
+                addMonths(
+                  previous,
+                  1,
+                ),
+            );
+
+            setSelectedDate(
+              null,
+            );
+          }}
+          onSelectDate={
+            selectCalendarDate
+          }
+        />
+
+        {selectedDate && (
+          <div className="flex min-w-0 items-center justify-between gap-3 px-1">
+            <div className="min-w-0">
+              <p className="text-xs font-black uppercase tracking-wider text-muted-foreground">
+                Séances du jour
+              </p>
+
+              <p className="mt-1 break-words text-sm font-bold capitalize text-white">
+                {format(
+                  selectedDate,
+                  "EEEE d MMMM",
+                  {
+                    locale:
+                      fr,
+                  },
+                )}
+              </p>
+            </div>
+
+            <div className="flex flex-shrink-0 items-center gap-2">
+              <span className="rounded-full border border-border bg-card px-3 py-1.5 font-mono text-xs text-white">
+                {
+                  visibleLogs.length
+                }
+              </span>
+
+              <button
+                type="button"
+                onClick={() =>
+                  setSelectedDate(
+                    null,
+                  )
+                }
+                className="rounded-full border border-border bg-card px-3 py-1.5 text-xs font-bold text-white"
+              >
+                Tout afficher
+              </button>
+            </div>
+          </div>
+        )}
+
+        {visibleLogs.length >
+        0 ? (
+          <div className="w-full space-y-4">
+            {visibleLogs.map(
+              (log) => (
+                <HistorySessionCard
+                  key={
+                    log.id
+                  }
+                  log={
+                    log
+                  }
+                  data={
+                    data
+                  }
+                  onDelete={() =>
+                    handleDelete(
+                      log,
+                    )
+                  }
+                />
+              ),
+            )}
+          </div>
+        ) : (
+          <div className="w-full rounded-2xl border border-border bg-card py-16 text-center">
+            <Activity
+              size={42}
+              className="mx-auto mb-4 text-muted-foreground/30"
+            />
+
+            <p className="font-bold text-muted-foreground">
+              {selectedDate
+                ? "Aucune séance ce jour-là."
+                : "Aucune séance enregistrée."}
+            </p>
+
+            <p className="mt-1 px-4 text-sm text-muted-foreground/70">
+              {selectedDate
+                ? "Choisir une autre date ou afficher tout l’historique."
+                : "Les prochaines séances apparaîtront ici."}
+            </p>
+
+            {selectedDate && (
+              <button
+                type="button"
+                onClick={() =>
+                  setSelectedDate(
+                    null,
+                  )
+                }
+                className="mt-4 rounded-xl border border-border px-4 py-2 text-sm font-bold text-white"
+              >
+                Tout afficher
+              </button>
+            )}
+          </div>
+        )}
+      </main>
     </div>
   );
 }

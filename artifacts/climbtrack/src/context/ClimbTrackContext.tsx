@@ -15,6 +15,11 @@ import type {
   TrackingType,
 } from "../data/sessions";
 
+import {
+  BADGES,
+  BADGE_BY_ID,
+} from "../data/badges";
+
 import type {
   BadgeLevel,
   ClimbingColor,
@@ -30,158 +35,488 @@ import type {
   EarnedBadgeEntry,
 } from "../utils/badgeEngine";
 
-// ── Types ─────────────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// Helpers
+// ─────────────────────────────────────────────────────────────────────────────
+
+function generateId(): string {
+  if (
+    typeof crypto !==
+      "undefined" &&
+    typeof crypto.randomUUID ===
+      "function"
+  ) {
+    return crypto.randomUUID();
+  }
+
+  return `${Date.now()}-${Math.random()
+    .toString(36)
+    .slice(2, 10)}`;
+}
+
+function getLocalDateString(
+  date = new Date(),
+): string {
+  const offset =
+    date.getTimezoneOffset() *
+    60_000;
+
+  return new Date(
+    date.getTime() -
+      offset,
+  )
+    .toISOString()
+    .split("T")[0];
+}
+
+function createCompletedAt(
+  sessionDate: string,
+): string {
+  const today =
+    getLocalDateString();
+
+  if (
+    sessionDate ===
+    today
+  ) {
+    return new Date().toISOString();
+  }
+
+  return new Date(
+    `${sessionDate}T12:00:00`,
+  ).toISOString();
+}
+
+function normalizePositiveNumber(
+  value: unknown,
+): number | undefined {
+  if (
+    typeof value !==
+      "number" ||
+    !Number.isFinite(
+      value,
+    )
+  ) {
+    return undefined;
+  }
+
+  return Math.max(
+    0,
+    value,
+  );
+}
+
+function normalizeOptionalText(
+  value: unknown,
+): string | undefined {
+  if (
+    typeof value !==
+    "string"
+  ) {
+    return undefined;
+  }
+
+  const trimmed =
+    value.trim();
+
+  return trimmed ||
+    undefined;
+}
+
+function normalizeStringArray(
+  value: unknown,
+): string[] | undefined {
+  if (
+    !Array.isArray(
+      value,
+    )
+  ) {
+    return undefined;
+  }
+
+  const normalized =
+    value.filter(
+      (
+        item,
+      ): item is string =>
+        typeof item ===
+          "string" &&
+        item.trim().length >
+          0,
+    );
+
+  return normalized.length >
+    0
+    ? normalized
+    : [];
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Exercise types
+// ─────────────────────────────────────────────────────────────────────────────
+
+export type ResistanceBandColor =
+  | "jaune"
+  | "rouge"
+  | "noir"
+  | "violet"
+  | "vert"
+  | "bleu"
+  | "orange";
 
 export type ExerciseDefaults = {
   sets: number;
+
   reps?: number;
+  secondaryReps?: number;
+
   duration?: number;
+
   weight?: number;
+  secondaryWeight?: number;
+
   assistance?: string;
+
+  progressionValue?: number;
+
+  bandColor?: ResistanceBandColor;
+  bandStretch?: number;
+
   restSeconds: number;
 };
 
 export type ExerciseLog = {
   exerciseId: string;
+
   completed: boolean;
 
   sets: number;
+
   reps?: number;
+
+  secondaryReps?: number;
+
   duration?: number;
+
   weight?: number;
+
+  secondaryWeight?: number;
+
   assistance?: string;
 
-  /**
-   * Utilisé pour les variantes d’un exercice.
-   * Pour les slopers :
-   * 30 = sloper 30°
-   * 45 = sloper 45°
-   */
   progressionValue?: number;
 
-  /**
-   * Nombre maximal de prises sautées avec chaque main.
-   * Le badge utilise la plus faible des deux valeurs.
-   */
   leftHandJumps?: number;
   rightHandJumps?: number;
-  };
-  export type ClimbingIntensity =
-    | "facile"
-    | "moyen"
-    | "dur";
 
-  export type KilterResult =
-    | "reussi"
-    | "travaille"
-    | "echoue";
+  variant?: string;
 
-  export type FinisherType =
-    | "abs"
-    | "flexibility";
+  bandColor?: ResistanceBandColor;
 
-  export type KilterEntry = {
-    id: string;
+  bandStretch?: number;
+};
 
-    /**
-     * Inclinaison de la Kilterboard en degrés.
-     * Exemple : 30, 35 ou 45.
-     */
-    angle: number;
+// ─────────────────────────────────────────────────────────────────────────────
+// Climbing types
+// ─────────────────────────────────────────────────────────────────────────────
 
-    /**
-     * Cotation américaine.
-     * 0 = V0, 1 = V1, 2 = V2...
-     */
-    grade: number;
+export type ClimbingIntensity =
+  | "facile"
+  | "moyen"
+  | "dur";
 
-    result: KilterResult;
+export type KilterResult =
+  | "reussi"
+  | "travaille"
+  | "echoue";
 
-    /**
-     * Facultatif : nombre d’essais réalisés
-     * sur cette partie.
-     */
-    attempts?: number;
+export type FinisherType =
+  | "abs"
+  | "flexibility";
 
-    /**
-     * Facultatif : durée de cette partie
-     * de la séance Kilter.
-     */
-    durationMinutes?: number;
-  };
+export type KilterEntry = {
+  id: string;
+
+  angle: number;
+
+  grade: number;
+
+  result: KilterResult;
+
+  attempts?: number;
+
+  durationMinutes?: number;
+};
+
+export type RouteClimbingMode =
+  | "moulinette"
+  | "tete";
+
+export type RouteClimbingResult =
+  | "reussi"
+  | "travaille"
+  | "echoue";
+
+export type RouteGrade =
+  | "3a"
+  | "3a+"
+  | "3b"
+  | "3b+"
+  | "3c"
+  | "3c+"
+  | "4a"
+  | "4a+"
+  | "4b"
+  | "4b+"
+  | "4c"
+  | "4c+"
+  | "5a"
+  | "5a+"
+  | "5b"
+  | "5b+"
+  | "5c"
+  | "5c+"
+  | "6a"
+  | "6a+"
+  | "6b"
+  | "6b+"
+  | "6c"
+  | "6c+"
+  | "7a"
+  | "7a+"
+  | "7b"
+  | "7b+"
+  | "7c"
+  | "7c+"
+  | "8a"
+  | "8a+"
+  | "8b"
+  | "8b+"
+  | "8c"
+  | "8c+"
+  | "9a"
+  | "9a+"
+  | "9b"
+  | "9b+"
+  | "9c";
+
+export const ROUTE_GRADES: RouteGrade[] = [
+  "3a",
+  "3a+",
+  "3b",
+  "3b+",
+  "3c",
+  "3c+",
+
+  "4a",
+  "4a+",
+  "4b",
+  "4b+",
+  "4c",
+  "4c+",
+
+  "5a",
+  "5a+",
+  "5b",
+  "5b+",
+  "5c",
+  "5c+",
+
+  "6a",
+  "6a+",
+  "6b",
+  "6b+",
+  "6c",
+  "6c+",
+
+  "7a",
+  "7a+",
+  "7b",
+  "7b+",
+  "7c",
+  "7c+",
+
+  "8a",
+  "8a+",
+  "8b",
+  "8b+",
+  "8c",
+  "8c+",
+
+  "9a",
+  "9a+",
+  "9b",
+  "9b+",
+  "9c",
+];
+
+export type RouteClimbingEntry = {
+  id: string;
+
+  grade: RouteGrade;
+
+  mode: RouteClimbingMode;
+
+  result: RouteClimbingResult;
+
+  attempts?: number;
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Injury types
+// ─────────────────────────────────────────────────────────────────────────────
+
+export type InjurySide =
+  | "gauche"
+  | "droite"
+  | "deux"
+  | "non-applicable";
+
+export type InjuryStatus =
+  | "active"
+  | "amelioration"
+  | "guerie";
+
+export type Injury = {
+  id: string;
+
+  area: string;
+
+  side: InjurySide;
+
+  injuryType: string;
+
+  painLevel: number;
+
+  startDate: string;
+
+  note?: string;
+
+  status: InjuryStatus;
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Session types
+// ─────────────────────────────────────────────────────────────────────────────
 
 export type SessionLog = {
   id: string;
+
   date: string;
+
+  completedAt?: string;
+
   sessionId: string;
+
   exerciseLogs: ExerciseLog[];
 
   note?: string;
-  isRestDay?: boolean;
-  pain?: Record<string, number>;
 
-  /**
-   * Informations utilisées pour une séance
-   * de grimpe libre.
-   */
+  isRestDay?: boolean;
+
+  pain?: Record<
+    string,
+    number
+  >;
+
   climbingDurationMinutes?: number;
+
   climbingIntensity?: ClimbingIntensity;
-  /**
-   * Couleurs de blocs réellement réussies
-   * pendant cette séance de grimpe.
-   */
+
   climbingColorsSucceeded?: ClimbingColor[];
-  /**
-   * Une séance Kilter peut contenir plusieurs
-   * angles, cotations et résultats.
-   */
+
   kilterEntries?: KilterEntry[];
 
-  /**
-   * Permet de compter correctement la répartition
-   * 70 % abdos / 30 % souplesse.
-   */
+  routeClimbingDurationMinutes?: number;
+
+  routeClimbingEntries?: RouteClimbingEntry[];
+
   finisherType?: FinisherType;
 };
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Exercise overrides
+// ─────────────────────────────────────────────────────────────────────────────
+
 export type ExerciseOverride = {
   name?: string;
-  category?: string;
-  tracking?: TrackingType;
+
   description?: string;
+
+  category?: string;
+
+  tracking?: TrackingType;
+
   sessionIds?: string[];
+
+  assistanceOptions?: string[];
+
+  isHangboard?: boolean;
+
+  variantOptions?: string[];
+
+  bandOptions?: ResistanceBandColor[];
+
+  totalWeight?: boolean;
+
+  perSide?: boolean;
+
+  primaryRepsLabel?: string;
+
+  secondaryRepsLabel?: string;
+
+  primaryWeightLabel?: string;
+
+  secondaryWeightLabel?: string;
+
   hidden?: boolean;
 };
 
 export type PendingBadgeNotification = {
   badgeId: string;
+
   level: BadgeLevel;
 };
 
 export type AppData = {
   sessionLogs: SessionLog[];
-  exerciseDefaults: Record<string, ExerciseDefaults>;
+
+  injuries: Injury[];
+
+  exerciseDefaults: Record<
+    string,
+    ExerciseDefaults
+  >;
+
   customExercises: ExerciseDef[];
+
   customCategories: string[];
+
   exerciseOverrides: Record<
     string,
     ExerciseOverride
   >;
+
   exerciseCategoryOrder: Record<
     string,
     string[]
   >;
+
   earnedBadges: Record<
     string,
     EarnedBadgeEntry[]
   >;
+
   pendingBadgeNotifications:
     PendingBadgeNotification[];
 };
 
-// ── Storage ───────────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// Storage
+// ─────────────────────────────────────────────────────────────────────────────
 
-const STORAGE_KEY = "climbtrack_data";
+const STORAGE_KEY =
+  "climbtrack_data";
 
 function buildDefaultExerciseValues(): Record<
   string,
@@ -192,34 +527,282 @@ function buildDefaultExerciseValues(): Record<
     ExerciseDefaults
   > = {};
 
-  SESSIONS.forEach((session) => {
-    session.exercises.forEach((exercise) => {
-      defaults[exercise.id] = {
-        ...exercise.defaultValues,
-      };
-    });
-  });
+  SESSIONS.forEach(
+    (session) => {
+      session.exercises.forEach(
+        (exercise) => {
+          defaults[
+            exercise.id
+          ] = {
+            ...exercise.defaultValues,
+          };
+        },
+      );
+    },
+  );
 
   return defaults;
+}
+
+function mergeExerciseDefaults(
+  savedDefaults:
+    | Record<
+        string,
+        ExerciseDefaults
+      >
+    | undefined,
+): Record<
+  string,
+  ExerciseDefaults
+> {
+  const builtInDefaults =
+    buildDefaultExerciseValues();
+
+  if (
+    !savedDefaults
+  ) {
+    return builtInDefaults;
+  }
+
+  const merged: Record<
+    string,
+    ExerciseDefaults
+  > = {
+    ...builtInDefaults,
+  };
+
+  Object.entries(
+    savedDefaults,
+  ).forEach(
+    (
+      [
+        exerciseId,
+        saved,
+      ],
+    ) => {
+      const fallback =
+        builtInDefaults[
+          exerciseId
+        ] ?? {
+          sets: 0,
+          restSeconds: 0,
+        };
+
+      merged[
+        exerciseId
+      ] = {
+        ...fallback,
+        ...saved,
+
+        sets:
+          typeof saved.sets ===
+            "number"
+            ? Math.max(
+                0,
+                saved.sets,
+              )
+            : fallback.sets,
+
+        restSeconds:
+          typeof saved.restSeconds ===
+            "number"
+            ? Math.max(
+                0,
+                saved.restSeconds,
+              )
+            : fallback.restSeconds,
+      };
+    },
+  );
+
+  return merged;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Normalisation
+// ─────────────────────────────────────────────────────────────────────────────
+
+function normalizeExerciseDefaults(
+  defaults:
+    | Partial<ExerciseDefaults>
+    | undefined,
+): ExerciseDefaults {
+  return {
+    sets:
+      typeof defaults?.sets ===
+        "number"
+        ? Math.max(
+            0,
+            defaults.sets,
+          )
+        : 0,
+
+    reps:
+      normalizePositiveNumber(
+        defaults?.reps,
+      ),
+
+    secondaryReps:
+      normalizePositiveNumber(
+        defaults?.secondaryReps,
+      ),
+
+    duration:
+      normalizePositiveNumber(
+        defaults?.duration,
+      ),
+
+    weight:
+      normalizePositiveNumber(
+        defaults?.weight,
+      ),
+
+    secondaryWeight:
+      normalizePositiveNumber(
+        defaults?.secondaryWeight,
+      ),
+
+    assistance:
+      normalizeOptionalText(
+        defaults?.assistance,
+      ),
+
+    progressionValue:
+      normalizePositiveNumber(
+        defaults?.progressionValue,
+      ),
+
+    bandColor:
+      defaults?.bandColor,
+
+    bandStretch:
+      normalizePositiveNumber(
+        defaults?.bandStretch,
+      ),
+
+    restSeconds:
+      typeof defaults?.restSeconds ===
+        "number"
+        ? Math.max(
+            0,
+            defaults.restSeconds,
+          )
+        : 0,
+  };
 }
 
 function normalizeExerciseLog(
   log: Partial<ExerciseLog>,
 ): ExerciseLog {
+  const validBandColors:
+    ResistanceBandColor[] = [
+      "jaune",
+      "rouge",
+      "noir",
+      "violet",
+      "vert",
+      "bleu",
+      "orange",
+    ];
+
+  const bandColor =
+    validBandColors.includes(
+      log.bandColor as ResistanceBandColor,
+    )
+      ? (
+          log.bandColor as ResistanceBandColor
+        )
+      : undefined;
+
   return {
-    exerciseId: log.exerciseId ?? "",
-    completed: log.completed ?? false,
-    sets: log.sets ?? 0,
-    reps: log.reps,
-    duration: log.duration,
-    weight: log.weight,
-    assistance: log.assistance,
+    exerciseId:
+      log.exerciseId ??
+      "",
+
+    /*
+     * COMPATIBILITÉ HISTORIQUE :
+     *
+     * Dans les anciennes versions, seuls les exercices
+     * réellement effectués pouvaient être présents dans
+     * exerciseLogs, et "completed" pouvait être absent.
+     *
+     * Une entrée ancienne sans completed doit donc être
+     * interprétée comme réalisée.
+     *
+     * Les nouvelles entrées utilisent explicitement
+     * true ou false.
+     */
+    completed:
+      typeof log.completed ===
+      "boolean"
+        ? log.completed
+        : true,
+
+    sets:
+      typeof log.sets ===
+        "number"
+        ? Math.max(
+            0,
+            log.sets,
+          )
+        : 0,
+
+    reps:
+      normalizePositiveNumber(
+        log.reps,
+      ),
+
+    secondaryReps:
+      normalizePositiveNumber(
+        log.secondaryReps,
+      ),
+
+    duration:
+      normalizePositiveNumber(
+        log.duration,
+      ),
+
+    weight:
+      normalizePositiveNumber(
+        log.weight,
+      ),
+
+    secondaryWeight:
+      normalizePositiveNumber(
+        log.secondaryWeight,
+      ),
+
+    assistance:
+      normalizeOptionalText(
+        log.assistance,
+      ),
+
     progressionValue:
-      log.progressionValue,
+      normalizePositiveNumber(
+        log.progressionValue,
+      ),
+
     leftHandJumps:
-      log.leftHandJumps,
+      normalizePositiveNumber(
+        log.leftHandJumps,
+      ),
+
     rightHandJumps:
-      log.rightHandJumps,
+      normalizePositiveNumber(
+        log.rightHandJumps,
+      ),
+
+    variant:
+      normalizeOptionalText(
+        log.variant,
+      ),
+
+    bandColor,
+
+    bandStretch:
+      normalizePositiveNumber(
+        log.bandStretch,
+      ),
   };
 }
 
@@ -227,17 +810,26 @@ function normalizeKilterEntry(
   entry: Partial<KilterEntry>,
 ): KilterEntry {
   const validResult =
-    entry.result === "reussi" ||
-    entry.result === "travaille" ||
-    entry.result === "echoue";
+    entry.result ===
+      "reussi" ||
+    entry.result ===
+      "travaille" ||
+    entry.result ===
+      "echoue";
+
+  const normalizedAttempts =
+    normalizePositiveNumber(
+      entry.attempts,
+    );
 
   return {
     id:
       entry.id ??
-      crypto.randomUUID(),
+      generateId(),
 
     angle:
-      typeof entry.angle === "number"
+      typeof entry.angle ===
+        "number"
         ? Math.max(
             0,
             Math.min(
@@ -248,39 +840,176 @@ function normalizeKilterEntry(
         : 30,
 
     grade:
-      typeof entry.grade === "number"
+      typeof entry.grade ===
+        "number"
         ? Math.max(
             0,
             Math.min(
               17,
-              entry.grade,
+              Math.round(
+                entry.grade,
+              ),
             ),
           )
         : 0,
 
-    result: validResult
-      ? entry.result!
-      : "travaille",
+    result:
+      validResult
+        ? entry.result!
+        : "travaille",
 
+    /*
+     * Une entrée Kilter enregistrée correspond
+     * forcément à au moins un essai.
+     */
     attempts:
-      typeof entry.attempts ===
-      "number"
-        ? Math.max(
-            0,
-            entry.attempts,
-          )
-        : undefined,
+      normalizedAttempts ===
+      undefined
+        ? undefined
+        : Math.max(
+            1,
+            Math.round(
+              normalizedAttempts,
+            ),
+          ),
 
     durationMinutes:
-      typeof entry.durationMinutes ===
-      "number"
-        ? Math.max(
-            0,
-            entry.durationMinutes,
-          )
-        : undefined,
+      normalizePositiveNumber(
+        entry.durationMinutes,
+      ),
   };
 }
+
+function normalizeRouteClimbingEntry(
+  entry: Partial<RouteClimbingEntry>,
+): RouteClimbingEntry {
+  const grade =
+    ROUTE_GRADES.includes(
+      entry.grade as RouteGrade,
+    )
+      ? (
+          entry.grade as RouteGrade
+        )
+      : "4a";
+
+  const mode:
+    RouteClimbingMode =
+      entry.mode ===
+      "tete"
+        ? "tete"
+        : "moulinette";
+
+  const result:
+    RouteClimbingResult =
+      entry.result ===
+        "reussi" ||
+      entry.result ===
+        "travaille" ||
+      entry.result ===
+        "echoue"
+        ? entry.result
+        : "travaille";
+
+  const normalizedAttempts =
+    normalizePositiveNumber(
+      entry.attempts,
+    );
+
+  return {
+    id:
+      entry.id ??
+      generateId(),
+
+    grade,
+
+    mode,
+
+    result,
+
+    /*
+     * Même logique que pour le Kilter :
+     * une voie enregistrée représente au moins un essai.
+     */
+    attempts:
+      normalizedAttempts ===
+      undefined
+        ? undefined
+        : Math.max(
+            1,
+            Math.round(
+              normalizedAttempts,
+            ),
+          ),
+  };
+}
+
+function normalizeInjury(
+  injury: Partial<Injury>,
+): Injury {
+  const side:
+    InjurySide =
+      injury.side ===
+        "gauche" ||
+      injury.side ===
+        "droite" ||
+      injury.side ===
+        "deux" ||
+      injury.side ===
+        "non-applicable"
+        ? injury.side
+        : "non-applicable";
+
+  const status:
+    InjuryStatus =
+      injury.status ===
+        "active" ||
+      injury.status ===
+        "amelioration" ||
+      injury.status ===
+        "guerie"
+        ? injury.status
+        : "active";
+
+  return {
+    id:
+      injury.id ??
+      generateId(),
+
+    area:
+      injury.area?.trim() ||
+      "Zone non renseignée",
+
+    side,
+
+    injuryType:
+      injury.injuryType?.trim() ||
+      "Blessure non renseignée",
+
+    painLevel:
+      typeof injury.painLevel ===
+        "number"
+        ? Math.max(
+            0,
+            Math.min(
+              10,
+              injury.painLevel,
+            ),
+          )
+        : 0,
+
+    startDate:
+      injury.startDate ??
+      getLocalDateString(),
+
+    note:
+      normalizeOptionalText(
+        injury.note,
+      ),
+
+    status,
+  };
+}
+
 function normalizeSessionLog(
   log: Partial<SessionLog>,
 ): SessionLog {
@@ -297,68 +1026,122 @@ function normalizeSessionLog(
       "abs" ||
     log.finisherType ===
       "flexibility";
-  const validClimbingColors: ClimbingColor[] = [
-    "rose",
-    "jaune",
-    "vert",
-    "turquoise",
-    "bleu",
-    "orange",
-    "rouge",
-    "noir",
-    "blanc",
-  ];
+
+  const validClimbingColors:
+    ClimbingColor[] = [
+      "rose",
+      "jaune",
+      "vert",
+      "turquoise",
+      "bleu",
+      "orange",
+      "rouge",
+      "noir",
+      "blanc",
+    ];
 
   const climbingColorsSucceeded =
-    Array.isArray(log.climbingColorsSucceeded)
+    Array.isArray(
+      log.climbingColorsSucceeded,
+    )
       ? log.climbingColorsSucceeded.filter(
-          (color): color is ClimbingColor =>
+          (
+            color,
+          ): color is ClimbingColor =>
             validClimbingColors.includes(
               color as ClimbingColor,
             ),
         )
       : undefined;
+
+  const date =
+    log.date ??
+    getLocalDateString();
+
+  const completedAtIsValid =
+    typeof log.completedAt ===
+      "string" &&
+    !Number.isNaN(
+      new Date(
+        log.completedAt,
+      ).getTime(),
+    );
+
+  const pain =
+    log.pain &&
+    typeof log.pain ===
+      "object"
+      ? Object.fromEntries(
+          Object.entries(
+            log.pain,
+          ).map(
+            (
+              [
+                area,
+                value,
+              ],
+            ) => [
+              area,
+
+              typeof value ===
+                "number"
+                ? Math.max(
+                    0,
+                    Math.min(
+                      10,
+                      value,
+                    ),
+                  )
+                : 0,
+            ],
+          ),
+        )
+      : undefined;
+
   return {
     id:
       log.id ??
-      crypto.randomUUID(),
+      generateId(),
 
-    date:
-    log.date ??
-    new Date(
-      Date.now() -
-        new Date().getTimezoneOffset() * 60_000,
-    )
-      .toISOString()
-      .split("T")[0],
+    date,
+
+    /*
+     * Pour les anciennes séances, laisser completedAt
+     * absent permet aux helpers historiques d'utiliser
+     * leur fallback à midi.
+     */
+    completedAt:
+      completedAtIsValid
+        ? log.completedAt
+        : undefined,
 
     sessionId:
-      log.sessionId ?? "",
+      log.sessionId ??
+      "",
 
-    exerciseLogs: Array.isArray(
-      log.exerciseLogs,
-    )
-      ? log.exerciseLogs.map(
-          normalizeExerciseLog,
-        )
-      : [],
+    exerciseLogs:
+      Array.isArray(
+        log.exerciseLogs,
+      )
+        ? log.exerciseLogs.map(
+            normalizeExerciseLog,
+          )
+        : [],
 
-    note: log.note,
+    note:
+      normalizeOptionalText(
+        log.note,
+      ),
 
     isRestDay:
       log.isRestDay,
 
-    pain:
-      log.pain,
+    pain,
 
     climbingDurationMinutes:
-      typeof log.climbingDurationMinutes ===
-      "number"
-        ? Math.max(
-            0,
-            log.climbingDurationMinutes,
-          )
-        : undefined,
+      normalizePositiveNumber(
+        log.climbingDurationMinutes,
+      ),
 
     climbingIntensity:
       validClimbingIntensity
@@ -366,14 +1149,29 @@ function normalizeSessionLog(
         : undefined,
 
     climbingColorsSucceeded,
-    
-    kilterEntries: Array.isArray(
-      log.kilterEntries,
-    )
-      ? log.kilterEntries.map(
-          normalizeKilterEntry,
-        )
-      : undefined,
+
+    kilterEntries:
+      Array.isArray(
+        log.kilterEntries,
+      )
+        ? log.kilterEntries.map(
+            normalizeKilterEntry,
+          )
+        : undefined,
+
+    routeClimbingDurationMinutes:
+      normalizePositiveNumber(
+        log.routeClimbingDurationMinutes,
+      ),
+
+    routeClimbingEntries:
+      Array.isArray(
+        log.routeClimbingEntries,
+      )
+        ? log.routeClimbingEntries.map(
+            normalizeRouteClimbingEntry,
+          )
+        : undefined,
 
     finisherType:
       validFinisher
@@ -382,46 +1180,345 @@ function normalizeSessionLog(
   };
 }
 
+function normalizeCustomExercise(
+  exercise: ExerciseDef,
+): ExerciseDef {
+  const validBandColors:
+    ResistanceBandColor[] = [
+      "jaune",
+      "rouge",
+      "noir",
+      "violet",
+      "vert",
+      "bleu",
+      "orange",
+    ];
+
+  const bandOptions =
+    Array.isArray(
+      exercise.bandOptions,
+    )
+      ? exercise.bandOptions.filter(
+          (
+            color,
+          ): color is ResistanceBandColor =>
+            validBandColors.includes(
+              color as ResistanceBandColor,
+            ),
+        )
+      : undefined;
+
+  return {
+    id:
+      typeof exercise.id ===
+        "string" &&
+      exercise.id.trim()
+        ? exercise.id
+        : `custom-${generateId()}`,
+
+    name:
+      typeof exercise.name ===
+        "string" &&
+      exercise.name.trim()
+        ? exercise.name.trim()
+        : "Exercice personnalisé",
+
+    description:
+      typeof exercise.description ===
+        "string"
+        ? exercise.description
+        : "",
+
+    category:
+      typeof exercise.category ===
+        "string" &&
+      exercise.category.trim()
+        ? exercise.category.trim()
+        : "Personnalisé",
+
+    tracking:
+      exercise.tracking ??
+      "none",
+
+    defaultValues:
+      normalizeExerciseDefaults(
+        exercise.defaultValues,
+      ),
+
+    assistanceOptions:
+      normalizeStringArray(
+        exercise.assistanceOptions,
+      ),
+
+    isHangboard:
+      Boolean(
+        exercise.isHangboard,
+      ),
+
+    variantOptions:
+      normalizeStringArray(
+        exercise.variantOptions,
+      ),
+
+    bandOptions,
+
+    totalWeight:
+      Boolean(
+        exercise.totalWeight,
+      ),
+
+    perSide:
+      Boolean(
+        exercise.perSide,
+      ),
+
+    primaryRepsLabel:
+      normalizeOptionalText(
+        exercise.primaryRepsLabel,
+      ),
+
+    secondaryRepsLabel:
+      normalizeOptionalText(
+        exercise.secondaryRepsLabel,
+      ),
+
+    primaryWeightLabel:
+      normalizeOptionalText(
+        exercise.primaryWeightLabel,
+      ),
+
+    secondaryWeightLabel:
+      normalizeOptionalText(
+        exercise.secondaryWeightLabel,
+      ),
+
+    sessionIds:
+      normalizeStringArray(
+        exercise.sessionIds,
+      ) ?? [],
+  };
+}
+
+function normalizeExerciseOverride(
+  override: ExerciseOverride,
+): ExerciseOverride {
+  const validBandColors:
+    ResistanceBandColor[] = [
+      "jaune",
+      "rouge",
+      "noir",
+      "violet",
+      "vert",
+      "bleu",
+      "orange",
+    ];
+
+  return {
+    name:
+      normalizeOptionalText(
+        override.name,
+      ),
+
+    /*
+     * La description peut volontairement être vide.
+     */
+    description:
+      typeof override.description ===
+        "string"
+        ? override.description
+        : undefined,
+
+    category:
+      normalizeOptionalText(
+        override.category,
+      ),
+
+    tracking:
+      override.tracking,
+
+    /*
+     * [] est conservé :
+     * cela signifie volontairement "aucune séance".
+     */
+    sessionIds:
+      normalizeStringArray(
+        override.sessionIds,
+      ),
+
+    assistanceOptions:
+      normalizeStringArray(
+        override.assistanceOptions,
+      ),
+
+    isHangboard:
+      typeof override.isHangboard ===
+        "boolean"
+        ? override.isHangboard
+        : undefined,
+
+    variantOptions:
+      normalizeStringArray(
+        override.variantOptions,
+      ),
+
+    bandOptions:
+      Array.isArray(
+        override.bandOptions,
+      )
+        ? override.bandOptions.filter(
+            (
+              color,
+            ): color is ResistanceBandColor =>
+              validBandColors.includes(
+                color,
+              ),
+          )
+        : undefined,
+
+    totalWeight:
+      typeof override.totalWeight ===
+        "boolean"
+        ? override.totalWeight
+        : undefined,
+
+    perSide:
+      typeof override.perSide ===
+        "boolean"
+        ? override.perSide
+        : undefined,
+
+    primaryRepsLabel:
+      normalizeOptionalText(
+        override.primaryRepsLabel,
+      ),
+
+    secondaryRepsLabel:
+      normalizeOptionalText(
+        override.secondaryRepsLabel,
+      ),
+
+    primaryWeightLabel:
+      normalizeOptionalText(
+        override.primaryWeightLabel,
+      ),
+
+    secondaryWeightLabel:
+      normalizeOptionalText(
+        override.secondaryWeightLabel,
+      ),
+
+    hidden:
+      typeof override.hidden ===
+        "boolean"
+        ? override.hidden
+        : undefined,
+  };
+}
+
 function normalizeAppData(
   parsed: Partial<AppData>,
 ): AppData {
-  const builtInDefaults =
-    buildDefaultExerciseValues();
-
-  return {
-    sessionLogs: Array.isArray(
-      parsed.sessionLogs,
-    )
-      ? parsed.sessionLogs.map(
-          normalizeSessionLog,
-        )
-      : [],
-
-    exerciseDefaults: {
-      ...builtInDefaults,
-      ...(parsed.exerciseDefaults ?? {}),
-    },
-
-    customExercises: Array.isArray(
+  const customExercises =
+    Array.isArray(
       parsed.customExercises,
     )
-      ? parsed.customExercises
-      : [],
+      ? parsed.customExercises.map(
+          normalizeCustomExercise,
+        )
+      : [];
 
-    customCategories: Array.isArray(
-      parsed.customCategories,
-    )
-      ? parsed.customCategories
-      : [],
+  const exerciseOverrides: Record<
+    string,
+    ExerciseOverride
+  > = {};
 
-    exerciseOverrides:
-      parsed.exerciseOverrides ?? {},
+  if (
+    parsed.exerciseOverrides &&
+    typeof parsed.exerciseOverrides ===
+      "object"
+  ) {
+    Object.entries(
+      parsed.exerciseOverrides,
+    ).forEach(
+      (
+        [
+          id,
+          override,
+        ],
+      ) => {
+        if (
+          override &&
+          typeof override ===
+            "object"
+        ) {
+          exerciseOverrides[
+            id
+          ] =
+            normalizeExerciseOverride(
+              override,
+            );
+        }
+      },
+    );
+  }
+
+  return {
+    sessionLogs:
+      Array.isArray(
+        parsed.sessionLogs,
+      )
+        ? parsed.sessionLogs.map(
+            normalizeSessionLog,
+          )
+        : [],
+
+    injuries:
+      Array.isArray(
+        parsed.injuries,
+      )
+        ? parsed.injuries.map(
+            normalizeInjury,
+          )
+        : [],
+
+    exerciseDefaults:
+      mergeExerciseDefaults(
+        parsed.exerciseDefaults,
+      ),
+
+    customExercises,
+
+    customCategories:
+      Array.isArray(
+        parsed.customCategories,
+      )
+        ? parsed.customCategories.filter(
+            (
+              category,
+            ): category is string =>
+              typeof category ===
+                "string" &&
+              category.trim().length >
+                0,
+          )
+        : [],
+
+    exerciseOverrides,
 
     exerciseCategoryOrder:
-      parsed.exerciseCategoryOrder ?? {},
+      parsed.exerciseCategoryOrder &&
+      typeof parsed.exerciseCategoryOrder ===
+        "object"
+        ? parsed.exerciseCategoryOrder
+        : {},
 
+    /*
+     * Conserver les badges historiques,
+     * y compris ceux qui ne sont plus affichés.
+     */
     earnedBadges:
-      parsed.earnedBadges ?? {},
+      parsed.earnedBadges ??
+      {},
 
     pendingBadgeNotifications:
       Array.isArray(
@@ -435,16 +1532,25 @@ function normalizeAppData(
 function getInitialData(): AppData {
   try {
     const saved =
-      localStorage.getItem(STORAGE_KEY);
+      localStorage.getItem(
+        STORAGE_KEY,
+      );
 
-    if (saved) {
-      const parsed = JSON.parse(
-        saved,
-      ) as Partial<AppData>;
+    if (
+      saved
+    ) {
+      const parsed =
+        JSON.parse(
+          saved,
+        ) as Partial<AppData>;
 
-      return normalizeAppData(parsed);
+      return normalizeAppData(
+        parsed,
+      );
     }
-  } catch (error) {
+  } catch (
+    error
+  ) {
     console.error(
       "Failed to load ClimbTrack data",
       error,
@@ -453,18 +1559,30 @@ function getInitialData(): AppData {
 
   return {
     sessionLogs: [],
+
+    injuries: [],
+
     exerciseDefaults:
       buildDefaultExerciseValues(),
+
     customExercises: [],
+
     customCategories: [],
+
     exerciseOverrides: {},
+
     exerciseCategoryOrder: {},
+
     earnedBadges: {},
-    pendingBadgeNotifications: [],
+
+    pendingBadgeNotifications:
+      [],
   };
 }
 
-// ── Badge helpers ─────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// Badge helpers
+// ─────────────────────────────────────────────────────────────────────────────
 
 function evaluateAndMergeBadges(
   logs: SessionLog[],
@@ -478,6 +1596,7 @@ function evaluateAndMergeBadges(
     string,
     EarnedBadgeEntry[]
   >;
+
   newNotifications:
     PendingBadgeNotification[];
 } {
@@ -496,7 +1615,10 @@ function evaluateAndMergeBadges(
 
   const newNotifications =
     newUnlocks.map(
-      ({ badgeId, level }) => ({
+      ({
+        badgeId,
+        level,
+      }) => ({
         badgeId,
         level,
       }),
@@ -514,43 +1636,180 @@ function recalculateEarnedBadges(
     string,
     EarnedBadgeEntry[]
   >,
-): Record<string, EarnedBadgeEntry[]> {
-  const validLevels =
-    evaluateAllBadges(sessionLogs);
+): Record<
+  string,
+  EarnedBadgeEntry[]
+> {
+  const evaluatedLevels =
+    evaluateAllBadges(
+      sessionLogs,
+    );
 
   const recalculated: Record<
     string,
     EarnedBadgeEntry[]
   > = {};
 
-  Object.entries(validLevels).forEach(
-    ([badgeId, levels]) => {
-      recalculated[badgeId] =
-        levels.map((level) => {
-          const previousEntry = (
-            previousEarned[badgeId] ??
-            []
-          ).find(
-            (entry) =>
-              entry.level === level,
-          );
+  /*
+   * ─────────────────────────────────────────────────────────────────────────
+   * 1. Recalculer TOUS les badges actuellement définis.
+   * ─────────────────────────────────────────────────────────────────────────
+   *
+   * Important :
+   *
+   * evaluateAllBadges() ne retourne pas un badge
+   * lorsqu'aucun de ses niveaux n'est actuellement
+   * débloqué.
+   *
+   * Il faut donc parcourir BADGES directement.
+   *
+   * Sinon :
+   * - un badge débloqué auparavant ;
+   * - puis rendu invalide par la suppression d'une séance ;
+   *
+   * pourrait rester enregistré à tort.
+   */
+  BADGES.forEach(
+    (
+      badge,
+    ) => {
+      const previousEntries =
+        previousEarned[
+          badge.id
+        ] ?? [];
 
-          return {
+      const currentlyDefinedLevels =
+        new Set(
+          badge.levels.map(
+            (
+              levelDefinition,
+            ) =>
+              levelDefinition.level,
+          ),
+        );
+
+      /*
+       * Conserver les anciennes données appartenant
+       * à un niveau qui n'existe PLUS dans ce badge.
+       *
+       * Exemple :
+       * un ancien niveau Platine enregistré avant
+       * sa suppression.
+       *
+       * Il reste ainsi dans la sauvegarde mais ne
+       * peut plus apparaître comme niveau actuel.
+       */
+      const archivedEntries =
+        previousEntries.filter(
+          (
+            entry,
+          ) =>
+            !currentlyDefinedLevels.has(
+              entry.level,
+            ),
+        );
+
+      /*
+       * Niveaux réellement justifiés par
+       * l'historique actuel.
+       *
+       * Si le badge n'apparaît pas dans
+       * evaluatedLevels, aucun niveau actuel
+       * n'est valide.
+       */
+      const validCurrentLevels =
+        evaluatedLevels[
+          badge.id
+        ] ?? [];
+
+      const activeEntries =
+        validCurrentLevels.map(
+          (
             level,
-            earnedAt:
-              previousEntry?.earnedAt ??
-              new Date()
-                .toISOString()
-                .split("T")[0],
-          };
-        });
+          ) => {
+            const previousEntry =
+              previousEntries.find(
+                (
+                  entry,
+                ) =>
+                  entry.level ===
+                  level,
+              );
+
+            /*
+             * Conserver la date originale
+             * lorsque le badge avait déjà
+             * été débloqué.
+             */
+            return {
+              level,
+
+              earnedAt:
+                previousEntry?.earnedAt ??
+                new Date().toISOString(),
+            };
+          },
+        );
+
+      const combinedEntries = [
+        ...archivedEntries,
+        ...activeEntries,
+      ];
+
+      if (
+        combinedEntries.length >
+        0
+      ) {
+        recalculated[
+          badge.id
+        ] =
+          combinedEntries;
+      }
+    },
+  );
+
+  /*
+   * ─────────────────────────────────────────────────────────────────────────
+   * 2. Conserver les badges qui n'existent PLUS du tout.
+   * ─────────────────────────────────────────────────────────────────────────
+   *
+   * Si une future version retire complètement
+   * un badge de BADGES, ses anciennes données
+   * restent dans la sauvegarde.
+   *
+   * Elles ne sont simplement plus affichées.
+   */
+  Object.entries(
+    previousEarned,
+  ).forEach(
+    (
+      [
+        badgeId,
+        entries,
+      ],
+    ) => {
+      if (
+        BADGE_BY_ID[
+          badgeId
+        ]
+      ) {
+        return;
+      }
+
+      recalculated[
+        badgeId
+      ] = [
+        ...entries,
+      ];
     },
   );
 
   return recalculated;
 }
 
-// ── Context ───────────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// Context
+// ─────────────────────────────────────────────────────────────────────────────
 
 type ClimbTrackContextType = {
   data: AppData;
@@ -616,6 +1875,22 @@ type ClimbTrackContextType = {
     fallbackCategory: string,
   ) => void;
 
+  addInjury: (
+    injury: Omit<
+      Injury,
+      "id"
+    >,
+  ) => void;
+
+  updateInjury: (
+    id: string,
+    injury: Injury,
+  ) => void;
+
+  deleteInjury: (
+    id: string,
+  ) => void;
+
   clearBadgeNotification: (
     badgeId: string,
     level: BadgeLevel,
@@ -635,109 +1910,160 @@ const ClimbTrackContext =
     ClimbTrackContextType | undefined
   >(undefined);
 
-// ── Provider ──────────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// Provider
+// ─────────────────────────────────────────────────────────────────────────────
 
 export function ClimbTrackProvider({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const [data, setData] =
-    useState<AppData>(getInitialData);
+  const [
+    data,
+    setData,
+  ] =
+    useState<AppData>(
+      getInitialData,
+    );
 
   /*
-   * Au chargement, les badges sont recalculés à partir
-   * de l’historique actuel.
-   *
-   * Cela permet aussi d’appliquer les nouveaux badges
-   * aux anciennes séances compatibles.
+   * Recalculer les badges au chargement.
    */
-  useEffect(() => {
-    setData((previous) => ({
-      ...previous,
-      earnedBadges:
-        recalculateEarnedBadges(
-          previous.sessionLogs,
-          previous.earnedBadges,
-        ),
-      pendingBadgeNotifications: [],
-    }));
-  }, []);
+  useEffect(
+    () => {
+      setData(
+        (previous) => ({
+          ...previous,
 
-  useEffect(() => {
-    try {
-      localStorage.setItem(
-        STORAGE_KEY,
-        JSON.stringify(data),
-      );
-    } catch (error) {
-      console.error(
-        "Failed to save ClimbTrack data",
-        error,
-      );
-    }
-  }, [data]);
+          earnedBadges:
+            recalculateEarnedBadges(
+              previous.sessionLogs,
+              previous.earnedBadges,
+            ),
 
-  // ── Session logs ───────────────────────────────────────────────────────────
+          pendingBadgeNotifications:
+            [],
+        }),
+      );
+    },
+    [],
+  );
+
+  useEffect(
+    () => {
+      try {
+        localStorage.setItem(
+          STORAGE_KEY,
+          JSON.stringify(
+            data,
+          ),
+        );
+      } catch (
+        error
+      ) {
+        console.error(
+          "Failed to save ClimbTrack data",
+          error,
+        );
+      }
+    },
+    [
+      data,
+    ],
+  );
+
+  // ───────────────────────────────────────────────────────────────────────────
+  // Session logs
+  // ───────────────────────────────────────────────────────────────────────────
 
   const addSessionLog =
     useCallback(
-      (log: SessionLog) => {
-        setData((previous) => {
-          const normalizedLog =
-            normalizeSessionLog(log);
+      (
+        log: SessionLog,
+      ) => {
+        setData(
+          (previous) => {
+            const normalizedLog =
+              normalizeSessionLog({
+                ...log,
 
-          const newLogs = [
-            ...previous.sessionLogs,
-            normalizedLog,
-          ];
+                completedAt:
+                  log.completedAt ??
+                  createCompletedAt(
+                    log.date,
+                  ),
+              });
 
-          const {
-            earnedBadges,
-            newNotifications,
-          } = evaluateAndMergeBadges(
-            newLogs,
-            previous.earnedBadges,
-            normalizedLog.date,
-          );
+            const newLogs = [
+              ...previous.sessionLogs,
+              normalizedLog,
+            ];
 
-          return {
-            ...previous,
-            sessionLogs: newLogs,
-            earnedBadges,
-            pendingBadgeNotifications: [
-              ...previous.pendingBadgeNotifications,
-              ...newNotifications,
-            ],
-          };
-        });
+            const {
+              earnedBadges,
+              newNotifications,
+            } =
+              evaluateAndMergeBadges(
+                newLogs,
+                previous.earnedBadges,
+                normalizedLog.date,
+              );
+
+            return {
+              ...previous,
+
+              sessionLogs:
+                newLogs,
+
+              earnedBadges,
+
+              pendingBadgeNotifications:
+                [
+                  ...previous.pendingBadgeNotifications,
+                  ...newNotifications,
+                ],
+            };
+          },
+        );
       },
       [],
     );
 
   const deleteSessionLog =
-    useCallback((id: string) => {
-      setData((previous) => {
-        const newLogs =
-          previous.sessionLogs.filter(
-            (session) =>
-              session.id !== id,
-          );
+    useCallback(
+      (
+        id: string,
+      ) => {
+        setData(
+          (previous) => {
+            const newLogs =
+              previous.sessionLogs.filter(
+                (session) =>
+                  session.id !==
+                  id,
+              );
 
-        const earnedBadges =
-          recalculateEarnedBadges(
-            newLogs,
-            previous.earnedBadges,
-          );
+            return {
+              ...previous,
 
-        return {
-          ...previous,
-          sessionLogs: newLogs,
-          earnedBadges,
-          pendingBadgeNotifications: [],
-        };
-      });
-    }, []);
+              sessionLogs:
+                newLogs,
+
+              earnedBadges:
+                recalculateEarnedBadges(
+                  newLogs,
+                  previous.earnedBadges,
+                ),
+
+              pendingBadgeNotifications:
+                [],
+            };
+          },
+        );
+      },
+      [],
+    );
 
   const updateSessionLog =
     useCallback(
@@ -745,48 +2071,77 @@ export function ClimbTrackProvider({
         id: string,
         log: SessionLog,
       ) => {
-        setData((previous) => {
-          const normalizedLog =
-            normalizeSessionLog(log);
+        setData(
+          (previous) => {
+            const existingLog =
+              previous.sessionLogs.find(
+                (session) =>
+                  session.id ===
+                  id,
+              );
 
-          const newLogs =
-            previous.sessionLogs.map(
-              (session) =>
-                session.id === id
-                  ? normalizedLog
-                  : session,
-            );
+            const normalizedLog =
+              normalizeSessionLog({
+                ...log,
 
-          const previouslyValid =
-            recalculateEarnedBadges(
-              newLogs,
-              previous.earnedBadges,
-            );
+                id,
 
-          const {
-            earnedBadges,
-            newNotifications,
-          } = evaluateAndMergeBadges(
-            newLogs,
-            previouslyValid,
-            normalizedLog.date,
-          );
+                completedAt:
+                  log.completedAt ??
+                  existingLog?.completedAt ??
+                  createCompletedAt(
+                    log.date,
+                  ),
+              });
 
-          return {
-            ...previous,
-            sessionLogs: newLogs,
-            earnedBadges,
-            pendingBadgeNotifications: [
-              ...previous.pendingBadgeNotifications,
-              ...newNotifications,
-            ],
-          };
-        });
+            const newLogs =
+              previous.sessionLogs.map(
+                (session) =>
+                  session.id ===
+                  id
+                    ? normalizedLog
+                    : session,
+              );
+
+            const previouslyValid =
+              recalculateEarnedBadges(
+                newLogs,
+                previous.earnedBadges,
+              );
+
+            const {
+              earnedBadges,
+              newNotifications,
+            } =
+              evaluateAndMergeBadges(
+                newLogs,
+                previouslyValid,
+                normalizedLog.date,
+              );
+
+            return {
+              ...previous,
+
+              sessionLogs:
+                newLogs,
+
+              earnedBadges,
+
+              pendingBadgeNotifications:
+                [
+                  ...previous.pendingBadgeNotifications,
+                  ...newNotifications,
+                ],
+            };
+          },
+        );
       },
       [],
     );
 
-  // ── Exercise defaults ──────────────────────────────────────────────────────
+  // ───────────────────────────────────────────────────────────────────────────
+  // Exercise defaults
+  // ───────────────────────────────────────────────────────────────────────────
 
   const updateExerciseDefault =
     useCallback(
@@ -794,40 +2149,97 @@ export function ClimbTrackProvider({
         exerciseId: string,
         defaults: Partial<ExerciseDefaults>,
       ) => {
-        setData((previous) => {
-          const currentDefaults =
-            previous.exerciseDefaults[
-              exerciseId
-            ] ?? {
-              sets: 0,
-              restSeconds: 0,
-            };
+        setData(
+          (previous) => {
+            const currentDefaults =
+              previous.exerciseDefaults[
+                exerciseId
+              ] ?? {
+                sets: 0,
+                restSeconds: 0,
+              };
 
-          return {
-            ...previous,
-            exerciseDefaults: {
-              ...previous.exerciseDefaults,
-              [exerciseId]: {
-                ...currentDefaults,
-                ...defaults,
+            return {
+              ...previous,
+
+              exerciseDefaults: {
+                ...previous.exerciseDefaults,
+
+                [exerciseId]: {
+                  ...currentDefaults,
+                  ...defaults,
+
+                  sets:
+                    defaults.sets !==
+                    undefined
+                      ? Math.max(
+                          0,
+                          defaults.sets,
+                        )
+                      : currentDefaults.sets,
+
+                  restSeconds:
+                    defaults.restSeconds !==
+                    undefined
+                      ? Math.max(
+                          0,
+                          defaults.restSeconds,
+                        )
+                      : currentDefaults.restSeconds,
+                },
               },
-            },
-          };
-        });
+            };
+          },
+        );
       },
       [],
     );
 
   const resetDefaults =
-    useCallback(() => {
-      setData((previous) => ({
-        ...previous,
-        exerciseDefaults:
-          buildDefaultExerciseValues(),
-      }));
-    }, []);
+    useCallback(
+      () => {
+        setData(
+          (previous) => {
+            const builtInDefaults =
+              buildDefaultExerciseValues();
 
-  // ── Exercise management ────────────────────────────────────────────────────
+            const customDefaults: Record<
+              string,
+              ExerciseDefaults
+            > = {};
+
+            previous.customExercises.forEach(
+              (
+                exercise,
+              ) => {
+                customDefaults[
+                  exercise.id
+                ] =
+                  previous.exerciseDefaults[
+                    exercise.id
+                  ] ?? {
+                    ...exercise.defaultValues,
+                  };
+              },
+            );
+
+            return {
+              ...previous,
+
+              exerciseDefaults: {
+                ...builtInDefaults,
+                ...customDefaults,
+              },
+            };
+          },
+        );
+      },
+      [],
+    );
+
+  // ───────────────────────────────────────────────────────────────────────────
+  // Exercise management
+  // ───────────────────────────────────────────────────────────────────────────
 
   const addExercise =
     useCallback(
@@ -839,91 +2251,187 @@ export function ClimbTrackProvider({
           sessionIds?: string[];
         },
       ) => {
-        const id = `custom-${Date.now()}-${Math.random()
-          .toString(36)
-          .slice(2, 7)}`;
+        const id =
+          `custom-${Date.now()}-${Math.random()
+            .toString(36)
+            .slice(2, 7)}`;
 
         const newExercise: ExerciseDef =
-          {
+          normalizeCustomExercise({
             id,
-            name: exercise.name,
+
+            name:
+              exercise.name,
+
             description:
               exercise.description ??
               "",
+
             category:
               exercise.category,
+
             tracking:
               exercise.tracking,
+
             defaultValues: {
               ...exercise.defaultValues,
             },
+
             assistanceOptions:
-              exercise.assistanceOptions,
+              exercise.assistanceOptions
+                ? [
+                    ...exercise.assistanceOptions,
+                  ]
+                : undefined,
+
             isHangboard:
               exercise.isHangboard,
+
+            variantOptions:
+              exercise.variantOptions
+                ? [
+                    ...exercise.variantOptions,
+                  ]
+                : undefined,
+
+            bandOptions:
+              exercise.bandOptions
+                ? [
+                    ...exercise.bandOptions,
+                  ]
+                : undefined,
+
+            totalWeight:
+              exercise.totalWeight,
+
+            perSide:
+              exercise.perSide,
+
+            primaryRepsLabel:
+              exercise.primaryRepsLabel,
+
+            secondaryRepsLabel:
+              exercise.secondaryRepsLabel,
+
+            primaryWeightLabel:
+              exercise.primaryWeightLabel,
+
+            secondaryWeightLabel:
+              exercise.secondaryWeightLabel,
+
             sessionIds:
-              exercise.sessionIds ??
-              [],
-          };
+              exercise.sessionIds
+                ? [
+                    ...exercise.sessionIds,
+                  ]
+                : [],
+          });
 
-        setData((previous) => ({
-          ...previous,
+        setData(
+          (previous) => ({
+            ...previous,
 
-          customExercises: [
-            ...previous.customExercises,
-            newExercise,
-          ],
+            customExercises: [
+              ...previous.customExercises,
+              newExercise,
+            ],
 
-          exerciseDefaults: {
-            ...previous.exerciseDefaults,
-            [id]: {
-              ...exercise.defaultValues,
+            exerciseDefaults: {
+              ...previous.exerciseDefaults,
+
+              [id]: {
+                ...newExercise.defaultValues,
+              },
             },
-          },
-        }));
+          }),
+        );
       },
       [],
     );
 
   const deleteExercise =
-    useCallback((id: string) => {
-      setData((previous) => ({
-        ...previous,
+    useCallback(
+      (
+        id: string,
+      ) => {
+        /*
+         * Masquer uniquement.
+         *
+         * Les logs, defaults et ID historiques
+         * restent dans la sauvegarde.
+         */
+        setData(
+          (previous) => ({
+            ...previous,
 
-        exerciseOverrides: {
-          ...previous.exerciseOverrides,
+            exerciseOverrides: {
+              ...previous.exerciseOverrides,
 
-          [id]: {
-            ...previous
-              .exerciseOverrides[id],
-            hidden: true,
-          },
-        },
-      }));
-    }, []);
+              [id]: {
+                ...previous.exerciseOverrides[
+                  id
+                ],
+
+                hidden:
+                  true,
+              },
+            },
+          }),
+        );
+      },
+      [],
+    );
 
   const restoreExercise =
-    useCallback((id: string) => {
-      setData((previous) => {
-        const {
-          hidden: _hidden,
-          ...remainingOverride
-        } =
-          previous.exerciseOverrides[
-            id
-          ] ?? {};
+    useCallback(
+      (
+        id: string,
+      ) => {
+        setData(
+          (previous) => {
+            const currentOverride =
+              previous.exerciseOverrides[
+                id
+              ] ?? {};
 
-        return {
-          ...previous,
+            const {
+              hidden:
+                _hidden,
+              ...remainingOverride
+            } =
+              currentOverride;
 
-          exerciseOverrides: {
-            ...previous.exerciseOverrides,
-            [id]:
-              remainingOverride,
+            const updatedOverrides = {
+              ...previous.exerciseOverrides,
+            };
+
+            if (
+              Object.keys(
+                remainingOverride,
+              ).length ===
+              0
+            ) {
+              delete updatedOverrides[
+                id
+              ];
+            } else {
+              updatedOverrides[
+                id
+              ] =
+                remainingOverride;
+            }
+
+            return {
+              ...previous,
+
+              exerciseOverrides:
+                updatedOverrides,
+            };
           },
-        };
-      });
-    }, []);
+        );
+      },
+      [],
+    );
 
   const updateExerciseOverride =
     useCallback(
@@ -931,19 +2439,24 @@ export function ClimbTrackProvider({
         id: string,
         override: Partial<ExerciseOverride>,
       ) => {
-        setData((previous) => ({
-          ...previous,
+        setData(
+          (previous) => ({
+            ...previous,
 
-          exerciseOverrides: {
-            ...previous.exerciseOverrides,
+            exerciseOverrides: {
+              ...previous.exerciseOverrides,
 
-            [id]: {
-              ...previous
-                .exerciseOverrides[id],
-              ...override,
+              [id]:
+                normalizeExerciseOverride({
+                  ...previous.exerciseOverrides[
+                    id
+                  ],
+
+                  ...override,
+                }),
             },
-          },
-        }));
+          }),
+        );
       },
       [],
     );
@@ -954,43 +2467,59 @@ export function ClimbTrackProvider({
         category: string,
         orderedIds: string[],
       ) => {
-        setData((previous) => ({
-          ...previous,
+        setData(
+          (previous) => ({
+            ...previous,
 
-          exerciseCategoryOrder: {
-            ...previous
-              .exerciseCategoryOrder,
+            exerciseCategoryOrder: {
+              ...previous.exerciseCategoryOrder,
 
-            [category]: orderedIds,
-          },
-        }));
+              [category]: [
+                ...orderedIds,
+              ],
+            },
+          }),
+        );
       },
       [],
     );
 
-  // ── Category management ────────────────────────────────────────────────────
+  // ───────────────────────────────────────────────────────────────────────────
+  // Category management
+  // ───────────────────────────────────────────────────────────────────────────
 
   const addCategory =
-    useCallback((name: string) => {
-      const trimmedName =
-        name.trim();
+    useCallback(
+      (
+        name: string,
+      ) => {
+        const trimmedName =
+          name.trim();
 
-      if (!trimmedName) return;
+        if (
+          !trimmedName
+        ) {
+          return;
+        }
 
-      setData((previous) => ({
-        ...previous,
+        setData(
+          (previous) => ({
+            ...previous,
 
-        customCategories:
-          previous.customCategories.includes(
-            trimmedName,
-          )
-            ? previous.customCategories
-            : [
-                ...previous.customCategories,
+            customCategories:
+              previous.customCategories.includes(
                 trimmedName,
-              ],
-      }));
-    }, []);
+              )
+                ? previous.customCategories
+                : [
+                    ...previous.customCategories,
+                    trimmedName,
+                  ],
+          }),
+        );
+      },
+      [],
+    );
 
   const renameCategory =
     useCallback(
@@ -1001,79 +2530,105 @@ export function ClimbTrackProvider({
         const trimmedName =
           newName.trim();
 
-        if (!trimmedName) return;
+        if (
+          !trimmedName
+        ) {
+          return;
+        }
 
-        setData((previous) => {
-          const updatedCustomExercises =
-            previous.customExercises.map(
-              (exercise) =>
-                exercise.category ===
-                oldName
-                  ? {
-                      ...exercise,
-                      category:
-                        trimmedName,
-                    }
-                  : exercise,
+        setData(
+          (previous) => {
+            const updatedCustomExercises =
+              previous.customExercises.map(
+                (
+                  exercise,
+                ) =>
+                  exercise.category ===
+                  oldName
+                    ? {
+                        ...exercise,
+
+                        category:
+                          trimmedName,
+                      }
+                    : exercise,
+              );
+
+            const updatedOverrides: Record<
+              string,
+              ExerciseOverride
+            > = {};
+
+            Object.entries(
+              previous.exerciseOverrides,
+            ).forEach(
+              (
+                [
+                  id,
+                  override,
+                ],
+              ) => {
+                updatedOverrides[
+                  id
+                ] =
+                  override.category ===
+                  oldName
+                    ? {
+                        ...override,
+
+                        category:
+                          trimmedName,
+                      }
+                    : override;
+              },
             );
 
-          const updatedOverrides: Record<
-            string,
-            ExerciseOverride
-          > = {};
+            const updatedOrder = {
+              ...previous.exerciseCategoryOrder,
+            };
 
-          Object.entries(
-            previous.exerciseOverrides,
-          ).forEach(
-            ([id, override]) => {
-              updatedOverrides[id] =
-                override.category ===
+            if (
+              updatedOrder[
                 oldName
-                  ? {
-                      ...override,
-                      category:
-                        trimmedName,
-                    }
-                  : override;
-            },
-          );
+              ]
+            ) {
+              updatedOrder[
+                trimmedName
+              ] =
+                updatedOrder[
+                  oldName
+                ];
 
-          const updatedOrder = {
-            ...previous.exerciseCategoryOrder,
-          };
+              delete updatedOrder[
+                oldName
+              ];
+            }
 
-          if (
-            updatedOrder[oldName]
-          ) {
-            updatedOrder[trimmedName] =
-              updatedOrder[oldName];
+            return {
+              ...previous,
 
-            delete updatedOrder[
-              oldName
-            ];
-          }
+              customExercises:
+                updatedCustomExercises,
 
-          return {
-            ...previous,
+              exerciseOverrides:
+                updatedOverrides,
 
-            customExercises:
-              updatedCustomExercises,
+              exerciseCategoryOrder:
+                updatedOrder,
 
-            exerciseOverrides:
-              updatedOverrides,
-
-            exerciseCategoryOrder:
-              updatedOrder,
-
-            customCategories:
-              previous.customCategories.map(
-                (category) =>
-                  category === oldName
-                    ? trimmedName
-                    : category,
-              ),
-          };
-        });
+              customCategories:
+                previous.customCategories.map(
+                  (
+                    category,
+                  ) =>
+                    category ===
+                    oldName
+                      ? trimmedName
+                      : category,
+                ),
+            };
+          },
+        );
       },
       [],
     );
@@ -1084,71 +2639,176 @@ export function ClimbTrackProvider({
         name: string,
         fallbackCategory: string,
       ) => {
-        setData((previous) => {
-          const updatedCustomExercises =
-            previous.customExercises.map(
-              (exercise) =>
-                exercise.category ===
-                name
-                  ? {
-                      ...exercise,
-                      category:
-                        fallbackCategory,
-                    }
-                  : exercise,
+        setData(
+          (previous) => {
+            const updatedCustomExercises =
+              previous.customExercises.map(
+                (
+                  exercise,
+                ) =>
+                  exercise.category ===
+                  name
+                    ? {
+                        ...exercise,
+
+                        category:
+                          fallbackCategory,
+                      }
+                    : exercise,
+              );
+
+            const updatedOverrides: Record<
+              string,
+              ExerciseOverride
+            > = {};
+
+            Object.entries(
+              previous.exerciseOverrides,
+            ).forEach(
+              (
+                [
+                  id,
+                  override,
+                ],
+              ) => {
+                updatedOverrides[
+                  id
+                ] =
+                  override.category ===
+                  name
+                    ? {
+                        ...override,
+
+                        category:
+                          fallbackCategory,
+                      }
+                    : override;
+              },
             );
 
-          const updatedOverrides: Record<
-            string,
-            ExerciseOverride
-          > = {};
+            const updatedOrder = {
+              ...previous.exerciseCategoryOrder,
+            };
 
-          Object.entries(
-            previous.exerciseOverrides,
-          ).forEach(
-            ([id, override]) => {
-              updatedOverrides[id] =
-                override.category ===
-                name
-                  ? {
-                      ...override,
-                      category:
-                        fallbackCategory,
-                    }
-                  : override;
-            },
-          );
+            delete updatedOrder[
+              name
+            ];
 
-          const updatedOrder = {
-            ...previous.exerciseCategoryOrder,
-          };
+            return {
+              ...previous,
 
-          delete updatedOrder[name];
+              customExercises:
+                updatedCustomExercises,
 
-          return {
-            ...previous,
+              exerciseOverrides:
+                updatedOverrides,
 
-            customExercises:
-              updatedCustomExercises,
+              customCategories:
+                previous.customCategories.filter(
+                  (
+                    category,
+                  ) =>
+                    category !==
+                    name,
+                ),
 
-            exerciseOverrides:
-              updatedOverrides,
-
-            customCategories:
-              previous.customCategories.filter(
-                (category) =>
-                  category !== name,
-              ),
-
-            exerciseCategoryOrder:
-              updatedOrder,
-          };
-        });
+              exerciseCategoryOrder:
+                updatedOrder,
+            };
+          },
+        );
       },
       [],
     );
 
-  // ── Badge management ───────────────────────────────────────────────────────
+  // ───────────────────────────────────────────────────────────────────────────
+  // Injury management
+  // ───────────────────────────────────────────────────────────────────────────
+
+  const addInjury =
+    useCallback(
+      (
+        injury: Omit<
+          Injury,
+          "id"
+        >,
+      ) => {
+        setData(
+          (previous) => ({
+            ...previous,
+
+            injuries: [
+              ...previous.injuries,
+
+              normalizeInjury({
+                ...injury,
+
+                id:
+                  generateId(),
+              }),
+            ],
+          }),
+        );
+      },
+      [],
+    );
+
+  const updateInjury =
+    useCallback(
+      (
+        id: string,
+        injury: Injury,
+      ) => {
+        setData(
+          (previous) => ({
+            ...previous,
+
+            injuries:
+              previous.injuries.map(
+                (
+                  current,
+                ) =>
+                  current.id ===
+                  id
+                    ? normalizeInjury({
+                        ...injury,
+
+                        id,
+                      })
+                    : current,
+              ),
+          }),
+        );
+      },
+      [],
+    );
+
+  const deleteInjury =
+    useCallback(
+      (
+        id: string,
+      ) => {
+        setData(
+          (previous) => ({
+            ...previous,
+
+            injuries:
+              previous.injuries.filter(
+                (
+                  injury,
+                ) =>
+                  injury.id !==
+                  id,
+              ),
+          }),
+        );
+      },
+      [],
+    );
+
+  // ───────────────────────────────────────────────────────────────────────────
+  // Badge management
+  // ───────────────────────────────────────────────────────────────────────────
 
   const clearBadgeNotification =
     useCallback(
@@ -1156,76 +2816,95 @@ export function ClimbTrackProvider({
         badgeId: string,
         level: BadgeLevel,
       ) => {
-        setData((previous) => ({
-          ...previous,
+        setData(
+          (previous) => ({
+            ...previous,
 
-          pendingBadgeNotifications:
-            previous.pendingBadgeNotifications.filter(
-              (notification) =>
-                !(
-                  notification.badgeId ===
-                    badgeId &&
-                  notification.level ===
-                    level
-                ),
-            ),
-        }));
+            pendingBadgeNotifications:
+              previous.pendingBadgeNotifications.filter(
+                (
+                  notification,
+                ) =>
+                  !(
+                    notification.badgeId ===
+                      badgeId &&
+                    notification.level ===
+                      level
+                  ),
+              ),
+          }),
+        );
       },
       [],
     );
 
-  // ── Data management ────────────────────────────────────────────────────────
+  // ───────────────────────────────────────────────────────────────────────────
+  // Data management
+  // ───────────────────────────────────────────────────────────────────────────
 
   const exportData =
-    useCallback(() => {
-      const blob = new Blob(
-        [
-          JSON.stringify(
-            data,
-            null,
-            2,
-          ),
-        ],
-        {
-          type: "application/json",
-        },
-      );
+    useCallback(
+      () => {
+        const blob =
+          new Blob(
+            [
+              JSON.stringify(
+                data,
+                null,
+                2,
+              ),
+            ],
+            {
+              type:
+                "application/json",
+            },
+          );
 
-      const url =
-        URL.createObjectURL(blob);
+        const url =
+          URL.createObjectURL(
+            blob,
+          );
 
-      const anchor =
-        document.createElement("a");
+        const anchor =
+          document.createElement(
+            "a",
+          );
 
-      anchor.href = url;
+        anchor.href =
+          url;
 
-      anchor.download =
-        `climbtrack-backup-${
-          new Date()
-            .toISOString()
-            .split("T")[0]
-        }.json`;
+        anchor.download =
+          `climbtrack-backup-${getLocalDateString()}.json`;
 
-      document.body.appendChild(
-        anchor,
-      );
+        document.body.appendChild(
+          anchor,
+        );
 
-      anchor.click();
+        anchor.click();
 
-      document.body.removeChild(
-        anchor,
-      );
+        document.body.removeChild(
+          anchor,
+        );
 
-      URL.revokeObjectURL(url);
-    }, [data]);
+        URL.revokeObjectURL(
+          url,
+        );
+      },
+      [
+        data,
+      ],
+    );
 
   const importData =
     useCallback(
-      (jsonData: string) => {
+      (
+        jsonData: string,
+      ) => {
         try {
-          const parsed = JSON.parse(
-            jsonData,
-          ) as Partial<AppData>;
+          const parsed =
+            JSON.parse(
+              jsonData,
+            ) as Partial<AppData>;
 
           if (
             !parsed ||
@@ -1237,7 +2916,9 @@ export function ClimbTrackProvider({
           }
 
           const normalized =
-            normalizeAppData(parsed);
+            normalizeAppData(
+              parsed,
+            );
 
           normalized.earnedBadges =
             recalculateEarnedBadges(
@@ -1248,10 +2929,14 @@ export function ClimbTrackProvider({
           normalized.pendingBadgeNotifications =
             [];
 
-          setData(normalized);
+          setData(
+            normalized,
+          );
 
           return true;
-        } catch (error) {
+        } catch (
+          error
+        ) {
           console.error(
             "Failed to import ClimbTrack data",
             error,
@@ -1264,19 +2949,39 @@ export function ClimbTrackProvider({
     );
 
   const clearData =
-    useCallback(() => {
-      setData({
-        sessionLogs: [],
-        exerciseDefaults:
-          buildDefaultExerciseValues(),
-        customExercises: [],
-        customCategories: [],
-        exerciseOverrides: {},
-        exerciseCategoryOrder: {},
-        earnedBadges: {},
-        pendingBadgeNotifications: [],
-      });
-    }, []);
+    useCallback(
+      () => {
+        setData({
+          sessionLogs:
+            [],
+
+          injuries:
+            [],
+
+          exerciseDefaults:
+            buildDefaultExerciseValues(),
+
+          customExercises:
+            [],
+
+          customCategories:
+            [],
+
+          exerciseOverrides:
+            {},
+
+          exerciseCategoryOrder:
+            {},
+
+          earnedBadges:
+            {},
+
+          pendingBadgeNotifications:
+            [],
+        });
+      },
+      [],
+    );
 
   return (
     <ClimbTrackContext.Provider
@@ -1300,6 +3005,10 @@ export function ClimbTrackProvider({
         renameCategory,
         deleteCategory,
 
+        addInjury,
+        updateInjury,
+        deleteInjury,
+
         clearBadgeNotification,
 
         exportData,
@@ -1314,9 +3023,13 @@ export function ClimbTrackProvider({
 
 export function useClimbTrack() {
   const context =
-    useContext(ClimbTrackContext);
+    useContext(
+      ClimbTrackContext,
+    );
 
-  if (!context) {
+  if (
+    !context
+  ) {
     throw new Error(
       "useClimbTrack must be used within ClimbTrackProvider",
     );
