@@ -36,71 +36,198 @@
   --font-mono: Menlo, monospace;
 }
 
-:root, .dark {
-  /* Strict black/gray theme */
-  --background: 0 0% 0%; /* #000 */
-  --foreground: 0 0% 100%; /* White */
-  
-  --card: 0 0% 10%; /* #1a1a1a */
+:root,
+.dark {
+  /* Strict black / gray theme */
+  --background: 0 0% 0%;
+  --foreground: 0 0% 100%;
+
+  --card: 0 0% 10%;
   --card-foreground: 0 0% 100%;
   --card-border: 0 0% 16%;
-  
+
   --popover: 0 0% 10%;
   --popover-foreground: 0 0% 100%;
   --popover-border: 0 0% 16%;
-  
-  --border: 0 0% 16%; /* #2a2a2a */
+
+  --border: 0 0% 16%;
   --input: 0 0% 16%;
   --ring: 0 0% 100%;
-  
-  --primary: 0 0% 100%; /* White buttons */
-  --primary-foreground: 0 0% 0%; /* Black text */
-  
-  --secondary: 0 0% 15%; 
+
+  --primary: 0 0% 100%;
+  --primary-foreground: 0 0% 0%;
+
+  --secondary: 0 0% 15%;
   --secondary-foreground: 0 0% 100%;
-  
+
   --muted: 0 0% 16%;
-  --muted-foreground: 0 0% 60%; /* #999 */
-  
+  --muted-foreground: 0 0% 60%;
+
   --accent: 0 0% 20%;
   --accent-foreground: 0 0% 100%;
-  
+
   --destructive: 0 100% 40%;
   --destructive-foreground: 0 0% 100%;
 
-  --success: 120 100% 25%; /* Discrete green */
+  --success: 120 100% 25%;
 
   --radius: 0.5rem;
+}
+
+/* ────────────────────────────────────────────────────────────────────────── */
+/* Global viewport / scroll                                                   */
+/* ────────────────────────────────────────────────────────────────────────── */
+
+html {
+  width: 100%;
+  max-width: 100%;
+
+  min-height: 100%;
+  min-height: 100dvh;
+
+  margin: 0;
+  padding: 0;
+
+  background: #000;
+
+  overflow-x: hidden;
+
+  /*
+   * Évite l'effet de rebond important de Safari/PWA
+   * lorsqu'on arrive en haut ou en bas d'une page.
+   */
+  overscroll-behavior-x: none;
+  overscroll-behavior-y: none;
+
+  /*
+   * Masque la barre de défilement sans bloquer
+   * le défilement vertical.
+   */
+  scrollbar-width: none;
+
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  width: 100%;
+  max-width: 100%;
+
+  min-height: 100%;
+  min-height: 100dvh;
+
+  margin: 0;
+  padding: 0;
+
+  background: #000;
+
+  overflow-x: hidden;
+
+  overscroll-behavior-x: none;
+  overscroll-behavior-y: none;
+
+  scrollbar-width: none;
+
+  /*
+   * Autorise le déplacement vertical normal,
+   * mais limite les gestes horizontaux accidentels.
+   */
+  touch-action: pan-y;
+
+  -webkit-tap-highlight-color: transparent;
+}
+
+#root {
+  width: 100%;
+  max-width: 100%;
+
+  min-height: 100%;
+  min-height: 100dvh;
+
+  margin: 0;
+
+  overflow-x: hidden;
+
+  background: #000;
+}
+
+/*
+ * Safari / Chrome / iOS :
+ * la page reste scrollable mais la barre visible
+ * sur le côté droit disparaît.
+ */
+html::-webkit-scrollbar,
+body::-webkit-scrollbar,
+#root::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  display: none;
+}
+
+/*
+ * Évite qu'un élément un peu trop large fasse
+ * décaler toute l'application horizontalement.
+ */
+img,
+svg,
+video,
+canvas {
+  max-width: 100%;
 }
 
 @layer base {
   * {
     @apply border-border;
+
+    box-sizing: border-box;
   }
 
   body {
     @apply font-sans antialiased bg-background text-foreground selection:bg-white selection:text-black;
-    -webkit-tap-highlight-color: transparent;
+  }
+
+  button,
+  input,
+  textarea,
+  select {
+    font: inherit;
   }
 }
 
-/* Custom Utilities */
+/* ────────────────────────────────────────────────────────────────────────── */
+/* Custom utilities                                                          */
+/* ────────────────────────────────────────────────────────────────────────── */
+
 @layer utilities {
   .pb-safe {
-    padding-bottom: env(safe-area-inset-bottom, 16px);
+    padding-bottom: env(
+      safe-area-inset-bottom,
+      16px
+    );
   }
+
   .pt-safe {
-    padding-top: env(safe-area-inset-top, 0px);
+    padding-top: env(
+      safe-area-inset-top,
+      0px
+    );
   }
-  
-  .hide-scrollbar::-webkit-scrollbar {
-    display: none;
-  }
+
   .hide-scrollbar {
     -ms-overflow-style: none;
     scrollbar-width: none;
   }
+
+  .hide-scrollbar::-webkit-scrollbar {
+    width: 0;
+    height: 0;
+    display: none;
+  }
 }
+
+/* ────────────────────────────────────────────────────────────────────────── */
+/* Badge unlock animation                                                     */
+/* ────────────────────────────────────────────────────────────────────────── */
+
 @keyframes badge-unlock {
   0% {
     transform: scale(0.82);
@@ -124,5 +251,9 @@
 
 .badge-unlock-animation {
   transform-origin: center;
-  animation: badge-unlock 520ms ease-out;
+
+  animation:
+    badge-unlock
+    520ms
+    ease-out;
 }

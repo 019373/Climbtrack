@@ -658,29 +658,10 @@ export type KilterEntry = {
 
   angle: number;
 
-  /*
-   * Valeur CANONIQUE interne.
-   *
-   * Toujours V0 → V17,
-   * même si l'utilisateur a saisi 6a, 7b+, etc.
-   */
   grade: number;
 
-  /*
-   * Système utilisé pour CE bloc.
-   */
   gradeSystem?: KilterGradeSystem;
 
-  /*
-   * Valeur réellement affichée / saisie.
-   *
-   * Ex :
-   * "V3"
-   * "6a"
-   *
-   * Permet à l'historique de conserver
-   * exactement la notation utilisée.
-   */
   displayGrade?: string;
 
   result: KilterResult;
@@ -954,28 +935,28 @@ export type AppData = {
   pendingBadgeNotifications:
     PendingBadgeNotification[];
 
-  /*
-   * Une entrée ici signifie :
-   *
-   * ClimbTrack a augmenté automatiquement
-   * la prescription de cet exercice mais
-   * l'utilisateur ne l'a pas encore validée
-   * une première fois.
-   *
-   * C'est cette présence qui déclenche ↗.
-   */
   pendingAutomaticProgressions: Record<
     string,
     PendingAutomaticProgression
   >;
+
+  /*
+   * Permet d'exécuter les migrations historiques
+   * une seule fois.
+   */
+  exerciseAdaptationHistoryVersion:
+    number;
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Storage
+// Storage / migrations
 // ─────────────────────────────────────────────────────────────────────────────
 
 const STORAGE_KEY =
   "climbtrack_data";
+
+const EXERCISE_ADAPTATION_HISTORY_VERSION =
+  1;
 
 function buildDefaultExerciseValues(): Record<
   string,
@@ -2141,60 +2122,20 @@ function normalizeAppData(
       normalizePendingAutomaticProgressions(
         parsed.pendingAutomaticProgressions,
       ),
-  };
-}
 
-function getInitialData(): AppData {
-  try {
-    const saved =
-      localStorage.getItem(
-        STORAGE_KEY,
-      );
-
-    if (
-      saved
-    ) {
-      const parsed =
-        JSON.parse(
-          saved,
-        ) as Partial<AppData>;
-
-      return normalizeAppData(
-        parsed,
-      );
-    }
-  } catch (
-    error
-  ) {
-    console.error(
-      "Failed to load ClimbTrack data",
-      error,
-    );
-  }
-
-  return {
-    sessionLogs: [],
-
-    injuries: [],
-
-    exerciseDefaults:
-      buildDefaultExerciseValues(),
-
-    customExercises: [],
-
-    customCategories: [],
-
-    exerciseOverrides: {},
-
-    exerciseCategoryOrder: {},
-
-    earnedBadges: {},
-
-    pendingBadgeNotifications:
-      [],
-
-    pendingAutomaticProgressions:
-      {},
+    exerciseAdaptationHistoryVersion:
+      typeof parsed.exerciseAdaptationHistoryVersion ===
+        "number" &&
+      Number.isFinite(
+        parsed.exerciseAdaptationHistoryVersion,
+      )
+        ? Math.max(
+            0,
+            Math.floor(
+              parsed.exerciseAdaptationHistoryVersion,
+            ),
+          )
+        : 0,
   };
 }
 
@@ -2534,19 +2475,6 @@ function getProgressionField(
   exercise: ExerciseDef,
   defaults: ExerciseDefaults,
 ): AutomaticProgressionField {
-  /*
-   * Priorité :
-   *
-   * 1. Charge
-   * 2. Répétitions
-   * 3. Durée
-   * 4. Valeur spécifique
-   * 5. Étirement d'élastique
-   * 6. Séries
-   *
-   * Ainsi un développé couché progressera d'abord
-   * en kg, tandis qu'une planche progressera en durée.
-   */
   if (
     trackingSupportsWeight(
       exercise.tracking,
@@ -2666,10 +2594,6 @@ function getNextProgressionValue(
     );
   }
 
-  /*
-   * Reps, séries et valeurs de progression :
-   * +1 unité.
-   */
   return (
     current +
     1
@@ -2749,16 +2673,6 @@ function getLearnedWeightCandidate(
   const second =
     weights[1];
 
-  /*
-   * Cas normal :
-   *
-   * 12 / 12       → 12
-   * 11 / 12       → 11
-   * 12 / 12,5     → 12
-   *
-   * Quand les deux sont proches,
-   * on prend volontairement la plus basse.
-   */
   if (
     Math.abs(
       newest -
@@ -2774,18 +2688,6 @@ function getLearnedWeightCandidate(
     );
   }
 
-  /*
-   * Si les deux dernières valeurs sont trop éloignées,
-   * on attend la troisième occurrence.
-   *
-   * 10 → 12 → 10
-   * récent = 10, 12, 10
-   * => 10 cohérent avec l'ancien 10.
-   *
-   * 10 → 12 → 12
-   * récent = 12, 12, 10
-   * => le premier test ci-dessus donne 12.
-   */
   const third =
     weights[2];
 
@@ -2810,7 +2712,258 @@ function getLearnedWeightCandidate(
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Application progression + apprentissage
+// Migration des anciennes séances
+// ─────────────────────────────────────────────────────────────────────────────
+
+function migrateHistoricalExerciseAdaptations(
+  data: AppData,
+): AppData {
+  if (
+    data.exerciseAdaptationHistoryVersion >=
+    EXERCISE_ADAPTATION_HISTORY_VERSION
+  ) {
+    return data;
+  }
+
+  const exerciseDefaults = {
+    ...data.exerciseDefaults,
+  };
+
+  const pendingAutomaticProgressions = {
+    ...data.pendingAutomaticProgressions,
+  };
+
+  const exerciseIds =
+    new Set<string>();
+
+  data.sessionLogs.forEach(
+    (sessionLog) => {
+      sessionLog.exerciseLogs.forEach(
+        (exerciseLog) => {
+          if (
+            exerciseLog.exerciseId
+          ) {
+            exerciseIds.add(
+              exerciseLog.exerciseId,
+            );
+          }
+        },
+      );
+    },
+  );
+
+  exerciseIds.forEach(
+    (exerciseId) => {
+      /*
+       * Si le nouveau système avait déjà commencé
+       * à suivre cet exercice avant la migration,
+       * on conserve son état actuel.
+       */
+      if (
+        pendingAutomaticProgressions[
+          exerciseId
+        ]
+      ) {
+        return;
+      }
+
+      const exercise =
+        getExerciseDefinition(
+          exerciseId,
+          data,
+        );
+
+      if (
+        !exercise
+      ) {
+        return;
+      }
+
+      const currentDefaults =
+        exerciseDefaults[
+          exerciseId
+        ] ?? {
+          ...exercise.defaultValues,
+        };
+
+      // ───────────────────────────────────────────────────────────────────────
+      // 1. Anciennes charges réellement utilisées
+      // ───────────────────────────────────────────────────────────────────────
+
+      if (
+        trackingSupportsWeight(
+          exercise.tracking,
+        ) &&
+        typeof currentDefaults.weight ===
+          "number"
+      ) {
+        const learnedWeight =
+          getLearnedWeightCandidate(
+            data.sessionLogs,
+            exerciseId,
+          );
+
+        if (
+          learnedWeight !==
+            null &&
+          !numbersEqual(
+            learnedWeight,
+            currentDefaults.weight,
+          )
+        ) {
+          exerciseDefaults[
+            exerciseId
+          ] = {
+            ...currentDefaults,
+
+            weight:
+              learnedWeight,
+          };
+
+          /*
+           * Important :
+           *
+           * Les séances ayant servi à apprendre
+           * cette nouvelle charge ne comptent PAS
+           * immédiatement comme deux validations
+           * de la nouvelle prescription.
+           *
+           * Donc pas de ↗ ici.
+           */
+          return;
+        }
+      }
+
+      // ───────────────────────────────────────────────────────────────────────
+      // 2. Progression automatique depuis l'ancien historique
+      // ───────────────────────────────────────────────────────────────────────
+
+      const eligibleOccurrences =
+        getExerciseOccurrences(
+          data.sessionLogs,
+          exerciseId,
+        ).filter(
+          (occurrence) =>
+            occurrence.session.sessionId !==
+            "s7-prevention",
+        );
+
+      if (
+        eligibleOccurrences.length <
+        2
+      ) {
+        return;
+      }
+
+      const latest =
+        eligibleOccurrences[
+          0
+        ].exercise;
+
+      const previous =
+        eligibleOccurrences[
+          1
+        ].exercise;
+
+      if (
+        !latest.completed ||
+        !previous.completed
+      ) {
+        return;
+      }
+
+      const field =
+        getProgressionField(
+          exercise,
+          currentDefaults,
+        );
+
+      const currentTarget =
+        getDefaultNumericValue(
+          currentDefaults,
+          field,
+        );
+
+      if (
+        typeof currentTarget !==
+        "number"
+      ) {
+        return;
+      }
+
+      const latestValue =
+        getExerciseLogNumericValue(
+          latest,
+          field,
+        );
+
+      const previousValue =
+        getExerciseLogNumericValue(
+          previous,
+          field,
+        );
+
+      if (
+        !numbersEqual(
+          latestValue,
+          currentTarget,
+        ) ||
+        !numbersEqual(
+          previousValue,
+          currentTarget,
+        )
+      ) {
+        return;
+      }
+
+      const nextValue =
+        getNextProgressionValue(
+          field,
+          currentTarget,
+        );
+
+      exerciseDefaults[
+        exerciseId
+      ] = {
+        ...currentDefaults,
+
+        [field]:
+          nextValue,
+      };
+
+      pendingAutomaticProgressions[
+        exerciseId
+      ] = {
+        exerciseId,
+
+        field,
+
+        previousValue:
+          currentTarget,
+
+        targetValue:
+          nextValue,
+
+        createdAt:
+          new Date().toISOString(),
+      };
+    },
+  );
+
+  return {
+    ...data,
+
+    exerciseDefaults,
+
+    pendingAutomaticProgressions,
+
+    exerciseAdaptationHistoryVersion:
+      EXERCISE_ADAPTATION_HISTORY_VERSION,
+  };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Application progression + apprentissage des nouvelles séances
 // ─────────────────────────────────────────────────────────────────────────────
 
 function processExerciseAdaptations(
@@ -2835,10 +2988,6 @@ function processExerciseAdaptations(
     ...previous.pendingAutomaticProgressions,
   };
 
-  /*
-   * Inclure la séance qui vient d'être enregistrée
-   * dans l'historique utilisé pour les décisions.
-   */
   const allLogs = [
     ...previous.sessionLogs,
     normalizedLog,
@@ -2876,23 +3025,11 @@ function processExerciseAdaptations(
             pending,
           )
         ) {
-          /*
-           * Première réussite avec le nouvel objectif :
-           * la flèche disparaît.
-           *
-           * On ne crée PAS immédiatement une nouvelle
-           * progression durant la même sauvegarde.
-           */
           delete pendingAutomaticProgressions[
             exerciseId
           ];
         }
 
-        /*
-         * Tant qu'une progression automatique est
-         * en attente, l'apprentissage manuel du poids
-         * est suspendu pour éviter les conflits.
-         */
         return;
       }
 
@@ -2955,20 +3092,12 @@ function processExerciseAdaptations(
               learnedWeight,
           };
 
-          /*
-           * IMPORTANT :
-           *
-           * Un default appris silencieusement
-           * ne doit jamais créer la flèche verte.
-           *
-           * On arrête donc ici pour cet exercice.
-           */
           return;
         }
       }
 
       // ───────────────────────────────────────────────────────────────────────
-      // 3. Prévention : aucune progression automatique
+      // 3. Prévention
       // ───────────────────────────────────────────────────────────────────────
 
       if (
@@ -2979,7 +3108,7 @@ function processExerciseAdaptations(
       }
 
       // ───────────────────────────────────────────────────────────────────────
-      // 4. Vérifier deux réussites CONSÉCUTIVES
+      // 4. Deux réussites consécutives
       // ───────────────────────────────────────────────────────────────────────
 
       const occurrences =
@@ -3003,13 +3132,6 @@ function processExerciseAdaptations(
         occurrences[1]
           .exercise;
 
-      /*
-       * "Deux fois de suite" signifie vraiment
-       * deux occurrences consécutives de l'exercice.
-       *
-       * Si l'une des deux n'a pas été réalisée,
-       * la série est cassée.
-       */
       if (
         !latest.completed ||
         !previousOccurrence.completed
@@ -3048,14 +3170,6 @@ function processExerciseAdaptations(
           field,
         );
 
-      /*
-       * Les deux réussites doivent correspondre
-       * à la prescription actuelle.
-       *
-       * Si l'utilisateur a modifié librement une valeur,
-       * on évite de considérer automatiquement cela
-       * comme deux validations du même objectif.
-       */
       if (
         !numbersEqual(
           latestValue,
@@ -3107,6 +3221,72 @@ function processExerciseAdaptations(
     exerciseDefaults,
 
     pendingAutomaticProgressions,
+  };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Initial data
+// ─────────────────────────────────────────────────────────────────────────────
+
+function getInitialData(): AppData {
+  try {
+    const saved =
+      localStorage.getItem(
+        STORAGE_KEY,
+      );
+
+    if (
+      saved
+    ) {
+      const parsed =
+        JSON.parse(
+          saved,
+        ) as Partial<AppData>;
+
+      const normalized =
+        normalizeAppData(
+          parsed,
+        );
+
+      return migrateHistoricalExerciseAdaptations(
+        normalized,
+      );
+    }
+  } catch (
+    error
+  ) {
+    console.error(
+      "Failed to load ClimbTrack data",
+      error,
+    );
+  }
+
+  return {
+    sessionLogs: [],
+
+    injuries: [],
+
+    exerciseDefaults:
+      buildDefaultExerciseValues(),
+
+    customExercises: [],
+
+    customCategories: [],
+
+    exerciseOverrides: {},
+
+    exerciseCategoryOrder: {},
+
+    earnedBadges: {},
+
+    pendingBadgeNotifications:
+      [],
+
+    pendingAutomaticProgressions:
+      {},
+
+    exerciseAdaptationHistoryVersion:
+      EXERCISE_ADAPTATION_HISTORY_VERSION,
   };
 }
 
@@ -3475,12 +3655,6 @@ export function ClimbTrackProvider({
               ...previous.pendingAutomaticProgressions,
             };
 
-            /*
-             * Une modification manuelle des valeurs par défaut
-             * annule l'indicateur de progression automatique.
-             *
-             * Le changement manuel lui-même n'affiche jamais ↗.
-             */
             delete updatedPending[
               exerciseId
             ];
@@ -4253,17 +4427,22 @@ export function ClimbTrackProvider({
               parsed,
             );
 
-          normalized.earnedBadges =
-            recalculateEarnedBadges(
-              normalized.sessionLogs,
-              normalized.earnedBadges,
+          const migrated =
+            migrateHistoricalExerciseAdaptations(
+              normalized,
             );
 
-          normalized.pendingBadgeNotifications =
+          migrated.earnedBadges =
+            recalculateEarnedBadges(
+              migrated.sessionLogs,
+              migrated.earnedBadges,
+            );
+
+          migrated.pendingBadgeNotifications =
             [];
 
           setData(
-            normalized,
+            migrated,
           );
 
           return true;
@@ -4314,6 +4493,9 @@ export function ClimbTrackProvider({
 
           pendingAutomaticProgressions:
             {},
+
+          exerciseAdaptationHistoryVersion:
+            EXERCISE_ADAPTATION_HISTORY_VERSION,
         });
       },
       [],
