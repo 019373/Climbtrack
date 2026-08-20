@@ -50,6 +50,31 @@ import {
   SessionDetailPage,
 } from "@/pages/SessionDetailPage";
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Router
+// ─────────────────────────────────────────────────────────────────────────────
+
+function getRouterBasename(): string {
+  const baseUrl =
+    import.meta.env.BASE_URL ||
+    "/";
+
+  if (
+    baseUrl === "/"
+  ) {
+    return "/";
+  }
+
+  return baseUrl.replace(
+    /\/+$/,
+    "",
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Layout
+// ─────────────────────────────────────────────────────────────────────────────
+
 function AppLayout() {
   const location =
     useLocation();
@@ -148,10 +173,21 @@ function AppLayout() {
   );
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// App
+// ─────────────────────────────────────────────────────────────────────────────
+
 export default function App() {
+  const routerBasename =
+    getRouterBasename();
+
   return (
     <ClimbTrackProvider>
-      <BrowserRouter>
+      <BrowserRouter
+        basename={
+          routerBasename
+        }
+      >
         <AppLayout />
       </BrowserRouter>
     </ClimbTrackProvider>

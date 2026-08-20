@@ -16,6 +16,7 @@ import {
 } from "@/components/BodyMapSVG";
 
 import {
+  MUSCLE_GROUPS,
   calculateAccumulatedScores,
   calculateRecoveryScores,
 } from "@/utils/muscleRecovery";
@@ -26,10 +27,32 @@ type TimeFilter =
   | "30"
   | "all";
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Helpers
+// ─────────────────────────────────────────────────────────────────────────────
+
+function getMuscleName(
+  muscleId: string,
+): string {
+  return (
+    MUSCLE_GROUPS.find(
+      (muscle) =>
+        muscle.id ===
+        muscleId,
+    )?.name ??
+    muscleId
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Page
+// ─────────────────────────────────────────────────────────────────────────────
+
 export function CorpsPage() {
   const {
     data,
-  } = useClimbTrack();
+  } =
+    useClimbTrack();
 
   const [
     timeFilter,
@@ -39,30 +62,68 @@ export function CorpsPage() {
       "recovery",
     );
 
-  const muscleAccumulation =
-    useMemo(() => {
-      if (
-        timeFilter ===
-        "recovery"
-      ) {
-        return calculateRecoveryScores(
-          data.sessionLogs,
-        );
-      }
+  /*
+   * Données nécessaires au moteur musculaire.
+   *
+   * Cela permet maintenant de prendre en compte :
+   *
+   * - les exercices personnalisés ;
+   * - leurs muscles enregistrés ;
+   * - les modifications musculaires des exercices de base.
+   */
+  const recoveryExerciseData =
+    useMemo(
+      () => ({
+        customExercises:
+          data.customExercises,
 
-      return calculateAccumulatedScores(
+        exerciseOverrides:
+          data.exerciseOverrides,
+      }),
+      [
+        data.customExercises,
+        data.exerciseOverrides,
+      ],
+    );
+
+  const muscleAccumulation =
+    useMemo(
+      () => {
+        if (
+          timeFilter ===
+          "recovery"
+        ) {
+          return calculateRecoveryScores(
+            data.sessionLogs,
+            data.injuries,
+            new Date(),
+            recoveryExerciseData,
+          );
+        }
+
+        return calculateAccumulatedScores(
+          data.sessionLogs,
+
+          timeFilter ===
+          "7"
+            ? 7
+            : timeFilter ===
+                "30"
+              ? 30
+              : null,
+
+          new Date(),
+
+          recoveryExerciseData,
+        );
+      },
+      [
         data.sessionLogs,
-        timeFilter === "7"
-          ? 7
-          : timeFilter ===
-              "30"
-            ? 30
-            : null,
-      );
-    }, [
-      data.sessionLogs,
-      timeFilter,
-    ]);
+        data.injuries,
+        recoveryExerciseData,
+        timeFilter,
+      ],
+    );
 
   const maxScore =
     Math.max(
@@ -76,11 +137,6 @@ export function CorpsPage() {
     Object.entries(
       muscleAccumulation,
     )
-      .filter(
-        ([muscle]) =>
-          muscle !==
-          "mobilité",
-      )
       .sort(
         (
           first,
@@ -90,14 +146,29 @@ export function CorpsPage() {
           second[1],
       )
       .filter(
-        ([, score]) =>
+        (
+          [
+            ,
+            score,
+          ],
+        ) =>
           score <
-          maxScore * 0.3,
+          maxScore *
+            0.3,
       )
-      .slice(0, 3)
+      .slice(
+        0,
+        3,
+      )
       .map(
-        ([muscle]) =>
-          muscle,
+        (
+          [
+            muscleId,
+          ],
+        ) =>
+          getMuscleName(
+            muscleId,
+          ),
       );
 
   const filters: {
@@ -109,16 +180,19 @@ export function CorpsPage() {
       label:
         "Récupération actuelle",
     },
+
     {
       id: "7",
       label:
         "7 derniers jours",
     },
+
     {
       id: "30",
       label:
         "30 derniers jours",
     },
+
     {
       id: "all",
       label:
@@ -127,17 +201,19 @@ export function CorpsPage() {
   ];
 
   return (
-    <div className="min-h-screen bg-background pb-24 pt-safe">
+    <div className="min-h-screen w-full overflow-x-hidden bg-background pb-24 pt-safe">
       <header className="sticky top-0 z-10 border-b border-border bg-background/95 px-5 py-6 backdrop-blur-md">
         <h1 className="text-3xl font-extrabold tracking-tight text-white">
           Corps
         </h1>
       </header>
 
-      <main className="space-y-6 p-5">
-        <div className="flex gap-2 overflow-x-auto pb-1">
+      <main className="w-full space-y-6 overflow-x-hidden p-5">
+        <div className="flex max-w-full gap-2 overflow-x-auto pb-1">
           {filters.map(
-            (filter) => (
+            (
+              filter,
+            ) => (
               <button
                 key={
                   filter.id
@@ -150,6 +226,7 @@ export function CorpsPage() {
                 }
                 className={cn(
                   "whitespace-nowrap rounded-full border px-4 py-2 text-xs font-bold transition-colors",
+
                   timeFilter ===
                     filter.id
                     ? "border-white bg-white text-black"
@@ -172,13 +249,12 @@ export function CorpsPage() {
             </h2>
 
             <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
-              Les couleurs représentent la charge encore présente après les séances enregistrées.
-              Elles diminuent progressivement pendant environ 48 à 96 heures selon l’intensité.
+              Les couleurs représentent la charge encore présente après les séances enregistrées. La récupération varie selon le groupe musculaire, la charge récente et les blessures enregistrées.
             </p>
           </div>
         )}
 
-        <div className="flex justify-center overflow-hidden rounded-xl border border-border bg-card px-3 py-5">
+        <div className="flex w-full justify-center overflow-hidden rounded-xl border border-border bg-card px-3 py-5">
           <BodyMapSVG
             scores={
               muscleAccumulation
@@ -193,7 +269,8 @@ export function CorpsPage() {
           "recovery" &&
           leastWorked.length >
             0 &&
-          maxScore > 5 && (
+          maxScore >
+            5 && (
             <div className="rounded-xl border border-border bg-[#151515] p-4">
               <h3 className="mb-2 text-sm font-bold text-white">
                 Recommandation
@@ -234,44 +311,56 @@ export function CorpsPage() {
                   first[1],
               )
               .filter(
-                ([, score]) =>
-                  score > 0,
+                (
+                  [
+                    ,
+                    score,
+                  ],
+                ) =>
+                  score >
+                  0,
               )
               .map(
-                ([
-                  muscle,
-                  score,
-                ]) => (
+                (
+                  [
+                    muscleId,
+                    score,
+                  ],
+                ) => (
                   <div
                     key={
-                      muscle
+                      muscleId
                     }
-                    className="flex items-center gap-3"
+                    className="flex min-w-0 items-center gap-3"
                   >
-                    <div className="w-24 text-right text-xs font-medium capitalize text-muted-foreground">
-                      {
-                        muscle
-                      }
+                    <div className="w-28 flex-shrink-0 text-right text-xs font-medium text-muted-foreground">
+                      {getMuscleName(
+                        muscleId,
+                      )}
                     </div>
 
-                    <div className="h-3 flex-1 overflow-hidden rounded-full bg-card">
+                    <div className="h-3 min-w-0 flex-1 overflow-hidden rounded-full bg-card">
                       <div
                         className="h-full rounded-full bg-white"
                         style={{
                           width: `${Math.min(
                             100,
-                            (score /
-                              maxScore) *
+                            (
+                              score /
+                              maxScore
+                            ) *
                               100,
                           )}%`,
                         }}
                       />
                     </div>
 
-                    <div className="w-10 text-right font-mono text-xs text-white">
-                      {
-                        score
-                      }
+                    <div className="w-10 flex-shrink-0 text-right font-mono text-xs text-white">
+                      {Math.round(
+                        score *
+                          10,
+                      ) /
+                        10}
                     </div>
                   </div>
                 ),
@@ -280,8 +369,11 @@ export function CorpsPage() {
             {Object.values(
               muscleAccumulation,
             ).every(
-              (score) =>
-                score === 0,
+              (
+                score,
+              ) =>
+                score ===
+                0,
             ) && (
               <div className="py-4 text-center text-sm text-muted-foreground">
                 Aucune charge musculaire active.

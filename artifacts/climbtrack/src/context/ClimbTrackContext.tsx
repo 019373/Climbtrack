@@ -7,11 +7,15 @@ import React, {
 } from "react";
 
 import {
+  MUSCLE_CATALOG,
   SESSIONS,
 } from "../data/sessions";
 
 import type {
   ExerciseDef,
+  ExerciseMuscleLoad,
+  MuscleId,
+  MuscleIntensity,
   TrackingType,
 } from "../data/sessions";
 
@@ -87,23 +91,98 @@ function createCompletedAt(
   ).toISOString();
 }
 
+function getSessionTimestamp(
+  log: Pick<
+    SessionLog,
+    "date" | "completedAt"
+  >,
+): number {
+  if (
+    log.completedAt
+  ) {
+    const timestamp =
+      new Date(
+        log.completedAt,
+      ).getTime();
+
+    if (
+      !Number.isNaN(
+        timestamp,
+      )
+    ) {
+      return timestamp;
+    }
+  }
+
+  const fallback =
+    new Date(
+      `${log.date}T12:00:00`,
+    ).getTime();
+
+  return Number.isNaN(
+    fallback,
+  )
+    ? 0
+    : fallback;
+}
+
 function normalizePositiveNumber(
   value: unknown,
 ): number | undefined {
   if (
-    typeof value !==
-      "number" ||
-    !Number.isFinite(
-      value,
-    )
+    typeof value ===
+    "number"
   ) {
-    return undefined;
+    if (
+      !Number.isFinite(
+        value,
+      )
+    ) {
+      return undefined;
+    }
+
+    return Math.max(
+      0,
+      value,
+    );
   }
 
-  return Math.max(
-    0,
-    value,
-  );
+  if (
+    typeof value ===
+    "string"
+  ) {
+    const normalized =
+      value
+        .trim()
+        .replace(
+          ",",
+          ".",
+        );
+
+    if (
+      !normalized
+    ) {
+      return undefined;
+    }
+
+    const parsed =
+      Number(
+        normalized,
+      );
+
+    if (
+      Number.isFinite(
+        parsed,
+      )
+    ) {
+      return Math.max(
+        0,
+        parsed,
+      );
+    }
+  }
+
+  return undefined;
 }
 
 function normalizeOptionalText(
@@ -149,6 +228,169 @@ function normalizeStringArray(
     0
     ? normalized
     : [];
+}
+
+function numbersEqual(
+  first:
+    | number
+    | undefined,
+  second:
+    | number
+    | undefined,
+  tolerance = 0.001,
+): boolean {
+  if (
+    typeof first !==
+      "number" ||
+    typeof second !==
+      "number"
+  ) {
+    return false;
+  }
+
+  return (
+    Math.abs(
+      first -
+        second,
+    ) <=
+    tolerance
+  );
+}
+
+function roundToQuarter(
+  value: number,
+): number {
+  return (
+    Math.round(
+      value * 4,
+    ) / 4
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Muscle helpers
+// ─────────────────────────────────────────────────────────────────────────────
+
+const VALID_MUSCLE_IDS =
+  new Set<MuscleId>(
+    MUSCLE_CATALOG.map(
+      (muscle) =>
+        muscle.id,
+    ),
+  );
+
+const VALID_MUSCLE_INTENSITIES =
+  new Set<MuscleIntensity>([
+    "low",
+    "medium",
+    "high",
+  ]);
+
+function normalizeMuscleLoads(
+  value: unknown,
+): ExerciseMuscleLoad[] | undefined {
+  if (
+    !Array.isArray(
+      value,
+    )
+  ) {
+    return undefined;
+  }
+
+  const intensityRank: Record<
+    MuscleIntensity,
+    number
+  > = {
+    low: 1,
+    medium: 2,
+    high: 3,
+  };
+
+  const normalized =
+    new Map<
+      MuscleId,
+      ExerciseMuscleLoad
+    >();
+
+  value.forEach(
+    (item) => {
+      if (
+        !item ||
+        typeof item !==
+          "object" ||
+        Array.isArray(
+          item,
+        )
+      ) {
+        return;
+      }
+
+      const record =
+        item as Record<
+          string,
+          unknown
+        >;
+
+      const muscleId =
+        record.muscleId;
+
+      const intensity =
+        record.intensity;
+
+      if (
+        typeof muscleId !==
+          "string" ||
+        !VALID_MUSCLE_IDS.has(
+          muscleId as MuscleId,
+        )
+      ) {
+        return;
+      }
+
+      if (
+        typeof intensity !==
+          "string" ||
+        !VALID_MUSCLE_INTENSITIES.has(
+          intensity as MuscleIntensity,
+        )
+      ) {
+        return;
+      }
+
+      const current: ExerciseMuscleLoad =
+        {
+          muscleId:
+            muscleId as MuscleId,
+
+          intensity:
+            intensity as MuscleIntensity,
+        };
+
+      const previous =
+        normalized.get(
+          current.muscleId,
+        );
+
+      if (
+        !previous ||
+        intensityRank[
+          current.intensity
+        ] >
+          intensityRank[
+            previous.intensity
+          ]
+      ) {
+        normalized.set(
+          current.muscleId,
+          current,
+        );
+      }
+    },
+  );
+
+  return [
+    ...normalized.values(),
+  ];
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -217,6 +459,36 @@ export type ExerciseLog = {
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Progression automatique
+// ─────────────────────────────────────────────────────────────────────────────
+
+export type AutomaticProgressionField =
+  | "sets"
+  | "reps"
+  | "secondaryReps"
+  | "duration"
+  | "weight"
+  | "secondaryWeight"
+  | "progressionValue"
+  | "bandStretch";
+
+export type PendingAutomaticProgression = {
+  exerciseId: string;
+
+  field:
+    AutomaticProgressionField;
+
+  previousValue:
+    number;
+
+  targetValue:
+    number;
+
+  createdAt:
+    string;
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Climbing types
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -234,12 +506,182 @@ export type FinisherType =
   | "abs"
   | "flexibility";
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Kilter V / Fontainebleau
+// ─────────────────────────────────────────────────────────────────────────────
+
+export type KilterGradeSystem =
+  | "v"
+  | "font";
+
+export const KILTER_FONT_GRADES = [
+  "4a",
+  "4b",
+  "4c",
+
+  "5a",
+  "5b",
+  "5c",
+
+  "6a",
+  "6a+",
+  "6b",
+  "6b+",
+  "6c",
+  "6c+",
+
+  "7a",
+  "7a+",
+  "7b",
+  "7b+",
+  "7c",
+  "7c+",
+
+  "8a",
+  "8a+",
+  "8b",
+  "8b+",
+  "8c",
+  "8c+",
+
+  "9a",
+] as const;
+
+export type KilterFontGrade =
+  (
+    typeof KILTER_FONT_GRADES
+  )[number];
+
+const FONT_TO_V: Record<
+  KilterFontGrade,
+  number
+> = {
+  "4a": 0,
+  "4b": 0,
+  "4c": 0,
+
+  "5a": 1,
+  "5b": 1,
+  "5c": 2,
+
+  "6a": 3,
+  "6a+": 3,
+
+  "6b": 4,
+  "6b+": 4,
+
+  "6c": 5,
+  "6c+": 5,
+
+  "7a": 6,
+
+  "7a+": 7,
+
+  "7b": 8,
+  "7b+": 8,
+
+  "7c": 9,
+
+  "7c+": 10,
+
+  "8a": 11,
+
+  "8a+": 12,
+
+  "8b": 13,
+
+  "8b+": 14,
+
+  "8c": 15,
+
+  "8c+": 16,
+
+  "9a": 17,
+};
+
+const DEFAULT_FONT_FOR_V: Record<
+  number,
+  KilterFontGrade
+> = {
+  0: "4a",
+  1: "5a",
+  2: "5c",
+  3: "6a",
+  4: "6b",
+  5: "6c",
+  6: "7a",
+  7: "7a+",
+  8: "7b",
+  9: "7c",
+  10: "7c+",
+  11: "8a",
+  12: "8a+",
+  13: "8b",
+  14: "8b+",
+  15: "8c",
+  16: "8c+",
+  17: "9a",
+};
+
+export function fontGradeToV(
+  grade: KilterFontGrade,
+): number {
+  return FONT_TO_V[
+    grade
+  ];
+}
+
+export function getDefaultFontGradeForV(
+  grade: number,
+): KilterFontGrade {
+  const normalized =
+    Math.max(
+      0,
+      Math.min(
+        17,
+        Math.round(
+          grade,
+        ),
+      ),
+    );
+
+  return (
+    DEFAULT_FONT_FOR_V[
+      normalized
+    ] ??
+    "4a"
+  );
+}
+
 export type KilterEntry = {
   id: string;
 
   angle: number;
 
+  /*
+   * Valeur CANONIQUE interne.
+   *
+   * Toujours V0 → V17,
+   * même si l'utilisateur a saisi 6a, 7b+, etc.
+   */
   grade: number;
+
+  /*
+   * Système utilisé pour CE bloc.
+   */
+  gradeSystem?: KilterGradeSystem;
+
+  /*
+   * Valeur réellement affichée / saisie.
+   *
+   * Ex :
+   * "V3"
+   * "6a"
+   *
+   * Permet à l'historique de conserver
+   * exactement la notation utilisée.
+   */
+  displayGrade?: string;
 
   result: KilterResult;
 
@@ -469,6 +911,8 @@ export type ExerciseOverride = {
 
   secondaryWeightLabel?: string;
 
+  muscleLoads?: ExerciseMuscleLoad[];
+
   hidden?: boolean;
 };
 
@@ -509,6 +953,21 @@ export type AppData = {
 
   pendingBadgeNotifications:
     PendingBadgeNotification[];
+
+  /*
+   * Une entrée ici signifie :
+   *
+   * ClimbTrack a augmenté automatiquement
+   * la prescription de cet exercice mais
+   * l'utilisateur ne l'a pas encore validée
+   * une première fois.
+   *
+   * C'est cette présence qui déclenche ↗.
+   */
+  pendingAutomaticProgressions: Record<
+    string,
+    PendingAutomaticProgression
+  >;
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -595,22 +1054,51 @@ function mergeExerciseDefaults(
         ...saved,
 
         sets:
-          typeof saved.sets ===
-            "number"
-            ? Math.max(
-                0,
-                saved.sets,
-              )
-            : fallback.sets,
+          normalizePositiveNumber(
+            saved.sets,
+          ) ??
+          fallback.sets,
+
+        reps:
+          normalizePositiveNumber(
+            saved.reps,
+          ),
+
+        secondaryReps:
+          normalizePositiveNumber(
+            saved.secondaryReps,
+          ),
+
+        duration:
+          normalizePositiveNumber(
+            saved.duration,
+          ),
+
+        weight:
+          normalizePositiveNumber(
+            saved.weight,
+          ),
+
+        secondaryWeight:
+          normalizePositiveNumber(
+            saved.secondaryWeight,
+          ),
+
+        progressionValue:
+          normalizePositiveNumber(
+            saved.progressionValue,
+          ),
+
+        bandStretch:
+          normalizePositiveNumber(
+            saved.bandStretch,
+          ),
 
         restSeconds:
-          typeof saved.restSeconds ===
-            "number"
-            ? Math.max(
-                0,
-                saved.restSeconds,
-              )
-            : fallback.restSeconds,
+          normalizePositiveNumber(
+            saved.restSeconds,
+          ) ??
+          fallback.restSeconds,
       };
     },
   );
@@ -629,13 +1117,10 @@ function normalizeExerciseDefaults(
 ): ExerciseDefaults {
   return {
     sets:
-      typeof defaults?.sets ===
-        "number"
-        ? Math.max(
-            0,
-            defaults.sets,
-          )
-        : 0,
+      normalizePositiveNumber(
+        defaults?.sets,
+      ) ??
+      0,
 
     reps:
       normalizePositiveNumber(
@@ -681,13 +1166,10 @@ function normalizeExerciseDefaults(
       ),
 
     restSeconds:
-      typeof defaults?.restSeconds ===
-        "number"
-        ? Math.max(
-            0,
-            defaults.restSeconds,
-          )
-        : 0,
+      normalizePositiveNumber(
+        defaults?.restSeconds,
+      ) ??
+      0,
   };
 }
 
@@ -719,19 +1201,6 @@ function normalizeExerciseLog(
       log.exerciseId ??
       "",
 
-    /*
-     * COMPATIBILITÉ HISTORIQUE :
-     *
-     * Dans les anciennes versions, seuls les exercices
-     * réellement effectués pouvaient être présents dans
-     * exerciseLogs, et "completed" pouvait être absent.
-     *
-     * Une entrée ancienne sans completed doit donc être
-     * interprétée comme réalisée.
-     *
-     * Les nouvelles entrées utilisent explicitement
-     * true ou false.
-     */
     completed:
       typeof log.completed ===
       "boolean"
@@ -739,13 +1208,10 @@ function normalizeExerciseLog(
         : true,
 
     sets:
-      typeof log.sets ===
-        "number"
-        ? Math.max(
-            0,
-            log.sets,
-          )
-        : 0,
+      normalizePositiveNumber(
+        log.sets,
+      ) ??
+      0,
 
     reps:
       normalizePositiveNumber(
@@ -822,6 +1288,50 @@ function normalizeKilterEntry(
       entry.attempts,
     );
 
+  const grade =
+    typeof entry.grade ===
+      "number"
+      ? Math.max(
+          0,
+          Math.min(
+            17,
+            Math.round(
+              entry.grade,
+            ),
+          ),
+        )
+      : 0;
+
+  const gradeSystem:
+    KilterGradeSystem =
+      entry.gradeSystem ===
+        "font"
+        ? "font"
+        : "v";
+
+  let displayGrade:
+    string;
+
+  if (
+    typeof entry.displayGrade ===
+      "string" &&
+    entry.displayGrade.trim()
+  ) {
+    displayGrade =
+      entry.displayGrade.trim();
+  } else if (
+    gradeSystem ===
+    "font"
+  ) {
+    displayGrade =
+      getDefaultFontGradeForV(
+        grade,
+      );
+  } else {
+    displayGrade =
+      `V${grade}`;
+  }
+
   return {
     id:
       entry.id ??
@@ -839,29 +1349,17 @@ function normalizeKilterEntry(
           )
         : 30,
 
-    grade:
-      typeof entry.grade ===
-        "number"
-        ? Math.max(
-            0,
-            Math.min(
-              17,
-              Math.round(
-                entry.grade,
-              ),
-            ),
-          )
-        : 0,
+    grade,
+
+    gradeSystem,
+
+    displayGrade,
 
     result:
       validResult
         ? entry.result!
         : "travaille",
 
-    /*
-     * Une entrée Kilter enregistrée correspond
-     * forcément à au moins un essai.
-     */
     attempts:
       normalizedAttempts ===
       undefined
@@ -895,7 +1393,7 @@ function normalizeRouteClimbingEntry(
   const mode:
     RouteClimbingMode =
       entry.mode ===
-      "tete"
+        "tete"
         ? "tete"
         : "moulinette";
 
@@ -926,10 +1424,6 @@ function normalizeRouteClimbingEntry(
 
     result,
 
-    /*
-     * Même logique que pour le Kilter :
-     * une voie enregistrée représente au moins un essai.
-     */
     attempts:
       normalizedAttempts ===
       undefined
@@ -1105,11 +1599,6 @@ function normalizeSessionLog(
 
     date,
 
-    /*
-     * Pour les anciennes séances, laisser completedAt
-     * absent permet aux helpers historiques d'utiliser
-     * leur fallback à midi.
-     */
     completedAt:
       completedAtIsValid
         ? log.completedAt
@@ -1296,6 +1785,11 @@ function normalizeCustomExercise(
       normalizeStringArray(
         exercise.sessionIds,
       ) ?? [],
+
+    muscleLoads:
+      normalizeMuscleLoads(
+        exercise.muscleLoads,
+      ) ?? [],
   };
 }
 
@@ -1319,9 +1813,6 @@ function normalizeExerciseOverride(
         override.name,
       ),
 
-    /*
-     * La description peut volontairement être vide.
-     */
     description:
       typeof override.description ===
         "string"
@@ -1336,10 +1827,6 @@ function normalizeExerciseOverride(
     tracking:
       override.tracking,
 
-    /*
-     * [] est conservé :
-     * cela signifie volontairement "aucune séance".
-     */
     sessionIds:
       normalizeStringArray(
         override.sessionIds,
@@ -1407,12 +1894,139 @@ function normalizeExerciseOverride(
         override.secondaryWeightLabel,
       ),
 
+    muscleLoads:
+      Array.isArray(
+        override.muscleLoads,
+      )
+        ? (
+            normalizeMuscleLoads(
+              override.muscleLoads,
+            ) ?? []
+          )
+        : undefined,
+
     hidden:
       typeof override.hidden ===
         "boolean"
         ? override.hidden
         : undefined,
   };
+}
+
+function normalizePendingAutomaticProgressions(
+  value: unknown,
+): Record<
+  string,
+  PendingAutomaticProgression
+> {
+  if (
+    !value ||
+    typeof value !==
+      "object" ||
+    Array.isArray(
+      value,
+    )
+  ) {
+    return {};
+  }
+
+  const validFields =
+    new Set<
+      AutomaticProgressionField
+    >([
+      "sets",
+      "reps",
+      "secondaryReps",
+      "duration",
+      "weight",
+      "secondaryWeight",
+      "progressionValue",
+      "bandStretch",
+    ]);
+
+  const result: Record<
+    string,
+    PendingAutomaticProgression
+  > = {};
+
+  Object.entries(
+    value as Record<
+      string,
+      unknown
+    >,
+  ).forEach(
+    (
+      [
+        exerciseId,
+        raw,
+      ],
+    ) => {
+      if (
+        !raw ||
+        typeof raw !==
+          "object" ||
+        Array.isArray(
+          raw,
+        )
+      ) {
+        return;
+      }
+
+      const record =
+        raw as Record<
+          string,
+          unknown
+        >;
+
+      const field =
+        record.field;
+
+      const previousValue =
+        normalizePositiveNumber(
+          record.previousValue,
+        );
+
+      const targetValue =
+        normalizePositiveNumber(
+          record.targetValue,
+        );
+
+      if (
+        typeof field !==
+          "string" ||
+        !validFields.has(
+          field as AutomaticProgressionField,
+        ) ||
+        previousValue ===
+          undefined ||
+        targetValue ===
+          undefined
+      ) {
+        return;
+      }
+
+      result[
+        exerciseId
+      ] = {
+        exerciseId,
+
+        field:
+          field as AutomaticProgressionField,
+
+        previousValue,
+
+        targetValue,
+
+        createdAt:
+          typeof record.createdAt ===
+            "string"
+            ? record.createdAt
+            : new Date().toISOString(),
+      };
+    },
+  );
+
+  return result;
 }
 
 function normalizeAppData(
@@ -1512,10 +2126,6 @@ function normalizeAppData(
         ? parsed.exerciseCategoryOrder
         : {},
 
-    /*
-     * Conserver les badges historiques,
-     * y compris ceux qui ne sont plus affichés.
-     */
     earnedBadges:
       parsed.earnedBadges ??
       {},
@@ -1526,6 +2136,11 @@ function normalizeAppData(
       )
         ? parsed.pendingBadgeNotifications
         : [],
+
+    pendingAutomaticProgressions:
+      normalizePendingAutomaticProgressions(
+        parsed.pendingAutomaticProgressions,
+      ),
   };
 }
 
@@ -1577,6 +2192,9 @@ function getInitialData(): AppData {
 
     pendingBadgeNotifications:
       [],
+
+    pendingAutomaticProgressions:
+      {},
   };
 }
 
@@ -1650,25 +2268,6 @@ function recalculateEarnedBadges(
     EarnedBadgeEntry[]
   > = {};
 
-  /*
-   * ─────────────────────────────────────────────────────────────────────────
-   * 1. Recalculer TOUS les badges actuellement définis.
-   * ─────────────────────────────────────────────────────────────────────────
-   *
-   * Important :
-   *
-   * evaluateAllBadges() ne retourne pas un badge
-   * lorsqu'aucun de ses niveaux n'est actuellement
-   * débloqué.
-   *
-   * Il faut donc parcourir BADGES directement.
-   *
-   * Sinon :
-   * - un badge débloqué auparavant ;
-   * - puis rendu invalide par la suppression d'une séance ;
-   *
-   * pourrait rester enregistré à tort.
-   */
   BADGES.forEach(
     (
       badge,
@@ -1688,17 +2287,6 @@ function recalculateEarnedBadges(
           ),
         );
 
-      /*
-       * Conserver les anciennes données appartenant
-       * à un niveau qui n'existe PLUS dans ce badge.
-       *
-       * Exemple :
-       * un ancien niveau Platine enregistré avant
-       * sa suppression.
-       *
-       * Il reste ainsi dans la sauvegarde mais ne
-       * peut plus apparaître comme niveau actuel.
-       */
       const archivedEntries =
         previousEntries.filter(
           (
@@ -1709,14 +2297,6 @@ function recalculateEarnedBadges(
             ),
         );
 
-      /*
-       * Niveaux réellement justifiés par
-       * l'historique actuel.
-       *
-       * Si le badge n'apparaît pas dans
-       * evaluatedLevels, aucun niveau actuel
-       * n'est valide.
-       */
       const validCurrentLevels =
         evaluatedLevels[
           badge.id
@@ -1736,11 +2316,6 @@ function recalculateEarnedBadges(
                   level,
               );
 
-            /*
-             * Conserver la date originale
-             * lorsque le badge avait déjà
-             * été débloqué.
-             */
             return {
               level,
 
@@ -1768,17 +2343,6 @@ function recalculateEarnedBadges(
     },
   );
 
-  /*
-   * ─────────────────────────────────────────────────────────────────────────
-   * 2. Conserver les badges qui n'existent PLUS du tout.
-   * ─────────────────────────────────────────────────────────────────────────
-   *
-   * Si une future version retire complètement
-   * un badge de BADGES, ses anciennes données
-   * restent dans la sauvegarde.
-   *
-   * Elles ne sont simplement plus affichées.
-   */
   Object.entries(
     previousEarned,
   ).forEach(
@@ -1805,6 +2369,745 @@ function recalculateEarnedBadges(
   );
 
   return recalculated;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Progression helpers
+// ─────────────────────────────────────────────────────────────────────────────
+
+function getExerciseDefinition(
+  exerciseId: string,
+  data: Pick<
+    AppData,
+    | "customExercises"
+    | "exerciseOverrides"
+  >,
+): ExerciseDef | null {
+  const custom =
+    data.customExercises.find(
+      (exercise) =>
+        exercise.id ===
+        exerciseId,
+    );
+
+  if (
+    custom
+  ) {
+    return {
+      ...custom,
+
+      ...(data.exerciseOverrides[
+        exerciseId
+      ] ?? {}),
+    };
+  }
+
+  for (
+    const session of SESSIONS
+  ) {
+    const exercise =
+      session.exercises.find(
+        (candidate) =>
+          candidate.id ===
+          exerciseId,
+      );
+
+    if (
+      exercise
+    ) {
+      return {
+        ...exercise,
+
+        ...(data.exerciseOverrides[
+          exerciseId
+        ] ?? {}),
+      };
+    }
+  }
+
+  return null;
+}
+
+function trackingSupportsWeight(
+  tracking: TrackingType,
+): boolean {
+  return [
+    "weight",
+    "weight+reps",
+    "weight+duration",
+    "dual-reps+dual-weight",
+    "dual-reps+weight",
+    "weight+reps+duration",
+    "variant+weight+duration",
+  ].includes(
+    tracking,
+  );
+}
+
+function trackingSupportsReps(
+  tracking: TrackingType,
+): boolean {
+  return [
+    "reps",
+    "weight+reps",
+    "assistance",
+    "dual-reps+dual-weight",
+    "dual-reps+weight",
+    "reps+duration",
+    "weight+reps+duration",
+    "variant+reps",
+  ].includes(
+    tracking,
+  );
+}
+
+function trackingSupportsDuration(
+  tracking: TrackingType,
+): boolean {
+  return [
+    "duration",
+    "duration+assistance",
+    "weight+duration",
+    "duration+band",
+    "reps+duration",
+    "weight+reps+duration",
+    "variant+weight+duration",
+    "assistance",
+  ].includes(
+    tracking,
+  );
+}
+
+type ExerciseOccurrence = {
+  session:
+    SessionLog;
+
+  exercise:
+    ExerciseLog;
+};
+
+function getExerciseOccurrences(
+  logs: SessionLog[],
+  exerciseId: string,
+): ExerciseOccurrence[] {
+  return [
+    ...logs,
+  ]
+    .sort(
+      (
+        first,
+        second,
+      ) =>
+        getSessionTimestamp(
+          second,
+        ) -
+        getSessionTimestamp(
+          first,
+        ),
+    )
+    .flatMap(
+      (session) => {
+        const exercise =
+          session.exerciseLogs.find(
+            (candidate) =>
+              candidate.exerciseId ===
+              exerciseId,
+          );
+
+        if (
+          !exercise
+        ) {
+          return [];
+        }
+
+        return [
+          {
+            session,
+            exercise,
+          },
+        ];
+      },
+    );
+}
+
+function getProgressionField(
+  exercise: ExerciseDef,
+  defaults: ExerciseDefaults,
+): AutomaticProgressionField {
+  /*
+   * Priorité :
+   *
+   * 1. Charge
+   * 2. Répétitions
+   * 3. Durée
+   * 4. Valeur spécifique
+   * 5. Étirement d'élastique
+   * 6. Séries
+   *
+   * Ainsi un développé couché progressera d'abord
+   * en kg, tandis qu'une planche progressera en durée.
+   */
+  if (
+    trackingSupportsWeight(
+      exercise.tracking,
+    ) &&
+    typeof defaults.weight ===
+      "number"
+  ) {
+    return "weight";
+  }
+
+  if (
+    trackingSupportsReps(
+      exercise.tracking,
+    ) &&
+    typeof defaults.reps ===
+      "number"
+  ) {
+    return "reps";
+  }
+
+  if (
+    trackingSupportsDuration(
+      exercise.tracking,
+    ) &&
+    typeof defaults.duration ===
+      "number"
+  ) {
+    return "duration";
+  }
+
+  if (
+    typeof defaults.progressionValue ===
+      "number"
+  ) {
+    return "progressionValue";
+  }
+
+  if (
+    typeof defaults.bandStretch ===
+      "number"
+  ) {
+    return "bandStretch";
+  }
+
+  return "sets";
+}
+
+function getExerciseLogNumericValue(
+  log: ExerciseLog,
+  field: AutomaticProgressionField,
+): number | undefined {
+  if (
+    field ===
+    "sets"
+  ) {
+    return log.sets;
+  }
+
+  return log[
+    field
+  ] as
+    | number
+    | undefined;
+}
+
+function getDefaultNumericValue(
+  defaults: ExerciseDefaults,
+  field: AutomaticProgressionField,
+): number | undefined {
+  if (
+    field ===
+    "sets"
+  ) {
+    return defaults.sets;
+  }
+
+  return defaults[
+    field
+  ] as
+    | number
+    | undefined;
+}
+
+function getNextProgressionValue(
+  field: AutomaticProgressionField,
+  current: number,
+): number {
+  if (
+    field ===
+      "weight" ||
+    field ===
+      "secondaryWeight"
+  ) {
+    return roundToQuarter(
+      current +
+        2.5,
+    );
+  }
+
+  if (
+    field ===
+      "duration"
+  ) {
+    return (
+      current +
+      5
+    );
+  }
+
+  if (
+    field ===
+      "bandStretch"
+  ) {
+    return roundToQuarter(
+      current +
+        0.25,
+    );
+  }
+
+  /*
+   * Reps, séries et valeurs de progression :
+   * +1 unité.
+   */
+  return (
+    current +
+    1
+  );
+}
+
+function logMatchesProgressionTarget(
+  log: ExerciseLog,
+  progression: PendingAutomaticProgression,
+): boolean {
+  const value =
+    getExerciseLogNumericValue(
+      log,
+      progression.field,
+    );
+
+  return numbersEqual(
+    value,
+    progression.targetValue,
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Apprentissage silencieux du poids
+// ─────────────────────────────────────────────────────────────────────────────
+
+const WEIGHT_LEARNING_TOLERANCE_KG =
+  1.5;
+
+function getLearnedWeightCandidate(
+  logs: SessionLog[],
+  exerciseId: string,
+): number | null {
+  const weights =
+    getExerciseOccurrences(
+      logs,
+      exerciseId,
+    )
+      .filter(
+        (
+          occurrence,
+        ) =>
+          occurrence.exercise.completed ===
+          true,
+      )
+      .map(
+        (
+          occurrence,
+        ) =>
+          occurrence.exercise.weight,
+      )
+      .filter(
+        (
+          weight,
+        ): weight is number =>
+          typeof weight ===
+            "number" &&
+          Number.isFinite(
+            weight,
+          ),
+      )
+      .slice(
+        0,
+        3,
+      );
+
+  if (
+    weights.length <
+    2
+  ) {
+    return null;
+  }
+
+  const newest =
+    weights[0];
+
+  const second =
+    weights[1];
+
+  /*
+   * Cas normal :
+   *
+   * 12 / 12       → 12
+   * 11 / 12       → 11
+   * 12 / 12,5     → 12
+   *
+   * Quand les deux sont proches,
+   * on prend volontairement la plus basse.
+   */
+  if (
+    Math.abs(
+      newest -
+        second,
+    ) <=
+    WEIGHT_LEARNING_TOLERANCE_KG
+  ) {
+    return roundToQuarter(
+      Math.min(
+        newest,
+        second,
+      ),
+    );
+  }
+
+  /*
+   * Si les deux dernières valeurs sont trop éloignées,
+   * on attend la troisième occurrence.
+   *
+   * 10 → 12 → 10
+   * récent = 10, 12, 10
+   * => 10 cohérent avec l'ancien 10.
+   *
+   * 10 → 12 → 12
+   * récent = 12, 12, 10
+   * => le premier test ci-dessus donne 12.
+   */
+  const third =
+    weights[2];
+
+  if (
+    typeof third ===
+      "number" &&
+    Math.abs(
+      newest -
+        third,
+    ) <=
+      WEIGHT_LEARNING_TOLERANCE_KG
+  ) {
+    return roundToQuarter(
+      Math.min(
+        newest,
+        third,
+      ),
+    );
+  }
+
+  return null;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Application progression + apprentissage
+// ─────────────────────────────────────────────────────────────────────────────
+
+function processExerciseAdaptations(
+  previous: AppData,
+  normalizedLog: SessionLog,
+): {
+  exerciseDefaults: Record<
+    string,
+    ExerciseDefaults
+  >;
+
+  pendingAutomaticProgressions: Record<
+    string,
+    PendingAutomaticProgression
+  >;
+} {
+  const exerciseDefaults = {
+    ...previous.exerciseDefaults,
+  };
+
+  const pendingAutomaticProgressions = {
+    ...previous.pendingAutomaticProgressions,
+  };
+
+  /*
+   * Inclure la séance qui vient d'être enregistrée
+   * dans l'historique utilisé pour les décisions.
+   */
+  const allLogs = [
+    ...previous.sessionLogs,
+    normalizedLog,
+  ];
+
+  normalizedLog.exerciseLogs.forEach(
+    (
+      currentExerciseLog,
+    ) => {
+      if (
+        !currentExerciseLog.exerciseId
+      ) {
+        return;
+      }
+
+      const exerciseId =
+        currentExerciseLog.exerciseId;
+
+      const pending =
+        pendingAutomaticProgressions[
+          exerciseId
+        ];
+
+      // ───────────────────────────────────────────────────────────────────────
+      // 1. Validation d'une progression déjà proposée
+      // ───────────────────────────────────────────────────────────────────────
+
+      if (
+        pending
+      ) {
+        if (
+          currentExerciseLog.completed &&
+          logMatchesProgressionTarget(
+            currentExerciseLog,
+            pending,
+          )
+        ) {
+          /*
+           * Première réussite avec le nouvel objectif :
+           * la flèche disparaît.
+           *
+           * On ne crée PAS immédiatement une nouvelle
+           * progression durant la même sauvegarde.
+           */
+          delete pendingAutomaticProgressions[
+            exerciseId
+          ];
+        }
+
+        /*
+         * Tant qu'une progression automatique est
+         * en attente, l'apprentissage manuel du poids
+         * est suspendu pour éviter les conflits.
+         */
+        return;
+      }
+
+      if (
+        !currentExerciseLog.completed
+      ) {
+        return;
+      }
+
+      const exercise =
+        getExerciseDefinition(
+          exerciseId,
+          previous,
+        );
+
+      if (
+        !exercise
+      ) {
+        return;
+      }
+
+      const currentDefaults =
+        exerciseDefaults[
+          exerciseId
+        ] ?? {
+          ...exercise.defaultValues,
+        };
+
+      // ───────────────────────────────────────────────────────────────────────
+      // 2. Apprentissage silencieux du poids
+      // ───────────────────────────────────────────────────────────────────────
+
+      if (
+        trackingSupportsWeight(
+          exercise.tracking,
+        ) &&
+        typeof currentExerciseLog.weight ===
+          "number"
+      ) {
+        const learnedWeight =
+          getLearnedWeightCandidate(
+            allLogs,
+            exerciseId,
+          );
+
+        if (
+          learnedWeight !==
+            null &&
+          !numbersEqual(
+            learnedWeight,
+            currentDefaults.weight,
+          )
+        ) {
+          exerciseDefaults[
+            exerciseId
+          ] = {
+            ...currentDefaults,
+
+            weight:
+              learnedWeight,
+          };
+
+          /*
+           * IMPORTANT :
+           *
+           * Un default appris silencieusement
+           * ne doit jamais créer la flèche verte.
+           *
+           * On arrête donc ici pour cet exercice.
+           */
+          return;
+        }
+      }
+
+      // ───────────────────────────────────────────────────────────────────────
+      // 3. Prévention : aucune progression automatique
+      // ───────────────────────────────────────────────────────────────────────
+
+      if (
+        normalizedLog.sessionId ===
+        "s7-prevention"
+      ) {
+        return;
+      }
+
+      // ───────────────────────────────────────────────────────────────────────
+      // 4. Vérifier deux réussites CONSÉCUTIVES
+      // ───────────────────────────────────────────────────────────────────────
+
+      const occurrences =
+        getExerciseOccurrences(
+          allLogs,
+          exerciseId,
+        );
+
+      if (
+        occurrences.length <
+        2
+      ) {
+        return;
+      }
+
+      const latest =
+        occurrences[0]
+          .exercise;
+
+      const previousOccurrence =
+        occurrences[1]
+          .exercise;
+
+      /*
+       * "Deux fois de suite" signifie vraiment
+       * deux occurrences consécutives de l'exercice.
+       *
+       * Si l'une des deux n'a pas été réalisée,
+       * la série est cassée.
+       */
+      if (
+        !latest.completed ||
+        !previousOccurrence.completed
+      ) {
+        return;
+      }
+
+      const field =
+        getProgressionField(
+          exercise,
+          currentDefaults,
+        );
+
+      const currentTarget =
+        getDefaultNumericValue(
+          currentDefaults,
+          field,
+        );
+
+      if (
+        typeof currentTarget !==
+        "number"
+      ) {
+        return;
+      }
+
+      const latestValue =
+        getExerciseLogNumericValue(
+          latest,
+          field,
+        );
+
+      const previousValue =
+        getExerciseLogNumericValue(
+          previousOccurrence,
+          field,
+        );
+
+      /*
+       * Les deux réussites doivent correspondre
+       * à la prescription actuelle.
+       *
+       * Si l'utilisateur a modifié librement une valeur,
+       * on évite de considérer automatiquement cela
+       * comme deux validations du même objectif.
+       */
+      if (
+        !numbersEqual(
+          latestValue,
+          currentTarget,
+        ) ||
+        !numbersEqual(
+          previousValue,
+          currentTarget,
+        )
+      ) {
+        return;
+      }
+
+      const nextValue =
+        getNextProgressionValue(
+          field,
+          currentTarget,
+        );
+
+      exerciseDefaults[
+        exerciseId
+      ] = {
+        ...currentDefaults,
+
+        [field]:
+          nextValue,
+      };
+
+      pendingAutomaticProgressions[
+        exerciseId
+      ] = {
+        exerciseId,
+
+        field,
+
+        previousValue:
+          currentTarget,
+
+        targetValue:
+          nextValue,
+
+        createdAt:
+          new Date().toISOString(),
+      };
+    },
+  );
+
+  return {
+    exerciseDefaults,
+
+    pendingAutomaticProgressions,
+  };
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1927,9 +3230,6 @@ export function ClimbTrackProvider({
       getInitialData,
     );
 
-  /*
-   * Recalculer les badges au chargement.
-   */
   useEffect(
     () => {
       setData(
@@ -1995,6 +3295,12 @@ export function ClimbTrackProvider({
                   ),
               });
 
+            const adaptations =
+              processExerciseAdaptations(
+                previous,
+                normalizedLog,
+              );
+
             const newLogs = [
               ...previous.sessionLogs,
               normalizedLog,
@@ -2015,6 +3321,12 @@ export function ClimbTrackProvider({
 
               sessionLogs:
                 newLogs,
+
+              exerciseDefaults:
+                adaptations.exerciseDefaults,
+
+              pendingAutomaticProgressions:
+                adaptations.pendingAutomaticProgressions,
 
               earnedBadges,
 
@@ -2159,6 +3471,20 @@ export function ClimbTrackProvider({
                 restSeconds: 0,
               };
 
+            const updatedPending = {
+              ...previous.pendingAutomaticProgressions,
+            };
+
+            /*
+             * Une modification manuelle des valeurs par défaut
+             * annule l'indicateur de progression automatique.
+             *
+             * Le changement manuel lui-même n'affiche jamais ↗.
+             */
+            delete updatedPending[
+              exerciseId
+            ];
+
             return {
               ...previous,
 
@@ -2188,6 +3514,9 @@ export function ClimbTrackProvider({
                       : currentDefaults.restSeconds,
                 },
               },
+
+              pendingAutomaticProgressions:
+                updatedPending,
             };
           },
         );
@@ -2230,6 +3559,9 @@ export function ClimbTrackProvider({
                 ...builtInDefaults,
                 ...customDefaults,
               },
+
+              pendingAutomaticProgressions:
+                {},
             };
           },
         );
@@ -2325,6 +3657,13 @@ export function ClimbTrackProvider({
                     ...exercise.sessionIds,
                   ]
                 : [],
+
+            muscleLoads:
+              exercise.muscleLoads
+                ? [
+                    ...exercise.muscleLoads,
+                  ]
+                : [],
           });
 
         setData(
@@ -2354,12 +3693,6 @@ export function ClimbTrackProvider({
       (
         id: string,
       ) => {
-        /*
-         * Masquer uniquement.
-         *
-         * Les logs, defaults et ID historiques
-         * restent dans la sauvegarde.
-         */
         setData(
           (previous) => ({
             ...previous,
@@ -2978,6 +4311,9 @@ export function ClimbTrackProvider({
 
           pendingBadgeNotifications:
             [],
+
+          pendingAutomaticProgressions:
+            {},
         });
       },
       [],

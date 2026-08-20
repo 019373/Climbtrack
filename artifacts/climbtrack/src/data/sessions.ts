@@ -3,6 +3,10 @@ import type {
   ResistanceBandColor,
 } from "../context/ClimbTrackContext";
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Suivi des exercices
+// ─────────────────────────────────────────────────────────────────────────────
+
 export type TrackingType =
   | "duration+assistance"
   | "reps"
@@ -20,6 +24,548 @@ export type TrackingType =
   | "variant+weight+duration"
   | "variant+reps";
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Muscles
+// ─────────────────────────────────────────────────────────────────────────────
+
+export type MuscleIntensity =
+  | "low"
+  | "medium"
+  | "high";
+
+export type RecoveryMuscleGroup =
+  | "doigts"
+  | "avant-bras"
+  | "biceps"
+  | "triceps"
+  | "epaules"
+  | "pectoraux"
+  | "dorsaux"
+  | "lombaires"
+  | "abdominaux"
+  | "obliques"
+  | "fessiers"
+  | "quadriceps"
+  | "ischios"
+  | "adducteurs"
+  | "mollets"
+  | "tibial"
+  | "hanches"
+  | "pieds";
+
+export type MuscleRegion =
+  | "main"
+  | "avant-bras"
+  | "bras"
+  | "epaule"
+  | "poitrine"
+  | "dos"
+  | "tronc"
+  | "hanche"
+  | "cuisse"
+  | "jambe"
+  | "pied";
+
+export type MuscleId =
+  | "flechisseurs-doigts"
+  | "extenseurs-doigts"
+  | "thenar"
+  | "hypothenar"
+  | "interosseux-main"
+  | "lumbricaux-main"
+
+  | "flechisseurs-poignet"
+  | "extenseurs-poignet"
+  | "brachioradial"
+  | "pronateur-rond"
+  | "pronateur-carre"
+  | "supinateur"
+
+  | "biceps-brachial"
+  | "brachial"
+  | "coraco-brachial"
+  | "triceps-brachial"
+
+  | "deltoide-anterieur"
+  | "deltoide-lateral"
+  | "deltoide-posterieur"
+  | "supra-epineux"
+  | "infra-epineux"
+  | "petit-rond"
+  | "sous-scapulaire"
+
+  | "grand-pectoral-claviculaire"
+  | "grand-pectoral-sternal"
+  | "petit-pectoral"
+  | "dentelé-anterieur"
+
+  | "grand-dorsal"
+  | "grand-rond"
+  | "trapeze-superieur"
+  | "trapeze-moyen"
+  | "trapeze-inferieur"
+  | "rhomboide-majeur"
+  | "rhomboide-mineur"
+
+  | "erecteurs-rachis"
+  | "multifides"
+  | "carre-lombes"
+  | "droit-abdomen"
+  | "oblique-externe"
+  | "oblique-interne"
+  | "transverse-abdomen"
+
+  | "grand-fessier"
+  | "moyen-fessier"
+  | "petit-fessier"
+  | "ilio-psoas"
+  | "tenseur-fascia-lata"
+  | "sartorius"
+
+  | "pectine"
+  | "long-adducteur"
+  | "court-adducteur"
+  | "grand-adducteur"
+  | "gracile"
+
+  | "droit-femoral"
+  | "vaste-lateral"
+  | "vaste-medial"
+  | "vaste-intermediaire"
+
+  | "biceps-femoral"
+  | "semi-tendineux"
+  | "semi-membraneux"
+
+  | "gastrocnemien"
+  | "soleaire"
+  | "tibial-anterieur"
+  | "tibial-posterieur"
+  | "fibulaires"
+
+  | "intrinseques-pied";
+
+export interface MuscleDefinition {
+  id: MuscleId;
+  label: string;
+  region: MuscleRegion;
+  recoveryGroup: RecoveryMuscleGroup;
+}
+
+export interface ExerciseMuscleLoad {
+  muscleId: MuscleId;
+  intensity: MuscleIntensity;
+}
+
+export const MUSCLE_CATALOG: MuscleDefinition[] = [
+  {
+    id: "flechisseurs-doigts",
+    label: "Fléchisseurs des doigts",
+    region: "main",
+    recoveryGroup: "doigts",
+  },
+  {
+    id: "extenseurs-doigts",
+    label: "Extenseurs des doigts",
+    region: "main",
+    recoveryGroup: "doigts",
+  },
+  {
+    id: "thenar",
+    label: "Éminence thénar",
+    region: "main",
+    recoveryGroup: "doigts",
+  },
+  {
+    id: "hypothenar",
+    label: "Éminence hypothénar",
+    region: "main",
+    recoveryGroup: "doigts",
+  },
+  {
+    id: "interosseux-main",
+    label: "Interosseux de la main",
+    region: "main",
+    recoveryGroup: "doigts",
+  },
+  {
+    id: "lumbricaux-main",
+    label: "Lombricaux de la main",
+    region: "main",
+    recoveryGroup: "doigts",
+  },
+
+  {
+    id: "flechisseurs-poignet",
+    label: "Fléchisseurs du poignet",
+    region: "avant-bras",
+    recoveryGroup: "avant-bras",
+  },
+  {
+    id: "extenseurs-poignet",
+    label: "Extenseurs du poignet",
+    region: "avant-bras",
+    recoveryGroup: "avant-bras",
+  },
+  {
+    id: "brachioradial",
+    label: "Brachio-radial",
+    region: "avant-bras",
+    recoveryGroup: "avant-bras",
+  },
+  {
+    id: "pronateur-rond",
+    label: "Pronateur rond",
+    region: "avant-bras",
+    recoveryGroup: "avant-bras",
+  },
+  {
+    id: "pronateur-carre",
+    label: "Pronateur carré",
+    region: "avant-bras",
+    recoveryGroup: "avant-bras",
+  },
+  {
+    id: "supinateur",
+    label: "Supinateur",
+    region: "avant-bras",
+    recoveryGroup: "avant-bras",
+  },
+
+  {
+    id: "biceps-brachial",
+    label: "Biceps brachial",
+    region: "bras",
+    recoveryGroup: "biceps",
+  },
+  {
+    id: "brachial",
+    label: "Brachial",
+    region: "bras",
+    recoveryGroup: "biceps",
+  },
+  {
+    id: "coraco-brachial",
+    label: "Coraco-brachial",
+    region: "bras",
+    recoveryGroup: "biceps",
+  },
+  {
+    id: "triceps-brachial",
+    label: "Triceps brachial",
+    region: "bras",
+    recoveryGroup: "triceps",
+  },
+
+  {
+    id: "deltoide-anterieur",
+    label: "Deltoïde antérieur",
+    region: "epaule",
+    recoveryGroup: "epaules",
+  },
+  {
+    id: "deltoide-lateral",
+    label: "Deltoïde latéral",
+    region: "epaule",
+    recoveryGroup: "epaules",
+  },
+  {
+    id: "deltoide-posterieur",
+    label: "Deltoïde postérieur",
+    region: "epaule",
+    recoveryGroup: "epaules",
+  },
+  {
+    id: "supra-epineux",
+    label: "Supra-épineux",
+    region: "epaule",
+    recoveryGroup: "epaules",
+  },
+  {
+    id: "infra-epineux",
+    label: "Infra-épineux",
+    region: "epaule",
+    recoveryGroup: "epaules",
+  },
+  {
+    id: "petit-rond",
+    label: "Petit rond",
+    region: "epaule",
+    recoveryGroup: "epaules",
+  },
+  {
+    id: "sous-scapulaire",
+    label: "Sous-scapulaire",
+    region: "epaule",
+    recoveryGroup: "epaules",
+  },
+
+  {
+    id: "grand-pectoral-claviculaire",
+    label: "Grand pectoral — portion claviculaire",
+    region: "poitrine",
+    recoveryGroup: "pectoraux",
+  },
+  {
+    id: "grand-pectoral-sternal",
+    label: "Grand pectoral — portion sternale",
+    region: "poitrine",
+    recoveryGroup: "pectoraux",
+  },
+  {
+    id: "petit-pectoral",
+    label: "Petit pectoral",
+    region: "poitrine",
+    recoveryGroup: "pectoraux",
+  },
+  {
+    id: "dentelé-anterieur",
+    label: "Dentelé antérieur",
+    region: "poitrine",
+    recoveryGroup: "pectoraux",
+  },
+
+  {
+    id: "grand-dorsal",
+    label: "Grand dorsal",
+    region: "dos",
+    recoveryGroup: "dorsaux",
+  },
+  {
+    id: "grand-rond",
+    label: "Grand rond",
+    region: "dos",
+    recoveryGroup: "dorsaux",
+  },
+  {
+    id: "trapeze-superieur",
+    label: "Trapèze supérieur",
+    region: "dos",
+    recoveryGroup: "dorsaux",
+  },
+  {
+    id: "trapeze-moyen",
+    label: "Trapèze moyen",
+    region: "dos",
+    recoveryGroup: "dorsaux",
+  },
+  {
+    id: "trapeze-inferieur",
+    label: "Trapèze inférieur",
+    region: "dos",
+    recoveryGroup: "dorsaux",
+  },
+  {
+    id: "rhomboide-majeur",
+    label: "Rhomboïde majeur",
+    region: "dos",
+    recoveryGroup: "dorsaux",
+  },
+  {
+    id: "rhomboide-mineur",
+    label: "Rhomboïde mineur",
+    region: "dos",
+    recoveryGroup: "dorsaux",
+  },
+
+  {
+    id: "erecteurs-rachis",
+    label: "Érecteurs du rachis",
+    region: "tronc",
+    recoveryGroup: "lombaires",
+  },
+  {
+    id: "multifides",
+    label: "Multifides",
+    region: "tronc",
+    recoveryGroup: "lombaires",
+  },
+  {
+    id: "carre-lombes",
+    label: "Carré des lombes",
+    region: "tronc",
+    recoveryGroup: "lombaires",
+  },
+  {
+    id: "droit-abdomen",
+    label: "Droit de l’abdomen",
+    region: "tronc",
+    recoveryGroup: "abdominaux",
+  },
+  {
+    id: "oblique-externe",
+    label: "Oblique externe",
+    region: "tronc",
+    recoveryGroup: "obliques",
+  },
+  {
+    id: "oblique-interne",
+    label: "Oblique interne",
+    region: "tronc",
+    recoveryGroup: "obliques",
+  },
+  {
+    id: "transverse-abdomen",
+    label: "Transverse de l’abdomen",
+    region: "tronc",
+    recoveryGroup: "abdominaux",
+  },
+
+  {
+    id: "grand-fessier",
+    label: "Grand fessier",
+    region: "hanche",
+    recoveryGroup: "fessiers",
+  },
+  {
+    id: "moyen-fessier",
+    label: "Moyen fessier",
+    region: "hanche",
+    recoveryGroup: "fessiers",
+  },
+  {
+    id: "petit-fessier",
+    label: "Petit fessier",
+    region: "hanche",
+    recoveryGroup: "fessiers",
+  },
+  {
+    id: "ilio-psoas",
+    label: "Ilio-psoas",
+    region: "hanche",
+    recoveryGroup: "hanches",
+  },
+  {
+    id: "tenseur-fascia-lata",
+    label: "Tenseur du fascia lata",
+    region: "hanche",
+    recoveryGroup: "hanches",
+  },
+  {
+    id: "sartorius",
+    label: "Sartorius",
+    region: "cuisse",
+    recoveryGroup: "hanches",
+  },
+
+  {
+    id: "pectine",
+    label: "Pectiné",
+    region: "cuisse",
+    recoveryGroup: "adducteurs",
+  },
+  {
+    id: "long-adducteur",
+    label: "Long adducteur",
+    region: "cuisse",
+    recoveryGroup: "adducteurs",
+  },
+  {
+    id: "court-adducteur",
+    label: "Court adducteur",
+    region: "cuisse",
+    recoveryGroup: "adducteurs",
+  },
+  {
+    id: "grand-adducteur",
+    label: "Grand adducteur",
+    region: "cuisse",
+    recoveryGroup: "adducteurs",
+  },
+  {
+    id: "gracile",
+    label: "Gracile",
+    region: "cuisse",
+    recoveryGroup: "adducteurs",
+  },
+
+  {
+    id: "droit-femoral",
+    label: "Droit fémoral",
+    region: "cuisse",
+    recoveryGroup: "quadriceps",
+  },
+  {
+    id: "vaste-lateral",
+    label: "Vaste latéral",
+    region: "cuisse",
+    recoveryGroup: "quadriceps",
+  },
+  {
+    id: "vaste-medial",
+    label: "Vaste médial",
+    region: "cuisse",
+    recoveryGroup: "quadriceps",
+  },
+  {
+    id: "vaste-intermediaire",
+    label: "Vaste intermédiaire",
+    region: "cuisse",
+    recoveryGroup: "quadriceps",
+  },
+
+  {
+    id: "biceps-femoral",
+    label: "Biceps fémoral",
+    region: "cuisse",
+    recoveryGroup: "ischios",
+  },
+  {
+    id: "semi-tendineux",
+    label: "Semi-tendineux",
+    region: "cuisse",
+    recoveryGroup: "ischios",
+  },
+  {
+    id: "semi-membraneux",
+    label: "Semi-membraneux",
+    region: "cuisse",
+    recoveryGroup: "ischios",
+  },
+
+  {
+    id: "gastrocnemien",
+    label: "Gastrocnémien",
+    region: "jambe",
+    recoveryGroup: "mollets",
+  },
+  {
+    id: "soleaire",
+    label: "Soléaire",
+    region: "jambe",
+    recoveryGroup: "mollets",
+  },
+  {
+    id: "tibial-anterieur",
+    label: "Tibial antérieur",
+    region: "jambe",
+    recoveryGroup: "tibial",
+  },
+  {
+    id: "tibial-posterieur",
+    label: "Tibial postérieur",
+    region: "jambe",
+    recoveryGroup: "mollets",
+  },
+  {
+    id: "fibulaires",
+    label: "Fibulaires",
+    region: "jambe",
+    recoveryGroup: "mollets",
+  },
+
+  {
+    id: "intrinseques-pied",
+    label: "Muscles intrinsèques du pied",
+    region: "pied",
+    recoveryGroup: "pieds",
+  },
+];
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Exercices / séances
+// ─────────────────────────────────────────────────────────────────────────────
+
 export interface ExerciseDef {
   id: string;
   name: string;
@@ -27,17 +573,22 @@ export interface ExerciseDef {
   category: string;
   tracking: TrackingType;
   defaultValues: ExerciseDefaults;
+
   assistanceOptions?: string[];
   isHangboard?: boolean;
   variantOptions?: string[];
   bandOptions?: ResistanceBandColor[];
   totalWeight?: boolean;
   perSide?: boolean;
+
   primaryRepsLabel?: string;
   secondaryRepsLabel?: string;
   primaryWeightLabel?: string;
   secondaryWeightLabel?: string;
+
   sessionIds?: string[];
+
+  muscleLoads?: ExerciseMuscleLoad[];
 }
 
 export interface SessionDef {
@@ -46,6 +597,10 @@ export interface SessionDef {
   moment: string;
   exercises: ExerciseDef[];
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Options
+// ─────────────────────────────────────────────────────────────────────────────
 
 export const ASSISTANCE_OPTIONS = [
   "Deux pieds au sol, appui fort",
@@ -105,47 +660,45 @@ export const SLOPER_ANGLES = [
   43,
 ] as const;
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Séances
+// ─────────────────────────────────────────────────────────────────────────────
+
 export const SESSIONS: SessionDef[] = [
+  // ── Force doigts ────────────────────────────────────────────────────────────
+
   {
     id: "s1-force-doigts",
-    name: "FORCE DOIGTS / PUISSANCE",
-    moment:
-      "À réaliser avant la grimpe, après 20 à 30 minutes d’échauffement facile.",
-
+    name: "Force doigts",
+    moment: "Force maximale · doigts · puissance",
     exercises: [
       {
         id: "suspension-20mm",
-        name: "Suspension semi-arche 20 mm",
+        name: "Suspension 20 mm",
         description:
-          "Se suspendre en semi-arche sur une réglette de 20 mm. Garder les épaules engagées et arrêter en cas de douleur vive aux doigts.",
-        category: "Suspensions",
+          "Suspension contrôlée sur réglette de 20 mm. Garder les épaules actives et arrêter en cas de douleur aux doigts.",
+        category: "Doigts",
         tracking: "duration+assistance",
         isHangboard: true,
-
         defaultValues: {
-          sets: 5,
+          sets: 6,
           duration: 10,
+          assistance: "Sans assistance",
           restSeconds: 180,
-          assistance:
-            "Deux pieds au sol, appui moyen",
         },
-
-        assistanceOptions:
-          ASSISTANCE_OPTIONS,
       },
 
       {
         id: "suspension-slopers",
-        name: "Suspensions sur plats",
+        name: "Suspension sur plats",
         description:
-          "Se suspendre sur les plats à 35°, 38° ou 43°. Garder les doigts ouverts, les épaules engagées et les bras presque tendus.",
-        category: "Suspensions",
+          "Suspensions sur plats avec inclinaison progressive.",
+        category: "Doigts",
         tracking: "duration",
         isHangboard: true,
-
         defaultValues: {
           sets: 6,
-          duration: 10,
+          duration: 15,
           progressionValue: 35,
           restSeconds: 150,
         },
@@ -153,161 +706,121 @@ export const SESSIONS: SessionDef[] = [
 
       {
         id: "sauts-prise",
-        name: "Croisé dynamique — grandes prises",
+        name: "Sauts sur prise",
         description:
-          "Partir d’une grande prise puis réaliser un mouvement croisé explosif vers une prise plus haute. Travailler séparément la main gauche et la main droite.",
-        category: "Préhension",
-        tracking: "variant+reps",
-
-        variantOptions: [
-          "Pieds sur le mur",
-          "Pieds libres",
-        ],
-
+          "Mouvement dynamique explosif vers une prise cible. Noter séparément le meilleur résultat gauche et droite.",
+        category: "Puissance",
+        tracking: "reps",
         defaultValues: {
           sets: 5,
           reps: 3,
-          restSeconds: 60,
+          restSeconds: 150,
         },
       },
 
       {
         id: "croise-dynamique-19-30",
-        name: "Croisé dynamique — prises 19/30",
+        name: "Croisé dynamique 19 → 30",
         description:
-          "Partir d’une grande prise et attraper dynamiquement une petite prise 19/30 située environ cinq prises plus haut. Commencer avec les pieds sur le mur.",
-        category: "Préhension",
-        tracking: "variant+reps",
-
-        variantOptions: [
-          "Pieds sur le mur",
-          "Pieds libres",
-        ],
-
+          "Croisé dynamique vers une prise cible. Prioriser la qualité du mouvement et la précision.",
+        category: "Puissance",
+        tracking: "reps",
         defaultValues: {
-          sets: 3,
+          sets: 5,
           reps: 3,
           progressionValue: 5,
-          restSeconds: 120,
+          restSeconds: 150,
         },
       },
 
       {
         id: "lourd-leger",
-        name: "Tractions lourd-léger",
+        name: "Lourd / léger",
         description:
-          "Réaliser 3 tractions lourdes, puis immédiatement 3 tractions légères et explosives. Enregistrer séparément les deux charges.",
-        category: "Tractions",
-        tracking:
-          "dual-reps+dual-weight",
-
-        primaryRepsLabel:
-          "Répétitions lourdes",
-
-        secondaryRepsLabel:
-          "Répétitions légères",
-
-        primaryWeightLabel:
-          "Charge lourde ajoutée",
-
-        secondaryWeightLabel:
-          "Charge légère ajoutée",
-
+          "Alterner une série lourde et une série plus légère en conservant une exécution explosive.",
+        category: "Dos",
+        tracking: "dual-reps+dual-weight",
+        primaryRepsLabel: "Répétitions lourdes",
+        secondaryRepsLabel: "Répétitions légères",
+        primaryWeightLabel: "Charge lourde (kg)",
+        secondaryWeightLabel: "Charge légère (kg)",
         defaultValues: {
-          sets: 3,
+          sets: 4,
           reps: 3,
-          secondaryReps: 3,
-          weight: 10,
-          secondaryWeight: 0,
+          secondaryReps: 5,
+          weight: 20,
+          secondaryWeight: 10,
           restSeconds: 180,
         },
       },
 
       {
         id: "pince-disque",
-        name: "Petite pince avec poids suspendu",
+        name: "Pince disque",
         description:
-          "Pincer la petite prise avec le pouce et les doigts pendant que le poids reste suspendu. Enregistrer la charge totale attachée.",
-        category: "Préhension",
-        tracking:
-          "variant+weight+duration",
-        totalWeight: true,
-
-        variantOptions: [
-          "Petite pince",
-        ],
-
+          "Tenir un disque en pince avec le pouce opposé aux doigts.",
+        category: "Doigts",
+        tracking: "weight+duration",
+        perSide: true,
         defaultValues: {
-          sets: 3,
-          weight: 2.5,
-          duration: 15,
-          restSeconds: 150,
+          sets: 4,
+          weight: 15,
+          duration: 10,
+          restSeconds: 120,
         },
       },
 
       {
         id: "pince-large",
-        name: "Grande pince avec poids suspendu",
+        name: "Pince large",
         description:
-          "Pincer la grande prise avec le pouce et les doigts pendant que le poids reste suspendu. Suivre séparément la progression de chaque taille de pince.",
-        category: "Préhension",
-        tracking:
-          "variant+weight+duration",
-        totalWeight: true,
-
-        variantOptions: [
-          "Grande pince",
-        ],
-
+          "Travail de pince large et de force du pouce.",
+        category: "Doigts",
+        tracking: "weight+duration",
+        perSide: true,
         defaultValues: {
-          sets: 3,
-          weight: 5,
-          duration: 15,
-          restSeconds: 150,
+          sets: 4,
+          weight: 10,
+          duration: 10,
+          restSeconds: 120,
         },
       },
     ],
   },
 
+  // ── Résistance ──────────────────────────────────────────────────────────────
+
   {
     id: "s2-resistance",
-    name: "RÉSISTANCE MUSCULAIRE",
-    moment:
-      "À réaliser après la grimpe ou comme séance principale sans blocs très difficiles.",
-
+    name: "Résistance",
+    moment: "Endurance de force · continuité · avant-bras",
     exercises: [
       {
         id: "repeaters-7-3",
-        name: "Repeaters 7/3 sur bacs",
+        name: "Repeaters 7/3",
         description:
-          "Utiliser deux bacs confortables. Se suspendre pendant 7 secondes, poser pendant 3 secondes et répéter 10 fois. Garder les épaules légèrement engagées.",
-        category: "Suspensions",
-        tracking: "assistance",
+          "7 secondes de suspension puis 3 secondes de repos à l’intérieur de chaque série.",
+        category: "Résistance",
+        tracking: "reps+duration",
         isHangboard: true,
-
+        primaryRepsLabel: "Répétitions par série",
         defaultValues: {
-          sets: 3,
-          reps: 10,
+          sets: 5,
+          reps: 6,
           duration: 7,
           restSeconds: 180,
-          assistance:
-            "Deux pieds au sol, appui moyen",
         },
-
-        assistanceOptions:
-          ASSISTANCE_OPTIONS,
       },
 
       {
         id: "blocs-devers",
         name: "Blocs en dévers",
         description:
-          "Choisir un bloc adapté au niveau actuel et réaliser trois essais par série sans atteindre systématiquement l’échec.",
-        category: "Préhension",
+          "Enchaîner plusieurs blocs en dévers avec repos limité pour développer l’endurance de force.",
+        category: "Résistance",
         tracking: "reps",
-
         defaultValues: {
-          sets: 2,
+          sets: 4,
           reps: 3,
           restSeconds: 180,
         },
@@ -317,10 +830,9 @@ export const SESSIONS: SessionDef[] = [
         id: "traversees-longues",
         name: "Traversées longues",
         description:
-          "Réaliser une traversée facile ou moyenne sans descendre pendant environ 3 à 5 minutes.",
-        category: "Préhension",
+          "Traversée continue à intensité modérée en gardant une bonne technique.",
+        category: "Résistance",
         tracking: "duration",
-
         defaultValues: {
           sets: 3,
           duration: 180,
@@ -332,73 +844,64 @@ export const SESSIONS: SessionDef[] = [
         id: "tractions-endurance",
         name: "Tractions endurance",
         description:
-          "Réaliser des tractions propres en conservant une à deux répétitions en réserve.",
-        category: "Tractions",
+          "Séries longues de tractions propres, sans aller jusqu’à l’échec dès les premières séries.",
+        category: "Dos",
         tracking: "reps",
-
         defaultValues: {
-          sets: 5,
-          reps: 6,
-          restSeconds: 60,
+          sets: 4,
+          reps: 10,
+          restSeconds: 120,
         },
       },
 
       {
         id: "suspension-facile",
-        name: "Suspension longue sur bacs",
+        name: "Suspension facile",
         description:
-          "Se suspendre sur deux bacs confortables avec les bras tendus et les épaules légèrement engagées.",
-        category: "Suspensions",
+          "Suspension sur prise confortable à intensité modérée.",
+        category: "Résistance",
         tracking: "duration",
-
+        isHangboard: true,
         defaultValues: {
           sets: 4,
           duration: 30,
-          restSeconds: 60,
+          restSeconds: 90,
         },
       },
 
       {
         id: "dead-hang",
-        name: "Dead hang 25 mm — un pied au sol",
+        name: "Dead hang",
         description:
-          "Se suspendre à deux mains sur une réglette de 25 mm en gardant un pied au sol pour contrôler l’assistance. Garder les épaules légèrement engagées.",
-        category: "Suspensions",
-        tracking: "duration+assistance",
-        isHangboard: true,
-
-        assistanceOptions:
-          ASSISTANCE_OPTIONS,
-
+          "Suspension relâchée contrôlée sur grosse prise ou barre.",
+        category: "Dos",
+        tracking: "duration",
         defaultValues: {
           sets: 3,
-          duration: 20,
-          restSeconds: 120,
-          assistance:
-            "Un pied au sol",
+          duration: 30,
+          restSeconds: 90,
         },
       },
     ],
   },
 
+  // ── Dos / épaules ───────────────────────────────────────────────────────────
+
   {
     id: "s3-dos-epaules",
-    name: "HAUT DU CORPS / FORCE",
-    moment:
-      "À réaliser après une grimpe légère ou comme séance séparée.",
-
+    name: "Dos / épaules",
+    moment: "Force du haut du corps · tirage · poussée",
     exercises: [
       {
         id: "tractions-lestees",
         name: "Tractions lestées",
         description:
-          "Utiliser une charge permettant environ 7 répétitions maximales et s’arrêter avant l’échec.",
-        category: "Tractions",
+          "Tractions strictes avec charge supplémentaire.",
+        category: "Dos",
         tracking: "weight+reps",
-
         defaultValues: {
-          sets: 3,
-          reps: 6,
+          sets: 4,
+          reps: 5,
           weight: 10,
           restSeconds: 180,
         },
@@ -408,15 +911,13 @@ export const SESSIONS: SessionDef[] = [
         id: "blocages",
         name: "Blocages",
         description:
-          "Maintenir un blocage pendant 12 secondes, puis réaliser 2 tractions propres sans balancer le corps.",
-        category: "Tractions",
-        tracking: "reps+duration",
-
+          "Maintenir une position de traction à angle fixe en gardant les omoplates actives.",
+        category: "Dos",
+        tracking: "duration",
         defaultValues: {
-          sets: 3,
-          reps: 2,
-          duration: 12,
-          restSeconds: 180,
+          sets: 4,
+          duration: 10,
+          restSeconds: 120,
         },
       },
 
@@ -424,88 +925,12 @@ export const SESSIONS: SessionDef[] = [
         id: "rowing-haltere",
         name: "Rowing haltère",
         description:
-          "Incliner le buste en gardant le dos neutre. Tirer l’haltère vers les côtes. Enregistrer la charge d’un seul haltère.",
-        category: "Musculation",
+          "Tirage unilatéral avec contrôle de l’omoplate et du tronc.",
+        category: "Dos",
         tracking: "weight+reps",
-
+        perSide: true,
         defaultValues: {
-          sets: 3,
-          reps: 10,
-          weight: 15,
-          restSeconds: 120,
-        },
-      },
-
-      {
-        id: "lat-pulldown",
-        name: "Lat pulldown derrière + devant",
-        description:
-          "Réaliser 8 répétitions derrière la tête puis 8 répétitions devant la poitrine. Utiliser une charge légère derrière la tête et arrêter en cas d’inconfort à l’épaule.",
-        category: "Musculation",
-        tracking:
-          "dual-reps+weight",
-        totalWeight: true,
-
-        primaryRepsLabel:
-          "Répétitions derrière",
-
-        secondaryRepsLabel:
-          "Répétitions devant",
-
-        primaryWeightLabel:
-          "Charge de la machine",
-
-        defaultValues: {
-          sets: 3,
-          reps: 8,
-          secondaryReps: 8,
-          weight: 0,
-          restSeconds: 180,
-        },
-      },
-
-      {
-        id: "facepull",
-        name: "Face pull",
-        description:
-          "Tirer la corde vers le visage en gardant les coudes hauts et les épaules basses et contrôlées.",
-        category: "Musculation",
-        tracking: "weight+reps",
-
-        defaultValues: {
-          sets: 3,
-          reps: 12,
-          weight: 10,
-          restSeconds: 90,
-        },
-      },
-
-      {
-        id: "triceps-elastique",
-        name: "Extension triceps avec élastique",
-        description:
-          "Garder les coudes près du corps et tendre les avant-bras vers le bas sans déplacer les épaules.",
-        category: "Musculation",
-        tracking: "reps",
-
-        defaultValues: {
-          sets: 3,
-          reps: 8,
-          restSeconds: 90,
-        },
-      },
-
-      {
-        id: "developpe-militaire",
-        name: "Développé militaire",
-        description:
-          "Pousser la charge au-dessus de la tête sans exagérer la cambrure lombaire.",
-        category: "Musculation",
-        tracking: "weight+reps",
-        totalWeight: true,
-
-        defaultValues: {
-          sets: 3,
+          sets: 4,
           reps: 8,
           weight: 20,
           restSeconds: 120,
@@ -513,19 +938,82 @@ export const SESSIONS: SessionDef[] = [
       },
 
       {
-        id: "developpe-couche",
-        name: "Développé couché",
+        id: "lat-pulldown",
+        name: "Lat pulldown",
         description:
-          "Réaliser 3 séries de 12 répétitions. Commencer à 30 kg au total, soit une barre de 20 kg et 5 kg de chaque côté.",
-        category: "Pectoraux",
+          "Tirage vertical vers le haut de la poitrine avec contrôle des épaules.",
+        category: "Dos",
         tracking: "weight+reps",
         totalWeight: true,
+        defaultValues: {
+          sets: 4,
+          reps: 8,
+          weight: 40,
+          restSeconds: 120,
+        },
+      },
 
+      {
+        id: "facepull",
+        name: "Face Pull",
+        description:
+          "Tirer la corde vers le visage en ouvrant les épaules et en contrôlant les omoplates.",
+        category: "Épaules",
+        tracking: "weight+reps",
+        totalWeight: true,
         defaultValues: {
           sets: 3,
           reps: 12,
+          weight: 20,
+          restSeconds: 90,
+        },
+      },
+
+      {
+        id: "triceps-elastique",
+        name: "Extension triceps élastique",
+        description:
+          "Extension du coude contrôlée à l’élastique.",
+        category: "Bras",
+        tracking: "duration+band",
+        defaultValues: {
+          sets: 3,
+          duration: 30,
+          bandColor: "jaune",
+          bandStretch: 1,
+          restSeconds: 60,
+        },
+      },
+
+      {
+        id: "developpe-militaire",
+        name: "Développé militaire",
+        description:
+          "Poussée verticale avec gainage du tronc.",
+        category: "Épaules",
+        tracking: "weight+reps",
+        totalWeight: true,
+        defaultValues: {
+          sets: 4,
+          reps: 6,
           weight: 30,
-          restSeconds: 120,
+          restSeconds: 150,
+        },
+      },
+
+      {
+        id: "developpe-couche",
+        name: "Développé couché",
+        description:
+          "Développé couché avec contrôle de la descente et poussée stable.",
+        category: "Pectoraux",
+        tracking: "weight+reps",
+        totalWeight: true,
+        defaultValues: {
+          sets: 4,
+          reps: 6,
+          weight: 50,
+          restSeconds: 150,
         },
       },
 
@@ -533,54 +1021,50 @@ export const SESSIONS: SessionDef[] = [
         id: "dips",
         name: "Dips",
         description:
-          "Descendre de manière contrôlée puis pousser jusqu’à tendre presque complètement les bras. Commencer au poids du corps.",
+          "Descendre de manière contrôlée puis repousser sans perdre la position des épaules.",
         category: "Pectoraux",
-        tracking: "weight+reps",
-        totalWeight: true,
-
+        tracking: "reps",
         defaultValues: {
-          sets: 3,
-          reps: 5,
-          weight: 0,
+          sets: 4,
+          reps: 8,
           restSeconds: 120,
         },
       },
     ],
   },
 
+  // ── Gainage ─────────────────────────────────────────────────────────────────
+
   {
     id: "s4-gainage",
-    name: "GAINAGE COMPLET",
-    moment:
-      "À réaliser après la grimpe ou séparément.",
-
+    name: "Gainage",
+    moment: "Tronc · stabilité · transfert de force",
     exercises: [
       {
         id: "dead-bug",
         name: "Dead bug",
         description:
-          "Garder le bas du dos collé au sol et descendre simultanément le bras et la jambe opposés.",
+          "Maintenir les lombaires stables pendant l’extension opposée bras/jambe.",
         category: "Gainage",
         tracking: "reps",
-
+        perSide: true,
         defaultValues: {
           sets: 3,
           reps: 10,
-          restSeconds: 45,
+          restSeconds: 60,
         },
       },
 
       {
         id: "planche",
-        name: "Planche avant-bras",
+        name: "Planche",
         description:
-          "Garder le corps aligné et éviter de laisser tomber ou monter excessivement les hanches.",
+          "Gainage frontal avec bassin neutre et respiration contrôlée.",
         category: "Gainage",
         tracking: "duration",
-
         defaultValues: {
           sets: 3,
-          duration: 30,
+          duration: 60,
           restSeconds: 60,
         },
       },
@@ -589,68 +1073,60 @@ export const SESSIONS: SessionDef[] = [
         id: "planche-laterale",
         name: "Planche latérale",
         description:
-          "Maintenir la position de chaque côté avec le bassin relevé et le corps aligné.",
+          "Gainage latéral avec alignement épaule-bassin-cheville.",
         category: "Gainage",
         tracking: "duration",
         perSide: true,
-
         defaultValues: {
           sets: 3,
-          duration: 30,
+          duration: 45,
           restSeconds: 60,
         },
       },
 
       {
         id: "pallof-press",
-        name: "Pallof press isométrique",
+        name: "Pallof press",
         description:
-          "Attacher l’élastique à un poteau, se placer de côté et tendre les bras sans laisser le tronc tourner. Maintenir la position de chaque côté.",
+          "Résister à la rotation du tronc face à une résistance latérale.",
         category: "Gainage",
         tracking: "duration+band",
         perSide: true,
-
-        bandOptions:
-          RESISTANCE_BAND_OPTIONS.map(
-            (band) => band.id,
-          ),
-
         defaultValues: {
           sets: 3,
           duration: 20,
-          bandColor: "orange",
-          bandStretch: 0,
+          bandColor: "rouge",
+          bandStretch: 1,
           restSeconds: 60,
         },
       },
 
       {
         id: "releves-jambes",
-        name: "Relevés de jambes suspendu",
+        name: "Relevés de jambes suspendus",
         description:
-          "Se suspendre à une barre et monter les jambes de manière contrôlée jusqu’à environ 90°.",
+          "Monter les jambes sans balancer et contrôler la descente.",
         category: "Gainage",
         tracking: "reps",
-
         defaultValues: {
           sets: 3,
-          reps: 8,
-          restSeconds: 90,
+          reps: 10,
+          restSeconds: 75,
         },
       },
 
       {
         id: "genoux-suspendus-twist",
-        name: "Relevés de genoux suspendus avec twist",
+        name: "Genoux suspendus avec twist",
         description:
-          "Ramener les genoux vers la tête puis les déplacer d’un côté et de l’autre. Compter gauche et droite comme une répétition complète.",
+          "Monter les genoux en ajoutant une rotation contrôlée du bassin.",
         category: "Gainage",
         tracking: "reps",
-
+        perSide: true,
         defaultValues: {
           sets: 3,
-          reps: 10,
-          restSeconds: 90,
+          reps: 8,
+          restSeconds: 75,
         },
       },
 
@@ -658,15 +1134,14 @@ export const SESSIONS: SessionDef[] = [
         id: "rotations-russes",
         name: "Rotations russes",
         description:
-          "Tourner le tronc de gauche à droite de manière contrôlée. Enregistrer la charge totale tenue.",
+          "Rotation contrôlée du tronc sans accélération excessive.",
         category: "Gainage",
         tracking: "weight+reps",
         totalWeight: true,
-
         defaultValues: {
           sets: 3,
-          reps: 12,
-          weight: 6,
+          reps: 16,
+          weight: 5,
           restSeconds: 60,
         },
       },
@@ -675,13 +1150,12 @@ export const SESSIONS: SessionDef[] = [
         id: "superman-hold",
         name: "Superman hold",
         description:
-          "S’allonger sur le ventre puis décoller légèrement le buste et les jambes sans mouvement brusque.",
+          "Maintien en extension légère du tronc et des hanches.",
         category: "Gainage",
         tracking: "duration",
-
         defaultValues: {
           sets: 3,
-          duration: 20,
+          duration: 30,
           restSeconds: 60,
         },
       },
@@ -690,152 +1164,82 @@ export const SESSIONS: SessionDef[] = [
         id: "copenhagen-plank",
         name: "Copenhagen plank",
         description:
-          "Placer le genou ou le pied de la jambe supérieure sur un banc et maintenir le bassin relevé.",
+          "Planche latérale avec la jambe supérieure soutenue pour renforcer les adducteurs.",
         category: "Gainage",
         tracking: "duration",
         perSide: true,
-
         defaultValues: {
           sets: 3,
           duration: 20,
-          restSeconds: 60,
+          restSeconds: 75,
         },
       },
     ],
   },
 
+  // ── Souplesse ────────────────────────────────────────────────────────────────
+
   {
     id: "s5-souplesse",
-    name: "SOUPLESSE / MOBILITÉ",
-    moment:
-      "À réaliser après une séance ou pendant un jour léger. Éviter les étirements intenses juste avant une grosse séance de force.",
-
+    name: "Souplesse / mobilité",
+    moment: "Mobilité · amplitude · récupération",
     exercises: [
       {
-        id: "mobilite-genou-mur",
-        name: "Montée de genou active contre le mur",
-        description:
-          "Se placer face au mur. Monter un genou vers l’épaule, forcer légèrement plus haut et maintenir 5 secondes. Réaliser 5 répétitions de chaque côté.",
-        category: "Mobilité active",
-        tracking: "reps+duration",
-        perSide: true,
-
-        defaultValues: {
-          sets: 1,
-          reps: 5,
-          duration: 5,
-          restSeconds: 30,
-        },
-      },
-
-      {
-        id: "pont-talon-sureleve",
-        name: "Pont une jambe — talon surélevé",
-        description:
-          "S’allonger sur le dos et placer un talon sur un support. Pousser dans le talon, monter le bassin au maximum et maintenir 7 secondes.",
-        category: "Mobilité active",
-        tracking: "reps+duration",
-        perSide: true,
-
-        defaultValues: {
-          sets: 3,
-          reps: 3,
-          duration: 7,
-          restSeconds: 45,
-        },
-      },
-
-      {
-        id: "stretch-poignet-paume-avant",
+        id: "etirement-poignet-paume",
         name: "Étirement poignet — paume vers l’avant",
         description:
-          "Tendre un bras avec la paume vers l’avant puis tirer doucement les doigts vers soi. Réaliser de chaque côté.",
-        category: "Poignets / avant-bras / mains",
+          "Étirement doux des fléchisseurs du poignet.",
+        category: "Souplesse / mobilité",
         tracking: "duration",
         perSide: true,
-
         defaultValues: {
           sets: 2,
-          duration: 20,
-          restSeconds: 15,
+          duration: 30,
+          restSeconds: 10,
         },
       },
 
       {
-        id: "stretch-poignet-paume-soi",
-        name: "Étirement poignet — paume vers soi",
+        id: "etirement-poignet-dos-main",
+        name: "Étirement poignet — dos de la main",
         description:
-          "Tendre un bras avec la paume orientée vers soi puis tirer doucement les doigts. Réaliser de chaque côté.",
-        category: "Poignets / avant-bras / mains",
+          "Étirement doux des extenseurs du poignet.",
+        category: "Souplesse / mobilité",
         tracking: "duration",
         perSide: true,
-
         defaultValues: {
           sets: 2,
-          duration: 20,
-          restSeconds: 15,
+          duration: 30,
+          restSeconds: 10,
         },
       },
 
       {
-        id: "stretch-epaules-chaise",
+        id: "epaules-chaise",
         name: "Épaules sur chaise ou banc",
         description:
-          "Placer les mains sur une chaise ou un banc, tendre les bras et descendre doucement la poitrine.",
-        category: "Épaules / dorsaux",
+          "Ouvrir progressivement les épaules sans forcer les lombaires.",
+        category: "Souplesse / mobilité",
         tracking: "duration",
-
         defaultValues: {
           sets: 2,
-          duration: 30,
-          restSeconds: 20,
+          duration: 40,
+          restSeconds: 10,
         },
       },
 
       {
-        id: "child-pose-epaules",
-        name: "Child pose épaules",
+        id: "rotation-thoracique",
+        name: "Rotation thoracique",
         description:
-          "S’agenouiller, reculer les fesses vers les talons et allonger les bras devant soi.",
-        category: "Épaules / dorsaux",
-        tracking: "duration",
-
-        defaultValues: {
-          sets: 2,
-          duration: 30,
-          restSeconds: 20,
-        },
-      },
-
-      {
-        id: "stretch-lateral-debout",
-        name: "Étirement latéral debout",
-        description:
-          "Placer un bras au-dessus de la tête et incliner doucement le buste du côté opposé.",
-        category: "Épaules / dorsaux",
-        tracking: "duration",
+          "Rotation contrôlée du haut du dos.",
+        category: "Souplesse / mobilité",
+        tracking: "reps",
         perSide: true,
-
         defaultValues: {
           sets: 2,
-          duration: 15,
-          restSeconds: 15,
-        },
-      },
-
-      {
-        id: "stretch-triceps-epaule",
-        name: "Étirement triceps / épaule",
-        description:
-          "Placer une main derrière la tête puis tirer doucement le coude avec l’autre main.",
-        category: "Épaules / dorsaux",
-        tracking: "duration",
-        perSide: true,
-
-        defaultValues: {
-          sets: 2,
-          duration: 20,
-          restSeconds: 15,
+          reps: 8,
+          restSeconds: 10,
         },
       },
 
@@ -843,30 +1247,27 @@ export const SESSIONS: SessionDef[] = [
         id: "dos-rond-dos-creux",
         name: "Dos rond / dos creux",
         description:
-          "Se placer à quatre pattes, arrondir complètement le dos puis le creuser doucement.",
-        category: "Dos / rotation thoracique",
+          "Mobiliser doucement la colonne vertébrale.",
+        category: "Souplesse / mobilité",
         tracking: "reps",
-
         defaultValues: {
           sets: 2,
           reps: 10,
-          restSeconds: 20,
+          restSeconds: 10,
         },
       },
 
       {
-        id: "fente-profonde",
-        name: "Fente profonde",
+        id: "child-pose",
+        name: "Position de l’enfant",
         description:
-          "Placer un genou au sol et pousser doucement les hanches vers l’avant. Réaliser de chaque côté.",
-        category: "Hanches / fessiers / adducteurs",
+          "Relâcher le dos et les épaules.",
+        category: "Souplesse / mobilité",
         tracking: "duration",
-        perSide: true,
-
         defaultValues: {
           sets: 2,
-          duration: 30,
-          restSeconds: 20,
+          duration: 45,
+          restSeconds: 10,
         },
       },
 
@@ -874,182 +1275,231 @@ export const SESSIONS: SessionDef[] = [
         id: "papillon",
         name: "Papillon",
         description:
-          "S’asseoir avec les pieds collés et les genoux ouverts. Garder le dos aussi droit que possible.",
-        category: "Hanches / fessiers / adducteurs",
+          "Mobilité douce des adducteurs et des hanches.",
+        category: "Souplesse / mobilité",
         tracking: "duration",
-
         defaultValues: {
           sets: 2,
-          duration: 30,
-          restSeconds: 20,
+          duration: 45,
+          restSeconds: 10,
         },
       },
 
       {
         id: "grenouille",
-        name: "Ouverture de hanches en grenouille",
+        name: "Grenouille",
         description:
-          "Écarter les genoux, ouvrir les jambes et reculer progressivement les hanches.",
-        category: "Hanches / fessiers / adducteurs",
+          "Ouverture progressive des hanches et des adducteurs.",
+        category: "Souplesse / mobilité",
         tracking: "duration",
+        defaultValues: {
+          sets: 2,
+          duration: 40,
+          restSeconds: 10,
+        },
+      },
 
+      {
+        id: "fente-hanche",
+        name: "Fente — ouverture de hanche",
+        description:
+          "Mobiliser les fléchisseurs de hanche.",
+        category: "Souplesse / mobilité",
+        tracking: "duration",
+        perSide: true,
         defaultValues: {
           sets: 2,
           duration: 30,
-          restSeconds: 20,
+          restSeconds: 10,
         },
       },
 
       {
-        id: "stretch-fessier-allonge",
-        name: "Étirement fessier allongé",
+        id: "pigeon",
+        name: "Pigeon",
         description:
-          "Poser une cheville sur le genou opposé puis tirer doucement la jambe vers soi.",
-        category: "Hanches / fessiers / adducteurs",
+          "Mobilité de hanche et des fessiers.",
+        category: "Souplesse / mobilité",
         tracking: "duration",
         perSide: true,
-
         defaultValues: {
           sets: 2,
-          duration: 20,
-          restSeconds: 15,
+          duration: 35,
+          restSeconds: 10,
         },
       },
 
       {
-        id: "stretch-fessier-assis",
-        name: "Étirement fessier assis",
+        id: "ischios-jambe-tendue",
+        name: "Ischio-jambiers — jambe tendue",
         description:
-          "S’asseoir avec une jambe croisée devant soi puis incliner légèrement le buste vers l’avant.",
-        category: "Hanches / fessiers / adducteurs",
+          "Étirement contrôlé de l’arrière de la cuisse.",
+        category: "Souplesse / mobilité",
         tracking: "duration",
         perSide: true,
-
-        defaultValues: {
-          sets: 2,
-          duration: 15,
-          restSeconds: 15,
-        },
-      },
-
-      {
-        id: "stretch-quadriceps-debout",
-        name: "Étirement quadriceps debout",
-        description:
-          "Attraper la cheville et ramener doucement le talon vers les fesses en gardant les genoux proches.",
-        category: "Quadriceps",
-        tracking: "duration",
-        perSide: true,
-
-        defaultValues: {
-          sets: 2,
-          duration: 20,
-          restSeconds: 15,
-        },
-      },
-
-      {
-        id: "ischios-debout-assis",
-        name: "Ischios debout ou assis",
-        description:
-          "Incliner doucement le buste vers les pieds sans rebond ni mouvement brusque.",
-        category: "Ischios",
-        tracking: "duration",
-
         defaultValues: {
           sets: 2,
           duration: 30,
-          restSeconds: 20,
+          restSeconds: 10,
         },
       },
 
       {
-        id: "stretch-arriere-jambe-assis",
-        name: "Étirement arrière de jambe assis",
+        id: "quadriceps-debout",
+        name: "Quadriceps debout",
         description:
-          "Tendre une jambe, plier l’autre puis incliner doucement le buste vers le pied.",
-        category: "Ischios",
+          "Étirement doux du quadriceps.",
+        category: "Souplesse / mobilité",
         tracking: "duration",
         perSide: true,
-
         defaultValues: {
           sets: 2,
-          duration: 20,
-          restSeconds: 15,
+          duration: 30,
+          restSeconds: 10,
         },
       },
 
       {
-        id: "stretch-mollet-mur",
+        id: "mollet-mur",
         name: "Étirement mollet contre un mur",
         description:
-          "Placer les mains contre un mur, tendre une jambe derrière et maintenir le talon au sol.",
-        category: "Mollets / chevilles",
+          "Étirement du mollet avec talon au sol.",
+        category: "Souplesse / mobilité",
         tracking: "duration",
         perSide: true,
-
         defaultValues: {
           sets: 2,
-          duration: 20,
-          restSeconds: 15,
+          duration: 30,
+          restSeconds: 10,
         },
       },
 
       {
-        id: "stretch-mollet-jambe-pliee",
-        name: "Étirement mollet jambe pliée",
+        id: "mobilite-genou-mur",
+        name: "Montée de genou active contre le mur",
         description:
-          "Plier légèrement le genou arrière tout en gardant le talon au sol afin de cibler davantage le soléaire.",
-        category: "Mollets / chevilles",
-        tracking: "duration",
-        perSide: true,
-
-        defaultValues: {
-          sets: 2,
-          duration: 20,
-          restSeconds: 15,
-        },
-      },
-
-      {
-        id: "mobilite-cheville-chapeau-mexicain",
-        name: "Mobilité cheville sur chapeau mexicain",
-        description:
-          "Tenir en équilibre avec le genou légèrement plié et réaliser des mouvements contrôlés de cheville.",
-        category: "Mollets / chevilles",
+          "Mobilité active de hanche et contrôle du genou.",
+        category: "Souplesse / mobilité",
         tracking: "reps",
         perSide: true,
-
         defaultValues: {
           sets: 2,
-          reps: 30,
+          reps: 10,
+          restSeconds: 10,
+        },
+      },
+
+      {
+        id: "mobilite-cheville",
+        name: "Mobilité cheville",
+        description:
+          "Avancer le genou sans décoller le talon.",
+        category: "Souplesse / mobilité",
+        tracking: "reps",
+        perSide: true,
+        defaultValues: {
+          sets: 2,
+          reps: 12,
+          restSeconds: 10,
+        },
+      },
+
+      {
+        id: "rotation-cheville",
+        name: "Rotations de cheville",
+        description:
+          "Mobiliser doucement la cheville dans toutes les directions.",
+        category: "Souplesse / mobilité",
+        tracking: "reps",
+        perSide: true,
+        defaultValues: {
+          sets: 2,
+          reps: 10,
+          restSeconds: 10,
+        },
+      },
+
+      {
+        id: "pont-talon-sureleve",
+        name: "Pont une jambe — talon surélevé",
+        description:
+          "Activation douce des ischio-jambiers et des fessiers.",
+        category: "Souplesse / mobilité",
+        tracking: "reps",
+        perSide: true,
+        defaultValues: {
+          sets: 2,
+          reps: 10,
           restSeconds: 30,
+        },
+      },
+
+      {
+        id: "rotation-cervicale",
+        name: "Rotation cervicale douce",
+        description:
+          "Mobiliser le cou sans aller dans la douleur.",
+        category: "Souplesse / mobilité",
+        tracking: "reps",
+        perSide: true,
+        defaultValues: {
+          sets: 1,
+          reps: 6,
+          restSeconds: 10,
+        },
+      },
+
+      {
+        id: "ouverture-pectoraux",
+        name: "Ouverture des pectoraux",
+        description:
+          "Étirement doux de la poitrine et de l’avant des épaules.",
+        category: "Souplesse / mobilité",
+        tracking: "duration",
+        perSide: true,
+        defaultValues: {
+          sets: 2,
+          duration: 30,
+          restSeconds: 10,
+        },
+      },
+
+      {
+        id: "squat-profond-mobilite",
+        name: "Squat profond — mobilité",
+        description:
+          "Maintenir un squat profond confortable pour mobiliser chevilles, genoux et hanches.",
+        category: "Souplesse / mobilité",
+        tracking: "duration",
+        defaultValues: {
+          sets: 2,
+          duration: 30,
+          restSeconds: 10,
         },
       },
     ],
   },
 
+  // ── Jambes ──────────────────────────────────────────────────────────────────
+
   {
     id: "s6-jambes",
-    name: "JAMBES",
-    moment:
-      "À réaliser après une grimpe facile ou séparément.",
-
+    name: "Jambes",
+    moment: "Force · stabilité · chaîne postérieure",
     exercises: [
       {
         id: "squat",
-        name: "Squat avec deux haltères",
+        name: "Squat",
         description:
-          "Tenir un haltère dans chaque main et réaliser les squats de manière contrôlée. Enregistrer le poids combiné des deux haltères.",
-        category: "Musculation",
+          "Squat contrôlé en gardant le tronc stable et les genoux dans l’axe.",
+        category: "Jambes",
         tracking: "weight+reps",
         totalWeight: true,
-
         defaultValues: {
-          sets: 3,
-          reps: 15,
-          weight: 0,
-          restSeconds: 120,
+          sets: 4,
+          reps: 8,
+          weight: 40,
+          restSeconds: 150,
         },
       },
 
@@ -1057,16 +1507,14 @@ export const SESSIONS: SessionDef[] = [
         id: "fentes-bulgares",
         name: "Fentes bulgares",
         description:
-          "Placer le pied arrière sur un support. Enregistrer le poids combiné tenu dans les deux mains.",
-        category: "Musculation",
+          "Fente unilatérale avec pied arrière surélevé.",
+        category: "Jambes",
         tracking: "weight+reps",
-        totalWeight: true,
         perSide: true,
-
         defaultValues: {
           sets: 3,
-          reps: 12,
-          weight: 12,
+          reps: 8,
+          weight: 10,
           restSeconds: 120,
         },
       },
@@ -1075,16 +1523,15 @@ export const SESSIONS: SessionDef[] = [
         id: "sdle-roumain",
         name: "Soulevé de terre roumain",
         description:
-          "Reculer les hanches en gardant le dos neutre. Enregistrer la charge totale de la barre ou des deux haltères.",
-        category: "Musculation",
+          "Charnière de hanche avec tension contrôlée des ischio-jambiers.",
+        category: "Jambes",
         tracking: "weight+reps",
         totalWeight: true,
-
         defaultValues: {
-          sets: 3,
+          sets: 4,
           reps: 8,
           weight: 40,
-          restSeconds: 120,
+          restSeconds: 150,
         },
       },
 
@@ -1092,92 +1539,86 @@ export const SESSIONS: SessionDef[] = [
         id: "step-up",
         name: "Step-up",
         description:
-          "Monter sur une box sans prendre trop d’élan. Enregistrer le poids combiné des charges tenues.",
-        category: "Musculation",
+          "Monter sur un banc ou une box en contrôlant la poussée de la jambe de travail.",
+        category: "Jambes",
         tracking: "weight+reps",
-        totalWeight: true,
         perSide: true,
-
         defaultValues: {
           sets: 3,
-          reps: 8,
-          weight: 15,
+          reps: 10,
+          weight: 10,
           restSeconds: 90,
         },
       },
 
       {
         id: "mollets-debout",
-        name: "Élévations de mollets debout",
+        name: "Mollets debout",
         description:
-          "Monter sur la pointe des pieds avec 7 kg dans chaque main. Enregistrer 14 kg au total.",
-        category: "Musculation",
+          "Montée complète sur la pointe des pieds puis descente contrôlée.",
+        category: "Jambes",
         tracking: "weight+reps",
         totalWeight: true,
-
         defaultValues: {
-          sets: 3,
+          sets: 4,
           reps: 15,
-          weight: 14,
-          restSeconds: 60,
+          weight: 20,
+          restSeconds: 75,
         },
       },
 
       {
         id: "tibialis-raise",
-        name: "Tibialis raise au poids du corps",
+        name: "Tibialis raise",
         description:
-          "Garder les talons au sol, relever les pointes des pieds puis contrôler la descente.",
-        category: "Musculation",
+          "Relever l’avant du pied en gardant les talons au sol.",
+        category: "Jambes",
         tracking: "reps",
-
         defaultValues: {
           sets: 3,
-          reps: 15,
+          reps: 20,
           restSeconds: 60,
         },
       },
 
       {
         id: "tibialis-charge",
-        name: "Tibialis raise avec poids suspendu",
+        name: "Tibialis chargé",
         description:
-          "Passer l’avant du pied dans une poignée sécurisée, relever le pied puis redescendre lentement.",
-        category: "Musculation",
+          "Travail du tibial antérieur avec résistance supplémentaire.",
+        category: "Jambes",
         tracking: "weight+reps",
-        totalWeight: true,
-        perSide: true,
-
         defaultValues: {
           sets: 3,
-          reps: 12,
-          weight: 0,
+          reps: 15,
+          weight: 5,
           restSeconds: 60,
         },
       },
     ],
   },
 
+  // ── Prévention ──────────────────────────────────────────────────────────────
+
   {
     id: "s7-prevention",
-    name: "PRÉVENTION BLESSURES",
-    moment:
-      "À réaliser après la grimpe ou pendant un jour léger.",
-
+    name: "Prévention blessures",
+    moment: "Épaules · poignets · doigts · stabilité",
     exercises: [
       {
         id: "rot-ext-epaule",
-        name: "Rotations externes",
+        name: "Rotation externe épaule",
         description:
-          "Fixer un élastique à hauteur du coude. Garder le coude plié à 90° et collé contre le flanc, puis tourner lentement l’avant-bras vers l’extérieur sans déplacer l’épaule.",
+          "Rotation externe légère et contrôlée, coude proche du corps.",
         category: "Prévention",
-        tracking: "reps",
+        tracking: "duration+band",
         perSide: true,
-
         defaultValues: {
           sets: 3,
-          reps: 12,
-          restSeconds: 60,
+          duration: 25,
+          bandColor: "jaune",
+          bandStretch: 1,
+          restSeconds: 45,
         },
       },
 
@@ -1185,13 +1626,12 @@ export const SESSIONS: SessionDef[] = [
         id: "scapular-pullups",
         name: "Scapular pull-ups",
         description:
-          "Se suspendre bras tendus. Sans plier les coudes, abaisser les épaules et rapprocher légèrement les omoplates, puis revenir lentement.",
+          "Dépression et élévation contrôlée des omoplates sans plier les coudes.",
         category: "Prévention",
         tracking: "reps",
-
         defaultValues: {
           sets: 3,
-          reps: 8,
+          reps: 10,
           restSeconds: 60,
         },
       },
@@ -1200,10 +1640,9 @@ export const SESSIONS: SessionDef[] = [
         id: "ext-doigts",
         name: "Extension des doigts",
         description:
-          "Placer un petit élastique autour des doigts puis ouvrir complètement la main. Revenir lentement sans laisser l’élastique refermer brutalement les doigts.",
+          "Ouvrir les doigts contre un petit élastique pour travailler les extenseurs.",
         category: "Prévention",
         tracking: "reps",
-
         defaultValues: {
           sets: 3,
           reps: 20,
@@ -1213,35 +1652,33 @@ export const SESSIONS: SessionDef[] = [
 
       {
         id: "flex-poignet",
-        name: "Wrist curls",
+        name: "Flexion du poignet",
         description:
-          "Poser l’avant-bras sur un banc avec la paume vers le haut et le poignet dépassant du bord. Fléchir le poignet, marquer une courte pause puis redescendre lentement.",
+          "Flexion contrôlée du poignet avec charge légère.",
         category: "Prévention",
         tracking: "weight+reps",
         perSide: true,
-
         defaultValues: {
           sets: 3,
-          reps: 12,
-          weight: 0,
-          restSeconds: 60,
+          reps: 15,
+          weight: 3,
+          restSeconds: 45,
         },
       },
 
       {
         id: "ext-poignet",
-        name: "Extensions du poignet",
+        name: "Extension du poignet",
         description:
-          "Poser l’avant-bras sur un banc avec la paume vers le bas et le poignet dépassant du bord. Relever le dos de la main puis redescendre lentement.",
+          "Extension contrôlée du poignet avec charge légère.",
         category: "Prévention",
         tracking: "weight+reps",
         perSide: true,
-
         defaultValues: {
           sets: 3,
-          reps: 12,
-          weight: 0,
-          restSeconds: 60,
+          reps: 15,
+          weight: 3,
+          restSeconds: 45,
         },
       },
 
@@ -1249,56 +1686,53 @@ export const SESSIONS: SessionDef[] = [
         id: "pronation-supination",
         name: "Pronation / supination",
         description:
-          "Tenir un marteau ou une charge décentrée avec le coude plié à 90°. Tourner lentement la paume vers le haut puis vers le bas sans déplacer le coude.",
+          "Rotation lente de l’avant-bras avec charge légère.",
         category: "Prévention",
         tracking: "weight+reps",
         perSide: true,
-
         defaultValues: {
           sets: 3,
           reps: 12,
-          weight: 0,
-          restSeconds: 60,
+          weight: 2,
+          restSeconds: 45,
         },
       },
 
       {
         id: "equilibre-jambe",
-        name: "Équilibre sur une jambe",
+        name: "Équilibre une jambe",
         description:
-          "Tenir sur une jambe avec le genou légèrement fléchi. Garder le bassin stable et fermer les yeux uniquement si la position reste sûre.",
+          "Maintien stable sur une jambe avec pied actif.",
         category: "Prévention",
         tracking: "duration",
         perSide: true,
-
         defaultValues: {
           sets: 3,
           duration: 30,
-          restSeconds: 45,
+          restSeconds: 30,
         },
       },
     ],
   },
 
+  // ── Pompes / activation ─────────────────────────────────────────────────────
+
   {
     id: "s8-pompes-activation",
-    name: "POMPES / ACTIVATION",
-    moment:
-      "À réaliser seule, avant la souplesse ou comme activation légère. Éviter après une grosse séance de pectoraux, triceps ou épaules.",
-
+    name: "Pompes / activation",
+    moment: "Activation courte · poussée · épaules",
     exercises: [
       {
         id: "pompes-normales",
         name: "Pompes normales",
         description:
-          "Placer les mains légèrement plus larges que les épaules. Garder le corps aligné, descendre la poitrine puis pousser sans creuser le bas du dos.",
-        category: "Pompes",
+          "Pompes classiques avec tronc gainé.",
+        category: "Pectoraux",
         tracking: "reps",
-
         defaultValues: {
-          sets: 1,
-          reps: 10,
-          restSeconds: 30,
+          sets: 2,
+          reps: 12,
+          restSeconds: 45,
         },
       },
 
@@ -1306,12 +1740,11 @@ export const SESSIONS: SessionDef[] = [
         id: "pompes-pieds-sureleves",
         name: "Pompes pieds surélevés",
         description:
-          "Placer les pieds sur un support stable, garder le corps aligné et descendre de manière contrôlée.",
-        category: "Pompes",
+          "Pompes avec pieds surélevés pour augmenter le travail du haut du corps.",
+        category: "Pectoraux",
         tracking: "reps",
-
         defaultValues: {
-          sets: 1,
+          sets: 2,
           reps: 10,
           restSeconds: 45,
         },
@@ -1321,43 +1754,40 @@ export const SESSIONS: SessionDef[] = [
         id: "pompes-diamant",
         name: "Pompes diamant",
         description:
-          "Rapprocher les mains sous la poitrine afin que les pouces et les index forment un diamant. Garder les coudes proches du corps.",
-        category: "Pompes",
+          "Pompes mains rapprochées avec accent sur les triceps.",
+        category: "Bras",
         tracking: "reps",
-
         defaultValues: {
-          sets: 1,
-          reps: 5,
+          sets: 2,
+          reps: 10,
           restSeconds: 45,
         },
       },
 
       {
         id: "pompes-larges",
-        name: "Pompes prise large",
+        name: "Pompes larges",
         description:
-          "Placer les mains nettement plus larges que les épaules puis descendre la poitrine entre les mains de manière contrôlée.",
-        category: "Pompes",
+          "Pompes avec prise légèrement plus large.",
+        category: "Pectoraux",
         tracking: "reps",
-
         defaultValues: {
-          sets: 1,
-          reps: 10,
-          restSeconds: 30,
+          sets: 2,
+          reps: 12,
+          restSeconds: 45,
         },
       },
 
       {
         id: "pompes-pike",
-        name: "Pompes pike",
+        name: "Pompes Pike",
         description:
-          "Monter les hanches pour former un V inversé, descendre la tête entre les mains puis pousser verticalement.",
-        category: "Pompes",
+          "Pompes en position pike avec accent sur les épaules.",
+        category: "Épaules",
         tracking: "reps",
-
         defaultValues: {
-          sets: 1,
-          reps: 10,
+          sets: 2,
+          reps: 8,
           restSeconds: 45,
         },
       },
@@ -1366,24 +1796,24 @@ export const SESSIONS: SessionDef[] = [
         id: "pompes-coudes-serres",
         name: "Pompes coudes serrés",
         description:
-          "Placer les mains à la largeur des épaules et garder les coudes proches du corps pendant la descente et la poussée.",
-        category: "Pompes",
+          "Pompes en gardant les coudes proches du corps.",
+        category: "Bras",
         tracking: "reps",
-
         defaultValues: {
-          sets: 1,
+          sets: 2,
           reps: 10,
-          restSeconds: 30,
+          restSeconds: 45,
         },
       },
     ],
   },
 
+  // ── Grimpe libre ────────────────────────────────────────────────────────────
+
   {
     id: "grimpe-libre",
-    name: "JOUR DE GRIMPE",
-    moment:
-      "Enregistrer une séance de grimpe libre sans programme spécifique.",
+    name: "Grimpe libre",
+    moment: "Bloc libre",
     exercises: [],
   },
 ];

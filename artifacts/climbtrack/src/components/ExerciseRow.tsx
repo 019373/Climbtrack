@@ -1,4 +1,5 @@
 import {
+  useEffect,
   useState,
 } from "react";
 
@@ -7,6 +8,7 @@ import {
   Check,
   ChevronDown,
   ChevronUp,
+  TrendingUp,
 } from "lucide-react";
 
 import {
@@ -53,6 +55,16 @@ interface ExerciseRowProps {
   ) => void;
 
   isPainful?: boolean;
+
+  /*
+   * Affiché uniquement lorsqu'une progression
+   * a été décidée automatiquement par ClimbTrack.
+   *
+   * Un changement appris silencieusement à partir
+   * des valeurs réellement utilisées ne doit PAS
+   * activer cette flèche.
+   */
+  showProgressionIncrease?: boolean;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -65,7 +77,9 @@ function formatNumber(
   return Number.isInteger(
     value,
   )
-    ? String(value)
+    ? String(
+        value,
+      )
     : String(
         Math.round(
           value * 100,
@@ -104,30 +118,41 @@ function parseInteger(
 
 function parseDecimal(
   value: string,
-): number {
+): number | undefined {
+  const normalized =
+    value
+      .trim()
+      .replace(
+        ",",
+        ".",
+      );
+
   if (
-    value.trim() ===
-    ""
+    normalized ===
+      "" ||
+    normalized ===
+      "."
   ) {
-    return 0;
+    return undefined;
   }
 
   const parsed =
     Number.parseFloat(
-      value.replace(
-        ",",
-        ".",
-      ),
+      normalized,
     );
 
-  return Number.isFinite(
+  if (
+    !Number.isFinite(
+      parsed,
+    )
+  ) {
+    return undefined;
+  }
+
+  return Math.max(
+    0,
     parsed,
-  )
-    ? Math.max(
-        0,
-        parsed,
-      )
-    : 0;
+  );
 }
 
 function getBandLabel(
@@ -135,7 +160,9 @@ function getBandLabel(
 ): string {
   const option =
     RESISTANCE_BAND_OPTIONS.find(
-      (band) =>
+      (
+        band,
+      ) =>
         band.id ===
         color,
     );
@@ -144,6 +171,244 @@ function getBandLabel(
     option?.label ??
     color ??
     ""
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Decimal input
+// ─────────────────────────────────────────────────────────────────────────────
+
+type DecimalInputProps = {
+  value:
+    | number
+    | undefined;
+
+  fallbackValue?:
+    | number
+    | undefined;
+
+  onChange: (
+    value:
+      | number
+      | undefined,
+  ) => void;
+
+  min?: number;
+
+  placeholder?: string;
+};
+
+function DecimalInput({
+  value,
+  fallbackValue,
+  onChange,
+  min = 0,
+  placeholder,
+}: DecimalInputProps) {
+  const [
+    text,
+    setText,
+  ] =
+    useState(
+      typeof value ===
+      "number"
+        ? formatNumber(
+            value,
+          )
+        : "",
+    );
+
+  useEffect(
+    () => {
+      const parsedText =
+        parseDecimal(
+          text,
+        );
+
+      if (
+        value ===
+        undefined
+      ) {
+        if (
+          text !==
+            "" &&
+          parsedText !==
+            undefined
+        ) {
+          setText(
+            "",
+          );
+        }
+
+        return;
+      }
+
+      if (
+        parsedText ===
+        value
+      ) {
+        return;
+      }
+
+      setText(
+        formatNumber(
+          value,
+        ),
+      );
+    },
+    [
+      value,
+    ],
+  );
+
+  function handleChange(
+    rawValue: string,
+  ) {
+    const accepted =
+      /^\d*(?:[.,]\d*)?$/.test(
+        rawValue,
+      );
+
+    if (
+      !accepted
+    ) {
+      return;
+    }
+
+    setText(
+      rawValue,
+    );
+
+    if (
+      rawValue.trim() ===
+      ""
+    ) {
+      onChange(
+        undefined,
+      );
+
+      return;
+    }
+
+    const parsed =
+      parseDecimal(
+        rawValue,
+      );
+
+    if (
+      parsed !==
+      undefined
+    ) {
+      onChange(
+        Math.max(
+          min,
+          parsed,
+        ),
+      );
+    }
+  }
+
+  function handleBlur() {
+    if (
+      text.trim() ===
+      ""
+    ) {
+      if (
+        typeof fallbackValue ===
+        "number"
+      ) {
+        setText(
+          formatNumber(
+            fallbackValue,
+          ),
+        );
+
+        onChange(
+          Math.max(
+            min,
+            fallbackValue,
+          ),
+        );
+      }
+
+      return;
+    }
+
+    const parsed =
+      parseDecimal(
+        text,
+      );
+
+    if (
+      parsed ===
+      undefined
+    ) {
+      if (
+        typeof value ===
+        "number"
+      ) {
+        setText(
+          formatNumber(
+            value,
+          ),
+        );
+      } else {
+        setText(
+          "",
+        );
+      }
+
+      return;
+    }
+
+    const finalValue =
+      Math.max(
+        min,
+        parsed,
+      );
+
+    setText(
+      formatNumber(
+        finalValue,
+      ),
+    );
+
+    onChange(
+      finalValue,
+    );
+  }
+
+  return (
+    <input
+      type="text"
+      inputMode="decimal"
+      value={
+        text
+      }
+      placeholder={
+        placeholder ??
+        (
+          typeof fallbackValue ===
+          "number"
+            ? formatNumber(
+                fallbackValue,
+              )
+            : undefined
+        )
+      }
+      onChange={(
+        event,
+      ) =>
+        handleChange(
+          event.target.value,
+        )
+      }
+      onBlur={
+        handleBlur
+      }
+      autoComplete="off"
+      className="w-full rounded border border-border bg-background p-2 font-mono text-white"
+    />
   );
 }
 
@@ -158,6 +423,7 @@ export function ExerciseRow({
   onChange,
   onUpdateDefault: _onUpdateDefault,
   isPainful,
+  showProgressionIncrease = false,
 }: ExerciseRowProps) {
   const [
     isExpanded,
@@ -524,7 +790,9 @@ export function ExerciseRow({
 
   const allowedBandOptions =
     RESISTANCE_BAND_OPTIONS.filter(
-      (option) =>
+      (
+        option,
+      ) =>
         !exercise.bandOptions ||
         exercise.bandOptions.length ===
           0 ||
@@ -553,7 +821,9 @@ export function ExerciseRow({
         className="flex cursor-pointer items-start gap-4 p-4"
         onClick={() =>
           setIsExpanded(
-            (previous) =>
+            (
+              previous,
+            ) =>
               !previous,
           )
         }
@@ -584,11 +854,26 @@ export function ExerciseRow({
 
         <div className="min-w-0 flex-1">
           <div className="flex items-start justify-between gap-2">
-            <h4 className="text-[15px] font-bold leading-snug text-white">
-              {
-                exercise.name
-              }
-            </h4>
+            <div className="flex min-w-0 items-center gap-2">
+              <h4 className="min-w-0 text-[15px] font-bold leading-snug text-white">
+                {
+                  exercise.name
+                }
+              </h4>
+
+              {showProgressionIncrease && (
+                <span
+                  className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-green-500/15 text-green-400"
+                  aria-label="Objectif augmenté"
+                  title="Objectif augmenté"
+                >
+                  <TrendingUp
+                    size={15}
+                    strokeWidth={2.6}
+                  />
+                </span>
+              )}
+            </div>
 
             {isPainful && (
               <AlertTriangle
@@ -642,6 +927,7 @@ export function ExerciseRow({
                 type="number"
                 min="0"
                 step="1"
+                inputMode="numeric"
                 value={
                   log.sets
                 }
@@ -671,6 +957,7 @@ export function ExerciseRow({
                   type="number"
                   min="0"
                   step="1"
+                  inputMode="numeric"
                   value={
                     log.reps ??
                     ""
@@ -705,6 +992,7 @@ export function ExerciseRow({
                   type="number"
                   min="0"
                   step="1"
+                  inputMode="numeric"
                   value={
                     log.secondaryReps ??
                     ""
@@ -735,28 +1023,21 @@ export function ExerciseRow({
                     : "Durée (s)"}
                 </label>
 
-                <input
-                  type="number"
-                  min="0"
-                  step="1"
+                <DecimalInput
                   value={
-                    log.duration ??
-                    ""
+                    log.duration
+                  }
+                  fallbackValue={
+                    defaults.duration
                   }
                   onChange={(
-                    event,
+                    value,
                   ) =>
                     updateLog(
                       "duration",
-                      parseDecimal(
-                        event.target.value,
-                      ),
+                      value,
                     )
                   }
-                  placeholder={
-                    defaults.duration?.toString()
-                  }
-                  className="w-full rounded border border-border bg-background p-2 font-mono text-white"
                 />
               </div>
             )}
@@ -769,29 +1050,21 @@ export function ExerciseRow({
                   }
                 </label>
 
-                <input
-                  type="number"
-                  min="0"
-                  step="0.25"
-                  inputMode="decimal"
+                <DecimalInput
                   value={
-                    log.weight ??
-                    ""
+                    log.weight
+                  }
+                  fallbackValue={
+                    defaults.weight
                   }
                   onChange={(
-                    event,
+                    value,
                   ) =>
                     updateLog(
                       "weight",
-                      parseDecimal(
-                        event.target.value,
-                      ),
+                      value,
                     )
                   }
-                  placeholder={
-                    defaults.weight?.toString()
-                  }
-                  className="w-full rounded border border-border bg-background p-2 font-mono text-white"
                 />
               </div>
             )}
@@ -804,29 +1077,21 @@ export function ExerciseRow({
                   }
                 </label>
 
-                <input
-                  type="number"
-                  min="0"
-                  step="0.25"
-                  inputMode="decimal"
+                <DecimalInput
                   value={
-                    log.secondaryWeight ??
-                    ""
+                    log.secondaryWeight
+                  }
+                  fallbackValue={
+                    defaults.secondaryWeight
                   }
                   onChange={(
-                    event,
+                    value,
                   ) =>
                     updateLog(
                       "secondaryWeight",
-                      parseDecimal(
-                        event.target.value,
-                      ),
+                      value,
                     )
                   }
-                  placeholder={
-                    defaults.secondaryWeight?.toString()
-                  }
-                  className="w-full rounded border border-border bg-background p-2 font-mono text-white"
                 />
               </div>
             )}
@@ -855,7 +1120,9 @@ export function ExerciseRow({
 
               <div className="grid grid-cols-3 gap-3">
                 {SLOPER_ANGLES.map(
-                  (angle) => {
+                  (
+                    angle,
+                  ) => {
                     const selected =
                       log.progressionValue ===
                       angle;
@@ -904,25 +1171,21 @@ export function ExerciseRow({
                   Valeur de progression
                 </label>
 
-                <input
-                  type="number"
-                  min="0"
-                  step="1"
+                <DecimalInput
                   value={
-                    log.progressionValue ??
-                    ""
+                    log.progressionValue
+                  }
+                  fallbackValue={
+                    defaults.progressionValue
                   }
                   onChange={(
-                    event,
+                    value,
                   ) =>
                     updateLog(
                       "progressionValue",
-                      parseDecimal(
-                        event.target.value,
-                      ),
+                      value,
                     )
                   }
-                  className="w-full rounded border border-border bg-background p-2 font-mono text-white"
                 />
               </div>
             )}
@@ -1008,6 +1271,7 @@ export function ExerciseRow({
                     type="number"
                     min="1"
                     step="1"
+                    inputMode="numeric"
                     value={
                       log.progressionValue ??
                       defaults.progressionValue ??
@@ -1038,6 +1302,7 @@ export function ExerciseRow({
                     type="number"
                     min="0"
                     step="1"
+                    inputMode="numeric"
                     value={
                       log.leftHandJumps ??
                       log.reps ??
@@ -1066,6 +1331,7 @@ export function ExerciseRow({
                     type="number"
                     min="0"
                     step="1"
+                    inputMode="numeric"
                     value={
                       log.rightHandJumps ??
                       log.reps ??
@@ -1184,27 +1450,22 @@ export function ExerciseRow({
                   Distance ou repère d’étirement
                 </label>
 
-                <input
-                  type="number"
-                  min="0"
-                  step="0.25"
-                  inputMode="decimal"
+                <DecimalInput
                   value={
-                    log.bandStretch ??
-                    ""
+                    log.bandStretch
                   }
+                  fallbackValue={
+                    defaults.bandStretch
+                  }
+                  placeholder="Ex. 1,5 ou 1.5"
                   onChange={(
-                    event,
+                    value,
                   ) =>
                     updateLog(
                       "bandStretch",
-                      parseDecimal(
-                        event.target.value,
-                      ),
+                      value,
                     )
                   }
-                  placeholder="Ex. 1,5 ou repère 2"
-                  className="w-full rounded border border-border bg-background p-2 font-mono text-white"
                 />
 
                 <p className="text-xs leading-relaxed text-muted-foreground">

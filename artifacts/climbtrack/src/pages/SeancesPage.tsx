@@ -16,6 +16,7 @@ import {
   Route,
   Sparkles,
   Trash2,
+  X,
 } from "lucide-react";
 
 import {
@@ -23,13 +24,18 @@ import {
 } from "react-router-dom";
 
 import {
+  KILTER_FONT_GRADES,
   ROUTE_GRADES,
+  fontGradeToV,
+  getDefaultFontGradeForV,
   useClimbTrack,
 } from "@/context/ClimbTrackContext";
 
 import type {
   ClimbingIntensity,
   KilterEntry,
+  KilterFontGrade,
+  KilterGradeSystem,
   KilterResult,
   RouteClimbingEntry,
   RouteClimbingMode,
@@ -53,9 +59,15 @@ import {
 import {
   generateDailySuggestion,
   getTodayLocalDate,
-  type DailyPreference,
+  REQUESTABLE_SESSION_IDS,
+  type ClimbingPreference,
   type SuggestedStep,
+  type SuggestionExerciseReference,
 } from "@/utils/dailySuggestion";
+
+import {
+  getExercisesForSession,
+} from "@/utils/exercises";
 
 import {
   cn,
@@ -78,6 +90,9 @@ type ManualLogSheetProps = {
 // ─────────────────────────────────────────────────────────────────────────────
 // Constants
 // ─────────────────────────────────────────────────────────────────────────────
+
+const DEFAULT_TOTAL_TIME_MINUTES =
+  90;
 
 const CLIMBING_COLORS: {
   id: ClimbingColor;
@@ -162,33 +177,28 @@ const KILTER_ANGLES = [
   70,
 ];
 
-const PREFERENCE_OPTIONS: {
-  value: DailyPreference;
+const CLIMBING_PREFERENCE_OPTIONS: {
+  value: ClimbingPreference;
   label: string;
 }[] = [
   {
-    value: "unknown",
+    value: "none",
     label: "Aucune",
   },
 
   {
     value: "climbing",
-    label: "Grimper",
+    label: "Grimpe",
   },
 
   {
     value: "kilter",
-    label: "Faire du Kilter",
+    label: "Kilter",
   },
 
   {
     value: "climbing+kilter",
-    label: "Grimper + Kilter",
-  },
-
-  {
-    value: "rest",
-    label: "Récupérer",
+    label: "Grimpe + Kilter",
   },
 ];
 
@@ -250,34 +260,114 @@ function parsePositiveInteger(
   );
 }
 
-function parseOptionalMinutes(
-  value: string,
+function parseHoursAndMinutes(
+  hoursText: string,
+  minutesText: string,
 ): number | null {
   if (
-    value.trim() ===
-    ""
+    hoursText.trim() ===
+      "" &&
+    minutesText.trim() ===
+      ""
   ) {
     return null;
   }
 
-  const parsed =
-    Number.parseInt(
-      value,
-      10,
-    );
+  const hours =
+    hoursText.trim() ===
+    ""
+      ? 0
+      : parsePositiveInteger(
+          hoursText,
+        );
+
+  const minutes =
+    minutesText.trim() ===
+    ""
+      ? 0
+      : Math.min(
+          59,
+          parsePositiveInteger(
+            minutesText,
+          ),
+        );
+
+  return (
+    hours * 60 +
+    minutes
+  );
+}
+
+function formatDuration(
+  totalMinutes: number,
+): string {
+  if (
+    totalMinutes <= 0
+  ) {
+    return "0 min";
+  }
 
   if (
-    !Number.isFinite(
-      parsed,
-    )
+    totalMinutes < 60
   ) {
-    return null;
+    return `${totalMinutes} min`;
   }
 
-  return Math.max(
-    0,
-    parsed,
-  );
+  const hours =
+    Math.floor(
+      totalMinutes / 60,
+    );
+
+  const minutes =
+    totalMinutes % 60;
+
+  if (
+    minutes === 0
+  ) {
+    return `${hours} h`;
+  }
+
+  return `${hours} h ${minutes}`;
+}
+
+function createDefaultKilterEntry(
+  previous?: KilterEntry,
+): KilterEntry {
+  const grade =
+    previous?.grade ??
+    0;
+
+  const gradeSystem:
+    KilterGradeSystem =
+      previous?.gradeSystem ??
+      "v";
+
+  return {
+    id:
+      generateId(),
+
+    angle:
+      previous?.angle ??
+      30,
+
+    grade,
+
+    gradeSystem,
+
+    displayGrade:
+      gradeSystem ===
+      "font"
+        ? getDefaultFontGradeForV(
+            grade,
+          )
+        : `V${grade}`,
+
+    result:
+      "travaille",
+
+    attempts:
+      1,
+  };
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -323,7 +413,7 @@ function NumberInput({
       value={value}
       min={min}
       step={step}
-      inputMode="numeric"
+      inputMode="decimal"
       placeholder={placeholder}
       onChange={(
         event,
@@ -334,6 +424,77 @@ function NumberInput({
       }
       className="w-full min-w-0 rounded-xl border border-border bg-card px-3 py-3 font-mono text-white outline-none focus:border-white/40"
     />
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Kilter grade switch
+// ─────────────────────────────────────────────────────────────────────────────
+
+function KilterGradeSwitch({
+  value,
+  onChange,
+}: {
+  value: KilterGradeSystem;
+
+  onChange: (
+    value: KilterGradeSystem,
+  ) => void;
+}) {
+  const isFont =
+    value ===
+    "font";
+
+  return (
+    <button
+      type="button"
+      onClick={() =>
+        onChange(
+          isFont
+            ? "v"
+            : "font",
+        )
+      }
+      className="relative flex h-9 w-[92px] flex-shrink-0 items-center rounded-full border border-border bg-background p-1"
+      aria-label={
+        isFont
+          ? "Utiliser les cotations V"
+          : "Utiliser les cotations françaises"
+      }
+    >
+      <span
+        className={cn(
+          "absolute left-1 top-1 h-7 w-[40px] rounded-full bg-white transition-transform duration-200 ease-out",
+
+          isFont &&
+            "translate-x-[42px]",
+        )}
+      />
+
+      <span
+        className={cn(
+          "relative z-10 flex w-[40px] items-center justify-center text-[10px] font-black transition-colors",
+
+          !isFont
+            ? "text-black"
+            : "text-muted-foreground",
+        )}
+      >
+        V
+      </span>
+
+      <span
+        className={cn(
+          "relative z-10 flex w-[40px] items-center justify-center text-[10px] font-black transition-colors",
+
+          isFont
+            ? "text-black"
+            : "text-muted-foreground",
+        )}
+      >
+        Font
+      </span>
+    </button>
   );
 }
 
@@ -350,13 +511,6 @@ function ManualLogSheet({
   } =
     useClimbTrack();
 
-  /*
-   * Le bouton apparaît d'abord comme un +,
-   * puis tourne vers × juste après l'ouverture.
-   *
-   * Cela rend enfin visible la transition
-   * dans le sens + → ×.
-   */
   const [
     closeIconActive,
     setCloseIconActive,
@@ -400,10 +554,6 @@ function ManualLogSheet({
       true,
     );
 
-    /*
-     * Faire d'abord × → +,
-     * puis fermer le panneau.
-     */
     setCloseIconActive(
       false,
     );
@@ -438,8 +588,6 @@ function ManualLogSheet({
   ] =
     useState("");
 
-  // ── Bloc libre ─────────────────────────────────────────────────────────────
-
   const [
     climbingDuration,
     setClimbingDuration,
@@ -464,8 +612,6 @@ function ManualLogSheet({
       ClimbingColor[]
     >([]);
 
-  // ── Kilter ─────────────────────────────────────────────────────────────────
-
   const [
     kilterDuration,
     setKilterDuration,
@@ -479,25 +625,8 @@ function ManualLogSheet({
     setKilterEntries,
   ] =
     useState<KilterEntry[]>([
-      {
-        id:
-          generateId(),
-
-        angle:
-          30,
-
-        grade:
-          0,
-
-        result:
-          "travaille",
-
-        attempts:
-          1,
-      },
+      createDefaultKilterEntry(),
     ]);
-
-  // ── Voie ───────────────────────────────────────────────────────────────────
 
   const [
     routeDuration,
@@ -571,35 +700,106 @@ function ManualLogSheet({
     );
   }
 
+  function changeKilterGradeSystem(
+    entry: KilterEntry,
+    gradeSystem: KilterGradeSystem,
+  ) {
+    if (
+      gradeSystem ===
+      "font"
+    ) {
+      const displayGrade =
+        getDefaultFontGradeForV(
+          entry.grade,
+        );
+
+      updateKilterEntry(
+        entry.id,
+        {
+          gradeSystem:
+            "font",
+
+          displayGrade,
+        },
+      );
+
+      return;
+    }
+
+    updateKilterEntry(
+      entry.id,
+      {
+        gradeSystem:
+          "v",
+
+        displayGrade:
+          `V${entry.grade}`,
+      },
+    );
+  }
+
+  function changeKilterVGrade(
+    entry: KilterEntry,
+    grade: number,
+  ) {
+    const normalized =
+      Math.max(
+        0,
+        Math.min(
+          17,
+          Math.round(
+            grade,
+          ),
+        ),
+      );
+
+    updateKilterEntry(
+      entry.id,
+      {
+        grade:
+          normalized,
+
+        gradeSystem:
+          "v",
+
+        displayGrade:
+          `V${normalized}`,
+      },
+    );
+  }
+
+  function changeKilterFontGrade(
+    entry: KilterEntry,
+    grade: KilterFontGrade,
+  ) {
+    updateKilterEntry(
+      entry.id,
+      {
+        grade:
+          fontGradeToV(
+            grade,
+          ),
+
+        gradeSystem:
+          "font",
+
+        displayGrade:
+          grade,
+      },
+    );
+  }
+
   function addKilterEntry() {
     setKilterEntries(
       (previous) => [
         ...previous,
 
-        {
-          id:
-            generateId(),
-
-          angle:
-            previous[
-              previous.length -
-                1
-            ]?.angle ??
-            30,
-
-          grade:
-            previous[
-              previous.length -
-                1
-            ]?.grade ??
-            0,
-
-          result:
-            "travaille",
-
-          attempts:
-            1,
-        },
+        createDefaultKilterEntry(
+          previous[
+            previous.length -
+              1
+          ],
+        ),
       ],
     );
   }
@@ -742,7 +942,20 @@ function ManualLogSheet({
       addSessionLog({
         ...baseLog,
 
-        kilterEntries,
+        kilterEntries:
+          kilterEntries.map(
+            (entry) => ({
+              ...entry,
+
+              gradeSystem:
+                entry.gradeSystem ??
+                "v",
+
+              displayGrade:
+                entry.displayGrade ??
+                `V${entry.grade}`,
+            }),
+          ),
 
         climbingDurationMinutes:
           typeof kilterDuration ===
@@ -1084,201 +1297,266 @@ function ManualLogSheet({
                   (
                     entry,
                     index,
-                  ) => (
-                    <div
-                      key={
-                        entry.id
-                      }
-                      className="w-full space-y-3 overflow-x-hidden rounded-2xl border border-border bg-card p-4"
-                    >
-                      <div className="flex items-center justify-between gap-3">
-                        <span className="text-sm font-black text-white">
-                          Bloc{" "}
-                          {index +
-                            1}
-                        </span>
+                  ) => {
+                    const gradeSystem =
+                      entry.gradeSystem ??
+                      "v";
 
-                        <button
-                          type="button"
-                          onClick={() =>
-                            deleteKilterEntry(
-                              entry.id,
-                            )
-                          }
-                          disabled={
-                            kilterEntries.length <=
-                            1
-                          }
-                          className="rounded-lg p-2 text-muted-foreground disabled:opacity-30"
-                          aria-label="Supprimer le bloc"
-                        >
-                          <Trash2
-                            size={16}
-                          />
-                        </button>
-                      </div>
+                    const fontGrade =
+                      gradeSystem ===
+                        "font" &&
+                      entry.displayGrade &&
+                      KILTER_FONT_GRADES.includes(
+                        entry.displayGrade as KilterFontGrade,
+                      )
+                        ? (
+                            entry.displayGrade as KilterFontGrade
+                          )
+                        : getDefaultFontGradeForV(
+                            entry.grade,
+                          );
 
-                      <div className="grid min-w-0 grid-cols-2 gap-3">
-                        <Field label="Cotation">
-                          <select
-                            value={
-                              entry.grade
-                            }
-                            onChange={(
-                              event,
-                            ) =>
-                              updateKilterEntry(
-                                entry.id,
-                                {
-                                  grade:
-                                    Math.max(
-                                      0,
-                                      Math.min(
-                                        17,
-                                        Number.parseInt(
-                                          event.target
-                                            .value,
-                                          10,
-                                        ),
-                                      ),
-                                    ),
-                                },
-                              )
-                            }
-                            className="w-full min-w-0 rounded-xl border border-border bg-background px-3 py-3 text-white"
-                          >
-                            {Array.from(
-                              {
-                                length:
-                                  18,
-                              },
-                              (
-                                _,
-                                grade,
-                              ) => (
-                                <option
-                                  key={
-                                    grade
-                                  }
-                                  value={
-                                    grade
-                                  }
-                                >
-                                  V
-                                  {
-                                    grade
-                                  }
-                                </option>
-                              ),
-                            )}
-                          </select>
-                        </Field>
+                    return (
+                      <div
+                        key={
+                          entry.id
+                        }
+                        className="w-full space-y-4 overflow-x-hidden rounded-2xl border border-border bg-card p-4"
+                      >
+                        <div className="flex items-center justify-between gap-3">
+                          <span className="text-sm font-black text-white">
+                            Bloc{" "}
+                            {index +
+                              1}
+                          </span>
 
-                        <Field label="Inclinaison">
-                          <select
-                            value={
-                              entry.angle
-                            }
-                            onChange={(
-                              event,
-                            ) =>
-                              updateKilterEntry(
-                                entry.id,
-                                {
-                                  angle:
+                          <div className="flex items-center gap-2">
+                            <KilterGradeSwitch
+                              value={
+                                gradeSystem
+                              }
+                              onChange={(
+                                nextSystem,
+                              ) =>
+                                changeKilterGradeSystem(
+                                  entry,
+                                  nextSystem,
+                                )
+                              }
+                            />
+
+                            <button
+                              type="button"
+                              onClick={() =>
+                                deleteKilterEntry(
+                                  entry.id,
+                                )
+                              }
+                              disabled={
+                                kilterEntries.length <=
+                                1
+                              }
+                              className="rounded-lg p-2 text-muted-foreground disabled:opacity-30"
+                              aria-label="Supprimer le bloc"
+                            >
+                              <Trash2
+                                size={16}
+                              />
+                            </button>
+                          </div>
+                        </div>
+
+                        <div className="grid min-w-0 grid-cols-2 gap-3">
+                          <Field label="Cotation">
+                            {gradeSystem ===
+                            "v" ? (
+                              <select
+                                value={
+                                  entry.grade
+                                }
+                                onChange={(
+                                  event,
+                                ) =>
+                                  changeKilterVGrade(
+                                    entry,
                                     Number.parseInt(
                                       event.target
                                         .value,
                                       10,
                                     ),
-                                },
-                              )
-                            }
-                            className="w-full min-w-0 rounded-xl border border-border bg-background px-3 py-3 text-white"
-                          >
-                            {KILTER_ANGLES.map(
-                              (
-                                angle,
-                              ) => (
-                                <option
-                                  key={
-                                    angle
-                                  }
-                                  value={
-                                    angle
-                                  }
-                                >
+                                  )
+                                }
+                                className="w-full min-w-0 rounded-xl border border-border bg-background px-3 py-3 text-white"
+                              >
+                                {Array.from(
                                   {
-                                    angle
-                                  }
-                                  °
-                                </option>
-                              ),
-                            )}
-                          </select>
-                        </Field>
-
-                        <Field label="Résultat">
-                          <select
-                            value={
-                              entry.result
-                            }
-                            onChange={(
-                              event,
-                            ) =>
-                              updateKilterEntry(
-                                entry.id,
-                                {
-                                  result:
+                                    length:
+                                      18,
+                                  },
+                                  (
+                                    _,
+                                    grade,
+                                  ) => (
+                                    <option
+                                      key={
+                                        grade
+                                      }
+                                      value={
+                                        grade
+                                      }
+                                    >
+                                      V
+                                      {
+                                        grade
+                                      }
+                                    </option>
+                                  ),
+                                )}
+                              </select>
+                            ) : (
+                              <select
+                                value={
+                                  fontGrade
+                                }
+                                onChange={(
+                                  event,
+                                ) =>
+                                  changeKilterFontGrade(
+                                    entry,
                                     event.target
-                                      .value as KilterResult,
-                                },
-                              )
-                            }
-                            className="w-full min-w-0 rounded-xl border border-border bg-background px-3 py-3 text-white"
-                          >
-                            <option value="reussi">
-                              Réussi
-                            </option>
+                                      .value as KilterFontGrade,
+                                  )
+                                }
+                                className="w-full min-w-0 rounded-xl border border-border bg-background px-3 py-3 text-white"
+                              >
+                                {KILTER_FONT_GRADES.map(
+                                  (
+                                    grade,
+                                  ) => (
+                                    <option
+                                      key={
+                                        grade
+                                      }
+                                      value={
+                                        grade
+                                      }
+                                    >
+                                      {
+                                        grade
+                                      }
+                                    </option>
+                                  ),
+                                )}
+                              </select>
+                            )}
+                          </Field>
 
-                            <option value="travaille">
-                              Travaillé
-                            </option>
-
-                            <option value="echoue">
-                              Échoué
-                            </option>
-                          </select>
-                        </Field>
-
-                        <Field label="Essais">
-                          <NumberInput
-                            value={
-                              entry.attempts ??
-                              1
-                            }
-                            min={1}
-                            onChange={(
-                              value,
-                            ) =>
-                              updateKilterEntry(
-                                entry.id,
-                                {
-                                  attempts:
-                                    Math.max(
-                                      1,
-                                      parsePositiveInteger(
-                                        value,
+                          <Field label="Inclinaison">
+                            <select
+                              value={
+                                entry.angle
+                              }
+                              onChange={(
+                                event,
+                              ) =>
+                                updateKilterEntry(
+                                  entry.id,
+                                  {
+                                    angle:
+                                      Number.parseInt(
+                                        event.target
+                                          .value,
+                                        10,
                                       ),
-                                    ),
-                                },
-                              )
-                            }
-                          />
-                        </Field>
+                                  },
+                                )
+                              }
+                              className="w-full min-w-0 rounded-xl border border-border bg-background px-3 py-3 text-white"
+                            >
+                              {KILTER_ANGLES.map(
+                                (
+                                  angle,
+                                ) => (
+                                  <option
+                                    key={
+                                      angle
+                                    }
+                                    value={
+                                      angle
+                                    }
+                                  >
+                                    {
+                                      angle
+                                    }
+                                    °
+                                  </option>
+                                ),
+                              )}
+                            </select>
+                          </Field>
+
+                          <Field label="Résultat">
+                            <select
+                              value={
+                                entry.result
+                              }
+                              onChange={(
+                                event,
+                              ) =>
+                                updateKilterEntry(
+                                  entry.id,
+                                  {
+                                    result:
+                                      event.target
+                                        .value as KilterResult,
+                                  },
+                                )
+                              }
+                              className="w-full min-w-0 rounded-xl border border-border bg-background px-3 py-3 text-white"
+                            >
+                              <option value="reussi">
+                                Réussi
+                              </option>
+
+                              <option value="travaille">
+                                Travaillé
+                              </option>
+
+                              <option value="echoue">
+                                Échoué
+                              </option>
+                            </select>
+                          </Field>
+
+                          <Field label="Essais">
+                            <NumberInput
+                              value={
+                                entry.attempts ??
+                                1
+                              }
+                              min={1}
+                              onChange={(
+                                value,
+                              ) =>
+                                updateKilterEntry(
+                                  entry.id,
+                                  {
+                                    attempts:
+                                      Math.max(
+                                        1,
+                                        parsePositiveInteger(
+                                          value,
+                                        ),
+                                      ),
+                                  },
+                                )
+                              }
+                            />
+                          </Field>
+                        </div>
                       </div>
-                    </div>
-                  ),
+                    );
+                  },
                 )}
               </div>
             </>
@@ -1577,17 +1855,27 @@ function DailySuggestionCard({
     expanded,
     setExpanded,
   ] =
-    useState(
-      false,
+    useState(false);
+
+  const [
+    climbingPreference,
+    setClimbingPreference,
+  ] =
+    useState<ClimbingPreference>(
+      "none",
     );
 
   const [
-    preference,
-    setPreference,
+    requestedSessionIds,
+    setRequestedSessionIds,
   ] =
-    useState<DailyPreference>(
-      "unknown",
-    );
+    useState<string[]>([]);
+
+  const [
+    availableHoursText,
+    setAvailableHoursText,
+  ] =
+    useState("");
 
   const [
     availableMinutesText,
@@ -1599,17 +1887,89 @@ function DailySuggestionCard({
     variation,
     setVariation,
   ] =
-    useState(
-      0,
-    );
+    useState(0);
 
   const [
     rotating,
     setRotating,
   ] =
-    useState(
-      false,
+    useState(false);
+
+  const requestableSessions =
+    useMemo(
+      () =>
+        REQUESTABLE_SESSION_IDS
+          .map(
+            (sessionId) =>
+              SESSIONS.find(
+                (session) =>
+                  session.id ===
+                  sessionId,
+              ),
+          )
+          .filter(
+            (
+              session,
+            ): session is NonNullable<
+              typeof session
+            > =>
+              Boolean(
+                session,
+              ),
+          ),
+      [],
     );
+
+  const availableMinutes =
+    useMemo(
+      () =>
+        parseHoursAndMinutes(
+          availableHoursText,
+          availableMinutesText,
+        ),
+      [
+        availableHoursText,
+        availableMinutesText,
+      ],
+    );
+
+  const displayedTotalMinutes =
+    availableMinutes ??
+    DEFAULT_TOTAL_TIME_MINUTES;
+
+  const customSessionExercises =
+    useMemo(() => {
+      const result: Record<
+        string,
+        SuggestionExerciseReference[]
+      > = {};
+
+      SESSIONS.forEach(
+        (session) => {
+          result[
+            session.id
+          ] =
+            getExercisesForSession(
+              session.id,
+              data,
+            ).map(
+              (
+                exercise,
+              ) => ({
+                id:
+                  exercise.id,
+
+                name:
+                  exercise.name,
+              }),
+            );
+        },
+      );
+
+      return result;
+    }, [
+      data,
+    ]);
 
   const suggestion =
     useMemo(
@@ -1624,20 +1984,36 @@ function DailySuggestionCard({
           date:
             getTodayLocalDate(),
 
-          availableMinutes:
-            parseOptionalMinutes(
-              availableMinutesText,
-            ),
+          availableMinutes,
 
-          preference,
+          preference:
+            "unknown",
+
+          climbingPreference,
+
+          requestedSessionIds,
+
+          customSessionExercises,
+
+          recoveryExerciseData: {
+            customExercises:
+              data.customExercises,
+
+            exerciseOverrides:
+              data.exerciseOverrides,
+          },
 
           variation,
         }),
       [
         data.sessionLogs,
         data.injuries,
-        availableMinutesText,
-        preference,
+        data.customExercises,
+        data.exerciseOverrides,
+        availableMinutes,
+        climbingPreference,
+        requestedSessionIds,
+        customSessionExercises,
         variation,
       ],
     );
@@ -1665,6 +2041,126 @@ function DailySuggestionCard({
         );
       },
       1000,
+    );
+  }
+
+  function setPrimarySession(
+    sessionId: string,
+  ) {
+    if (
+      sessionId === ""
+    ) {
+      setRequestedSessionIds(
+        [],
+      );
+
+      return;
+    }
+
+    setRequestedSessionIds([
+      sessionId,
+    ]);
+  }
+
+  function updateRequestedSession(
+    index: number,
+    sessionId: string,
+  ) {
+    if (
+      index === 0
+    ) {
+      setPrimarySession(
+        sessionId,
+      );
+
+      return;
+    }
+
+    if (
+      sessionId === ""
+    ) {
+      setRequestedSessionIds(
+        (previous) =>
+          previous.filter(
+            (
+              _,
+              currentIndex,
+            ) =>
+              currentIndex !==
+              index,
+          ),
+      );
+
+      return;
+    }
+
+    setRequestedSessionIds(
+      (previous) => {
+        if (
+          previous.some(
+            (
+              current,
+              currentIndex,
+            ) =>
+              currentIndex !==
+                index &&
+              current ===
+                sessionId,
+          )
+        ) {
+          return previous;
+        }
+
+        return previous.map(
+          (
+            current,
+            currentIndex,
+          ) =>
+            currentIndex ===
+            index
+              ? sessionId
+              : current,
+        );
+      },
+    );
+  }
+
+  function addRequestedSession() {
+    const next =
+      requestableSessions.find(
+        (session) =>
+          !requestedSessionIds.includes(
+            session.id,
+          ),
+      );
+
+    if (
+      !next
+    ) {
+      return;
+    }
+
+    setRequestedSessionIds(
+      (previous) => [
+        ...previous,
+        next.id,
+      ],
+    );
+  }
+
+  function removeRequestedSession(
+    index: number,
+  ) {
+    setRequestedSessionIds(
+      (previous) =>
+        previous.filter(
+          (
+            _,
+            currentIndex,
+          ) =>
+            currentIndex !==
+            index,
+        ),
     );
   }
 
@@ -1714,6 +2210,12 @@ function DailySuggestionCard({
     }
   }
 
+  const canAddMoreSessions =
+    requestedSessionIds.length >
+      0 &&
+    requestedSessionIds.length <
+      requestableSessions.length;
+
   return (
     <section className="w-full overflow-hidden rounded-2xl border border-border bg-card">
       <div className="flex items-center gap-3 p-4">
@@ -1739,10 +2241,9 @@ function DailySuggestionCard({
             </h2>
 
             <p className="truncate text-xs text-muted-foreground">
-              {suggestion.plannedMinutes >
-              0
-                ? `${suggestion.plannedMinutes} min`
-                : "Récupérer"}
+              {formatDuration(
+                displayedTotalMinutes,
+              )}
             </p>
           </div>
 
@@ -1783,63 +2284,269 @@ function DailySuggestionCard({
       </div>
 
       {expanded && (
-        <div className="w-full space-y-4 overflow-x-hidden border-t border-border p-4">
-          <div className="grid min-w-0 grid-cols-2 gap-3">
-            <Field label="Temps disponible">
-              <input
-                type="number"
-                min="0"
-                inputMode="numeric"
+        <div className="w-full space-y-5 overflow-x-hidden border-t border-border p-4">
+          <Field label="Temps disponible">
+            <div className="grid grid-cols-2 gap-2">
+              <div className="relative">
+                <input
+                  type="number"
+                  min="0"
+                  inputMode="numeric"
+                  value={
+                    availableHoursText
+                  }
+                  onChange={(
+                    event,
+                  ) => {
+                    const value =
+                      event.target
+                        .value;
+
+                    setAvailableHoursText(
+                      value ===
+                        ""
+                        ? ""
+                        : String(
+                            Math.max(
+                              0,
+                              parsePositiveInteger(
+                                value,
+                              ),
+                            ),
+                          ),
+                    );
+                  }}
+                  placeholder="0"
+                  className="w-full rounded-xl border border-border bg-background px-3 py-3 pr-10 font-mono text-white outline-none focus:border-white/40"
+                />
+
+                <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-muted-foreground">
+                  h
+                </span>
+              </div>
+
+              <div className="relative">
+                <input
+                  type="number"
+                  min="0"
+                  max="59"
+                  inputMode="numeric"
+                  value={
+                    availableMinutesText
+                  }
+                  onChange={(
+                    event,
+                  ) => {
+                    const value =
+                      event.target
+                        .value;
+
+                    setAvailableMinutesText(
+                      value ===
+                        ""
+                        ? ""
+                        : String(
+                            Math.min(
+                              59,
+                              Math.max(
+                                0,
+                                parsePositiveInteger(
+                                  value,
+                                ),
+                              ),
+                            ),
+                          ),
+                    );
+                  }}
+                  placeholder="00"
+                  className="w-full rounded-xl border border-border bg-background px-3 py-3 pr-12 font-mono text-white outline-none focus:border-white/40"
+                />
+
+                <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-muted-foreground">
+                  min
+                </span>
+              </div>
+            </div>
+
+            <p className="text-[11px] leading-relaxed text-muted-foreground/70">
+              10 min sont automatiquement gardées pour la transition après l’entraînement.
+            </p>
+          </Field>
+
+          <Field label="Envie de grimper">
+            <select
+              value={
+                climbingPreference
+              }
+              onChange={(
+                event,
+              ) =>
+                setClimbingPreference(
+                  event.target
+                    .value as ClimbingPreference,
+                )
+              }
+              className="w-full min-w-0 rounded-xl border border-border bg-background px-3 py-3 text-white"
+            >
+              {CLIMBING_PREFERENCE_OPTIONS.map(
+                (option) => (
+                  <option
+                    key={
+                      option.value
+                    }
+                    value={
+                      option.value
+                    }
+                  >
+                    {
+                      option.label
+                    }
+                  </option>
+                ),
+              )}
+            </select>
+          </Field>
+
+          <Field label="Envie de faire une séance">
+            <div className="space-y-2">
+              <select
                 value={
-                  availableMinutesText
+                  requestedSessionIds[
+                    0
+                  ] ?? ""
                 }
                 onChange={(
                   event,
                 ) =>
-                  setAvailableMinutesText(
+                  setPrimarySession(
                     event.target
                       .value,
                   )
                 }
-                placeholder="Libre"
-                className="w-full min-w-0 rounded-xl border border-border bg-background px-3 py-3 font-mono text-white outline-none focus:border-white/40"
-              />
-            </Field>
-
-            <Field label="Choisir l’envie">
-              <select
-                value={
-                  preference
-                }
-                onChange={(
-                  event,
-                ) =>
-                  setPreference(
-                    event.target
-                      .value as DailyPreference,
-                  )
-                }
                 className="w-full min-w-0 rounded-xl border border-border bg-background px-3 py-3 text-white"
               >
-                {PREFERENCE_OPTIONS.map(
-                  (option) => (
+                <option value="">
+                  Aucune
+                </option>
+
+                {requestableSessions.map(
+                  (
+                    session,
+                  ) => (
                     <option
                       key={
-                        option.value
+                        session.id
                       }
                       value={
-                        option.value
+                        session.id
                       }
                     >
                       {
-                        option.label
+                        session.name
                       }
                     </option>
                   ),
                 )}
               </select>
-            </Field>
-          </div>
+
+              {requestedSessionIds
+                .slice(1)
+                .map(
+                  (
+                    sessionId,
+                    offset,
+                  ) => {
+                    const index =
+                      offset + 1;
+
+                    return (
+                      <div
+                        key={`${index}-${sessionId}`}
+                        className="flex min-w-0 gap-2"
+                      >
+                        <select
+                          value={
+                            sessionId
+                          }
+                          onChange={(
+                            event,
+                          ) =>
+                            updateRequestedSession(
+                              index,
+                              event.target
+                                .value,
+                            )
+                          }
+                          className="min-w-0 flex-1 rounded-xl border border-border bg-background px-3 py-3 text-white"
+                        >
+                          {requestableSessions.map(
+                            (
+                              session,
+                            ) => (
+                              <option
+                                key={
+                                  session.id
+                                }
+                                value={
+                                  session.id
+                                }
+                                disabled={
+                                  requestedSessionIds.some(
+                                    (
+                                      current,
+                                      currentIndex,
+                                    ) =>
+                                      currentIndex !==
+                                        index &&
+                                      current ===
+                                        session.id,
+                                  )
+                                }
+                              >
+                                {
+                                  session.name
+                                }
+                              </option>
+                            ),
+                          )}
+                        </select>
+
+                        <button
+                          type="button"
+                          onClick={() =>
+                            removeRequestedSession(
+                              index,
+                            )
+                          }
+                          className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-xl border border-border bg-background text-muted-foreground active:scale-95"
+                          aria-label="Retirer cette séance"
+                        >
+                          <X
+                            size={17}
+                          />
+                        </button>
+                      </div>
+                    );
+                  },
+                )}
+
+              {canAddMoreSessions && (
+                <button
+                  type="button"
+                  onClick={
+                    addRequestedSession
+                  }
+                  className="flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-border bg-background px-3 py-3 text-sm font-bold text-white active:scale-[0.99]"
+                >
+                  <Plus
+                    size={16}
+                  />
+
+                  Ajouter une séance
+                </button>
+              )}
+            </div>
+          </Field>
 
           <div className="min-w-0">
             <h3 className="text-base font-black text-white">
@@ -1913,10 +2620,9 @@ function DailySuggestionCard({
                       {step.durationMinutes >
                         0 && (
                         <span className="flex-shrink-0 rounded-full bg-white/10 px-2.5 py-1 font-mono text-xs text-white">
-                          {
-                            step.durationMinutes
-                          }{" "}
-                          min
+                          {formatDuration(
+                            step.durationMinutes,
+                          )}
                         </span>
                       )}
                     </div>
@@ -1993,8 +2699,7 @@ export function SeancesPage() {
       () =>
         SESSIONS.filter(
           (session) =>
-            session.exercises
-              .length >
+            session.exercises.length >
             0,
         ),
       [],
@@ -2037,9 +2742,7 @@ export function SeancesPage() {
             onClick={
               toggleAddSheet
             }
-            className={cn(
-              "flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full bg-white text-black shadow-lg active:scale-90",
-            )}
+            className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full bg-white text-black shadow-lg active:scale-90"
             aria-label={
               manualSheetType
                 ? "Fermer"

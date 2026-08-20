@@ -4,6 +4,7 @@ import {
 
 import type {
   ExerciseDef,
+  ExerciseMuscleLoad,
   TrackingType,
 } from "@/data/sessions";
 
@@ -20,6 +21,15 @@ type ExerciseOverrideLike = {
   tracking?: TrackingType;
 
   sessionIds?: string[];
+
+  /*
+   * Profil musculaire personnalisé.
+   *
+   * [] est volontairement accepté :
+   * cela signifie qu'aucun muscle n'est
+   * actuellement attribué à l'exercice.
+   */
+  muscleLoads?: ExerciseMuscleLoad[];
 
   assistanceOptions?: ExerciseDef["assistanceOptions"];
 
@@ -160,13 +170,14 @@ function uniqueById(
     >();
 
   exercises.forEach(
-    (exercise) => {
+    (
+      exercise,
+    ) => {
       /*
        * Le dernier exercice portant cet ID gagne.
        *
-       * Les IDs restent néanmoins uniques :
-       * on ne crée jamais un nouvel ID lors
-       * d'une modification.
+       * Cela évite les doublons tout en conservant
+       * le même identifiant historique.
        */
       result.set(
         exercise.id,
@@ -177,6 +188,27 @@ function uniqueById(
 
   return Array.from(
     result.values(),
+  );
+}
+
+function cloneMuscleLoads(
+  muscleLoads:
+    | ExerciseMuscleLoad[]
+    | undefined,
+): ExerciseMuscleLoad[] | undefined {
+  if (
+    muscleLoads ===
+    undefined
+  ) {
+    return undefined;
+  }
+
+  return muscleLoads.map(
+    (
+      muscleLoad,
+    ) => ({
+      ...muscleLoad,
+    }),
   );
 }
 
@@ -213,8 +245,6 @@ function applyOverride(
 
     /*
      * Une description vide est autorisée.
-     * Cela permet réellement de supprimer
-     * une ancienne description.
      */
     description:
       typeof override.description ===
@@ -235,8 +265,8 @@ function applyOverride(
 
     /*
      * [] est une valeur valide :
-     * elle signifie que l'exercice n'est
-     * associé à aucune séance.
+     * cela signifie volontairement
+     * "aucune séance".
      */
     sessionIds:
       override.sessionIds !==
@@ -245,6 +275,23 @@ function applyOverride(
             ...override.sessionIds,
           ]
         : exercise.sessionIds,
+
+    /*
+     * Même principe pour les muscles :
+     *
+     * undefined = garder le profil précédent ;
+     * []        = aucun muscle attribué ;
+     * tableau   = utiliser exactement ce profil.
+     */
+    muscleLoads:
+      override.muscleLoads !==
+      undefined
+        ? cloneMuscleLoads(
+            override.muscleLoads,
+          )
+        : cloneMuscleLoads(
+            exercise.muscleLoads,
+          ),
 
     assistanceOptions:
       override.assistanceOptions !==
@@ -325,7 +372,9 @@ function applyOverride(
 export function getBuiltinExercises(): ExerciseDef[] {
   return uniqueById(
     SESSIONS.flatMap(
-      (session) =>
+      (
+        session,
+      ) =>
         session.exercises,
     ),
   );
@@ -355,7 +404,9 @@ export function getAllManagedExercises(
 
   const builtinExercises =
     getBuiltinExercises().map(
-      (exercise) =>
+      (
+        exercise,
+      ) =>
         applyOverride(
           exercise,
           overrides[
@@ -369,7 +420,9 @@ export function getAllManagedExercises(
       data.customExercises ??
       []
     ).map(
-      (exercise) =>
+      (
+        exercise,
+      ) =>
         applyOverride(
           exercise,
           overrides[
@@ -408,7 +461,9 @@ export function getAllCategories(
     data.customCategories ??
     []
   ).forEach(
-    (category) => {
+    (
+      category,
+    ) => {
       const trimmed =
         category.trim();
 
@@ -429,7 +484,9 @@ export function getAllCategories(
   getAllManagedExercises(
     data,
   ).forEach(
-    (exercise) => {
+    (
+      exercise,
+    ) => {
       const category =
         exercise.category.trim();
 
@@ -451,7 +508,9 @@ export function getAllCategories(
     data.exerciseCategoryOrder ??
       {},
   ).forEach(
-    (category) => {
+    (
+      category,
+    ) => {
       const trimmed =
         category.trim();
 
@@ -489,7 +548,8 @@ export function isExerciseHidden(
   return (
     data.exerciseOverrides?.[
       exerciseId
-    ]?.hidden === true
+    ]?.hidden ===
+    true
   );
 }
 
@@ -499,7 +559,9 @@ export function getVisibleExercises(
   return getAllManagedExercises(
     data,
   ).filter(
-    (exercise) =>
+    (
+      exercise,
+    ) =>
       !isExerciseHidden(
         exercise.id,
         data,
@@ -513,7 +575,9 @@ export function getHiddenExercises(
   return getAllManagedExercises(
     data,
   ).filter(
-    (exercise) =>
+    (
+      exercise,
+    ) =>
       isExerciseHidden(
         exercise.id,
         data,
@@ -535,11 +599,12 @@ export function getExerciseSessionIds(
     ];
 
   /*
-   * Important :
+   * Ne surtout pas écrire :
    *
-   * ne pas écrire `if (override?.sessionIds)`.
-   * Un tableau vide [] est une modification valide :
-   * cela signifie "aucune séance".
+   * if (override?.sessionIds)
+   *
+   * car [] est volontairement une valeur valide :
+   * aucune séance.
    */
   if (
     override?.sessionIds !==
@@ -555,7 +620,9 @@ export function getExerciseSessionIds(
       data.customExercises ??
       []
     ).find(
-      (exercise) =>
+      (
+        exercise,
+      ) =>
         exercise.id ===
         exerciseId,
     );
@@ -573,18 +640,24 @@ export function getExerciseSessionIds(
 
   /*
    * Pour les exercices intégrés,
-   * reconstruire les séances d'origine
+   * reconstruire leurs séances d'origine
    * directement depuis SESSIONS.
    */
   return SESSIONS.filter(
-    (session) =>
+    (
+      session,
+    ) =>
       session.exercises.some(
-        (exercise) =>
+        (
+          exercise,
+        ) =>
           exercise.id ===
           exerciseId,
       ),
   ).map(
-    (session) =>
+    (
+      session,
+    ) =>
       session.id,
   );
 }
@@ -599,6 +672,14 @@ export function getSessionIdsForExercise(
   );
 }
 
+/*
+ * Source unique pour déterminer ce qui appartient
+ * réellement à une séance.
+ *
+ * Utiliser cette fonction partout où l'application
+ * doit reconstruire une séance avec les modifications
+ * locales de l'utilisateur.
+ */
 export function getExercisesForSession(
   sessionId: string,
   data: ExerciseDataLike,
@@ -606,7 +687,9 @@ export function getExercisesForSession(
   return getAllManagedExercises(
     data,
   ).filter(
-    (exercise) => {
+    (
+      exercise,
+    ) => {
       if (
         isExerciseHidden(
           exercise.id,
@@ -647,7 +730,9 @@ export function getExerciseById(
   return getAllManagedExercises(
     data,
   ).find(
-    (exercise) =>
+    (
+      exercise,
+    ) =>
       exercise.id ===
       exerciseId,
   );
@@ -667,7 +752,9 @@ export function isBuiltinExercise(
   exerciseId: string,
 ): boolean {
   return BUILTIN_EXERCISES.some(
-    (exercise) =>
+    (
+      exercise,
+    ) =>
       exercise.id ===
       exerciseId,
   );
@@ -692,7 +779,9 @@ export function createExerciseId(
     name
       .trim()
       .toLowerCase()
-      .normalize("NFD")
+      .normalize(
+        "NFD",
+      )
       .replace(
         /[\u0300-\u036f]/g,
         "",
@@ -732,7 +821,9 @@ export function createUniqueExerciseId(
   const ids =
     new Set(
       existingExercises.map(
-        (exercise) =>
+        (
+          exercise,
+        ) =>
           exercise.id,
       ),
     );
@@ -772,7 +863,9 @@ export function searchExercises(
     query
       .trim()
       .toLowerCase()
-      .normalize("NFD")
+      .normalize(
+        "NFD",
+      )
       .replace(
         /[\u0300-\u036f]/g,
         "",
@@ -785,11 +878,15 @@ export function searchExercises(
   }
 
   return exercises.filter(
-    (exercise) => {
+    (
+      exercise,
+    ) => {
       const searchable =
         `${exercise.name} ${exercise.description} ${exercise.category}`
           .toLowerCase()
-          .normalize("NFD")
+          .normalize(
+            "NFD",
+          )
           .replace(
             /[\u0300-\u036f]/g,
             "",

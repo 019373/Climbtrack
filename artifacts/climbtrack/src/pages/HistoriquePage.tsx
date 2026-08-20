@@ -43,6 +43,7 @@ import {
 import type {
   AppData,
   ExerciseLog,
+  KilterEntry,
   SessionLog,
 } from "@/context/ClimbTrackContext";
 
@@ -400,6 +401,20 @@ function getExerciseSummary(
   );
 }
 
+function getKilterDisplayGrade(
+  entry: KilterEntry,
+): string {
+  if (
+    typeof entry.displayGrade ===
+      "string" &&
+    entry.displayGrade.trim()
+  ) {
+    return entry.displayGrade;
+  }
+
+  return `V${entry.grade}`;
+}
+
 function getSessionIcon(
   log: SessionLog,
 ) {
@@ -540,8 +555,6 @@ function MonthlyCalendar({
 
   return (
     <section className="w-full overflow-hidden rounded-[22px] border border-border bg-card">
-      {/* Mois + flèches */}
-
       <div className="flex items-center justify-between px-5 pb-3 pt-5">
         <button
           type="button"
@@ -582,8 +595,6 @@ function MonthlyCalendar({
       </div>
 
       <div className="px-3 pb-4">
-        {/* Jours de la semaine */}
-
         <div className="mb-2 grid grid-cols-7">
           {weekLabels.map(
             (
@@ -601,8 +612,6 @@ function MonthlyCalendar({
             ),
           )}
         </div>
-
-        {/* Jours */}
 
         <div className="grid grid-cols-7 gap-y-1.5">
           {days.map(
@@ -808,13 +817,6 @@ function HistorySessionCard({
       },
     );
 
-  /*
-   * Les ExerciseLog sauvegardés sont la source
-   * de vérité historique.
-   *
-   * Ne jamais reconstruire une ancienne séance
-   * avec la définition actuelle.
-   */
   const completedExercises =
     log.exerciseLogs.filter(
       (exercise) =>
@@ -966,8 +968,6 @@ function HistorySessionCard({
 
       {isExpanded && (
         <div className="w-full space-y-5 overflow-x-hidden border-t border-border bg-[#151515] p-4">
-          {/* Exercices réalisés */}
-
           {completedExercises.length >
             0 && (
             <section className="space-y-2">
@@ -1002,8 +1002,6 @@ function HistorySessionCard({
             </section>
           )}
 
-          {/* Exercices non réalisés */}
-
           {incompleteExercises.length >
             0 && (
             <section className="space-y-2">
@@ -1037,8 +1035,6 @@ function HistorySessionCard({
               )}
             </section>
           )}
-
-          {/* Bloc libre */}
 
           {log.sessionId ===
             "grimpe-libre" && (
@@ -1102,8 +1098,6 @@ function HistorySessionCard({
             </section>
           )}
 
-          {/* Kilter */}
-
           {log.sessionId ===
             "kilter" && (
             <section className="space-y-3">
@@ -1136,10 +1130,9 @@ function HistorySessionCard({
                     >
                       <div className="min-w-0">
                         <p className="break-words text-sm font-black text-white">
-                          V
-                          {
-                            entry.grade
-                          }{" "}
+                          {getKilterDisplayGrade(
+                            entry,
+                          )}{" "}
                           à{" "}
                           {
                             entry.angle
@@ -1210,8 +1203,6 @@ function HistorySessionCard({
               )}
             </section>
           )}
-
-          {/* Voies */}
 
           {log.sessionId ===
             "route" && (
@@ -1320,8 +1311,6 @@ function HistorySessionCard({
             </section>
           )}
 
-          {/* Douleurs */}
-
           {log.pain &&
             Object.keys(
               log.pain,
@@ -1384,8 +1373,6 @@ function HistorySessionCard({
               </section>
             )}
 
-          {/* Note */}
-
           {log.note && (
             <section className="w-full overflow-hidden rounded-xl border border-border bg-background p-3">
               <p className="text-xs font-black uppercase tracking-wider text-muted-foreground">
@@ -1430,9 +1417,6 @@ export function HistoriquePage() {
   } =
     useClimbTrack();
 
-  /*
-   * Toujours ouvrir l'onglet Historique depuis le haut.
-   */
   useEffect(
     () => {
       window.scrollTo({
@@ -1512,10 +1496,6 @@ export function HistoriquePage() {
   function selectCalendarDate(
     date: Date,
   ) {
-    /*
-     * Toucher une deuxième fois le même jour
-     * enlève le filtre.
-     */
     if (
       selectedDate &&
       isSameDay(
@@ -1530,10 +1510,6 @@ export function HistoriquePage() {
       return;
     }
 
-    /*
-     * Les jours du mois précédent/suivant
-     * restent cliquables.
-     */
     if (
       !isSameMonth(
         date,

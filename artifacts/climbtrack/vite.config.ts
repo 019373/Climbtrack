@@ -6,65 +6,104 @@ import { VitePWA } from 'vite-plugin-pwa';
 
 import runtimeErrorOverlay from '@replit/vite-plugin-runtime-error-modal';
 
-const rawPort = process.env.PORT;
+const parsedPort = Number(
+  process.env.PORT ?? '5173',
+);
 
-if (!rawPort) {
-  throw new Error(
-    'PORT environment variable is required but was not provided.',
-  );
-}
+const port =
+  Number.isFinite(parsedPort) &&
+  parsedPort > 0
+    ? parsedPort
+    : 5173;
 
-const port = Number(rawPort);
-
-if (Number.isNaN(port) || port <= 0) {
-  throw new Error(`Invalid PORT value: "${rawPort}"`);
-}
-
-const basePath = process.env.BASE_PATH;
-
-if (!basePath) {
-  throw new Error(
-    'BASE_PATH environment variable is required but was not provided.',
-  );
-}
+const basePath =
+  process.env.BASE_PATH ?? '/';
 
 export default defineConfig({
   base: basePath,
+
   plugins: [
     react(),
+
     tailwindcss(),
+
     runtimeErrorOverlay(),
+
     VitePWA({
       registerType: 'autoUpdate',
+
+      includeAssets: [
+        'icons/icon-512.png',
+      ],
+
       workbox: {
-        globPatterns: ['**/*.{js,css,html,ico,png,svg}'],
+        globPatterns: [
+          '**/*.{js,css,html,ico,png,svg}',
+        ],
       },
+
       manifest: {
         name: 'ClimbTrack',
         short_name: 'ClimbTrack',
+
+        description:
+          'Application de suivi d’entraînement pour l’escalade et la préparation physique.',
+
         theme_color: '#000000',
         background_color: '#000000',
+
         display: 'standalone',
-        orientation: 'portrait'
-      }
+        orientation: 'portrait',
+
+        icons: [
+          {
+            src: 'icons/icon-512.png',
+            sizes: '512x512',
+            type: 'image/png',
+            purpose: 'any',
+          },
+          {
+            src: 'icons/icon-512.png',
+            sizes: '512x512',
+            type: 'image/png',
+            purpose: 'maskable',
+          },
+        ],
+      },
     }),
-    ...(process.env.NODE_ENV !== 'production' &&
-    process.env.REPL_ID !== undefined
+
+    ...(process.env.NODE_ENV !==
+      'production' &&
+    process.env.REPL_ID !==
+      undefined
       ? [
-          await import('@replit/vite-plugin-cartographer').then((m) =>
+          await import(
+            '@replit/vite-plugin-cartographer'
+          ).then((m) =>
             m.cartographer({
-              root: path.resolve(import.meta.dirname, '..'),
+              root: path.resolve(
+                import.meta.dirname,
+                '..',
+              ),
             }),
           ),
-          await import('@replit/vite-plugin-dev-banner').then((m) =>
+
+          await import(
+            '@replit/vite-plugin-dev-banner'
+          ).then((m) =>
             m.devBanner(),
           ),
         ]
       : []),
   ],
+
   resolve: {
     alias: {
-      '@': path.resolve(import.meta.dirname, 'src'),
+      '@': path.resolve(
+        import.meta.dirname,
+        'src',
+      ),
+
       '@assets': path.resolve(
         import.meta.dirname,
         '..',
@@ -72,25 +111,45 @@ export default defineConfig({
         'attached_assets',
       ),
     },
-    dedupe: ['react', 'react-dom'],
+
+    dedupe: [
+      'react',
+      'react-dom',
+    ],
   },
-  root: path.resolve(import.meta.dirname),
+
+  root: path.resolve(
+    import.meta.dirname,
+  ),
+
   build: {
-    outDir: path.resolve(import.meta.dirname, 'dist/public'),
+    outDir: path.resolve(
+      import.meta.dirname,
+      'dist/public',
+    ),
+
     emptyOutDir: true,
   },
+
   server: {
     port,
+
     strictPort: true,
+
     host: '0.0.0.0',
+
     allowedHosts: true,
+
     fs: {
       strict: true,
     },
   },
+
   preview: {
     port,
+
     host: '0.0.0.0',
+
     allowedHosts: true,
   },
 });

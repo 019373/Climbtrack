@@ -18,6 +18,7 @@ import {
 
 import {
   useClimbTrack,
+  type ExerciseDefaults,
   type ExerciseLog,
   type SessionLog,
 } from "@/context/ClimbTrackContext";
@@ -77,9 +78,7 @@ function getLocalDateString(): string {
 function createInitialExerciseLog(
   exercise: ExerciseDef,
   defaults:
-    | ReturnType<
-        typeof useClimbTrack
-      >["data"]["exerciseDefaults"][string]
+    | ExerciseDefaults
     | undefined,
 ): ExerciseLog {
   const source =
@@ -143,6 +142,10 @@ function createInitialExerciseLog(
         : undefined,
   };
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Blessures
+// ─────────────────────────────────────────────────────────────────────────────
 
 function normalizePainArea(
   value: string,
@@ -423,14 +426,9 @@ export function SessionDetailPage() {
   const {
     data,
     addSessionLog,
-  } = useClimbTrack();
+  } =
+    useClimbTrack();
 
-  /*
-   * Toujours ouvrir une séance depuis le haut.
-   *
-   * Sans cela, le navigateur peut conserver
-   * la position de scroll de la page précédente.
-   */
   useEffect(
     () => {
       window.scrollTo({
@@ -474,35 +472,30 @@ export function SessionDetailPage() {
   const [
     exerciseLogs,
     setExerciseLogs,
-  ] = useState<
-    ExerciseLog[]
-  >(() => {
-    if (
-      !sessionId
-    ) {
-      return [];
-    }
+  ] =
+    useState<
+      ExerciseLog[]
+    >(() => {
+      if (
+        !sessionId
+      ) {
+        return [];
+      }
 
-    return getExercisesForSession(
-      sessionId,
-      data,
-    ).map(
-      (exercise) =>
-        createInitialExerciseLog(
-          exercise,
-          data.exerciseDefaults[
-            exercise.id
-          ],
-        ),
-    );
-  });
+      return getExercisesForSession(
+        sessionId,
+        data,
+      ).map(
+        (exercise) =>
+          createInitialExerciseLog(
+            exercise,
+            data.exerciseDefaults[
+              exercise.id
+            ],
+          ),
+      );
+    });
 
-  /*
-   * Garder l'état de la séance cohérent si la liste
-   * des exercices change pendant que la page existe.
-   *
-   * Les valeurs déjà modifiées temporairement sont conservées.
-   */
   useEffect(
     () => {
       setExerciseLogs(
@@ -548,9 +541,10 @@ export function SessionDetailPage() {
   const [
     pain,
     setPain,
-  ] = useState<
-    Record<string, number>
-  >({});
+  ] =
+    useState<
+      Record<string, number>
+    >({});
 
   const [
     showPainSection,
@@ -641,6 +635,9 @@ export function SessionDetailPage() {
     );
   }
 
+  const currentSession =
+    session;
+
   function updateExerciseLog(
     exerciseId: string,
     updatedLog: ExerciseLog,
@@ -713,16 +710,8 @@ export function SessionDetailPage() {
           new Date().toISOString(),
 
         sessionId:
-          session.id,
+          currentSession.id,
 
-        /*
-         * Sauvegarder également les exercices non réalisés.
-         *
-         * Cela permet ensuite :
-         * - de distinguer réalisé / non réalisé ;
-         * - de détecter une séance partielle ;
-         * - de proposer uniquement ce qu'il reste à faire.
-         */
         exerciseLogs:
           exerciseLogs.map(
             (log) => ({
@@ -743,6 +732,20 @@ export function SessionDetailPage() {
             : undefined,
       };
 
+    /*
+     * Toute la logique suivante est maintenant
+     * centralisée dans ClimbTrackContext :
+     *
+     * - apprentissage silencieux du poids ;
+     * - détection de deux réussites consécutives ;
+     * - augmentation automatique ;
+     * - création de la flèche ↗ ;
+     * - suppression de la flèche après réussite ;
+     * - exclusion de Prévention.
+     *
+     * La page n'a donc plus à modifier elle-même
+     * les valeurs par défaut.
+     */
     addSessionLog(
       sessionLog,
     );
@@ -775,18 +778,12 @@ export function SessionDetailPage() {
       pain,
     ).filter(
       (value) =>
-        value > 0,
+        value >
+        0,
     ).length;
 
   return (
     <div className="min-h-screen w-full overflow-x-hidden bg-background pb-36 pt-safe">
-      {/*
-       * IMPORTANT :
-       * le header n'est volontairement PAS sticky.
-       *
-       * Le nom de la séance et la progression remontent
-       * donc normalement avec le contenu lorsque l'on scroll.
-       */}
       <header className="border-b border-border bg-background px-5 py-4">
         <div className="flex items-start gap-4">
           <button
@@ -807,13 +804,13 @@ export function SessionDetailPage() {
           <div className="min-w-0 flex-1">
             <h1 className="text-xl font-black leading-tight text-white">
               {
-                session.name
+                currentSession.name
               }
             </h1>
 
             <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
               {
-                session.moment
+                currentSession.moment
               }
             </p>
           </div>
@@ -917,6 +914,13 @@ export function SessionDetailPage() {
                   return null;
                 }
 
+                const hasPendingProgression =
+                  Boolean(
+                    data.pendingAutomaticProgressions[
+                      exercise.id
+                    ],
+                  );
+
                 return (
                   <ExerciseRow
                     key={
@@ -944,14 +948,20 @@ export function SessionDetailPage() {
                     }
                     onUpdateDefault={() => {
                       /*
-                       * Les changements effectués pendant
-                       * une séance restent temporaires.
+                       * Les changements effectués
+                       * pendant la séance restent
+                       * temporaires.
                        */
                     }}
                     isPainful={
                       painfulExerciseIds.has(
                         exercise.id,
                       )
+                    }
+                    showProgressionIncrease={
+                      currentSession.id !==
+                        "s7-prevention" &&
+                      hasPendingProgression
                     }
                   />
                 );

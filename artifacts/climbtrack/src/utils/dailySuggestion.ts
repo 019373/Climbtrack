@@ -12,6 +12,14 @@ import {
   calculateMuscleRecovery,
 } from "@/utils/muscleRecovery";
 
+import type {
+  RecoveryExerciseData,
+} from "@/utils/muscleRecovery";
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Types
+// ─────────────────────────────────────────────────────────────────────────────
+
 export type DailyPreference =
   | "unknown"
   | "climbing"
@@ -19,6 +27,12 @@ export type DailyPreference =
   | "climbing+kilter"
   | "rest"
   | string;
+
+export type ClimbingPreference =
+  | "none"
+  | "climbing"
+  | "kilter"
+  | "climbing+kilter";
 
 export type SuggestedStepType =
   | "warmup"
@@ -61,13 +75,36 @@ export type DailySuggestion = {
   signature: string;
 };
 
+export type SuggestionExerciseReference = {
+  id: string;
+  name: string;
+};
+
 type GenerateSuggestionOptions = {
   logs: SessionLog[];
   injuries?: Injury[];
+
   date: string;
-  availableMinutes: number | null;
+
+  availableMinutes:
+    | number
+    | null;
+
   preference: DailyPreference;
+
+  climbingPreference?: ClimbingPreference;
+
+  requestedSessionIds?: string[];
+
+  customSessionExercises?: Record<
+    string,
+    SuggestionExerciseReference[]
+  >;
+
+  recoveryExerciseData?: RecoveryExerciseData;
+
   variation: number;
+
   recentSuggestionSignatures?: string[];
 };
 
@@ -79,8 +116,10 @@ type RecoveryLoadScores = Record<
 type PartialSession = {
   sessionId: string;
   date: string;
+
   completedExerciseIds: string[];
   remainingExerciseIds: string[];
+
   completionRatio: number;
 };
 
@@ -108,30 +147,91 @@ type BoulderResult = {
   date: string;
 };
 
-const DEFAULT_UNKNOWN_TIME_MINUTES =
-  105;
+type AutomaticSessionCandidate = {
+  sessionId: string;
+  score: number;
+  recoveryPenalty: number;
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Durées
+// ─────────────────────────────────────────────────────────────────────────────
+
+/*
+ * Si aucun temps n'est indiqué :
+ * on construit une proposition autour de 1 h 30.
+ */
+const DEFAULT_UNKNOWN_TOTAL_TIME_MINUTES =
+  90;
+
+/*
+ * Si l'utilisateur donne un temps total,
+ * on garde 10 minutes de marge pour :
+ *
+ * - se changer ;
+ * - se doucher ;
+ * - ranger ;
+ * - se déplacer dans la salle.
+ */
+const USER_TIME_MARGIN_MINUTES =
+  10;
 
 const SESSION_DURATION: Record<
   string,
   number
 > = {
-  "s1-force-doigts": 35,
-  "s2-resistance": 40,
-  "s3-dos-epaules": 45,
-  "s4-gainage": 30,
-  "s5-souplesse": 30,
-  "s6-jambes": 40,
-  "s7-prevention": 25,
-  "s8-pompes-activation": 10,
+  "s1-force-doigts":
+    35,
+
+  "s2-resistance":
+    40,
+
+  "s3-dos-epaules":
+    45,
+
+  "s4-gainage":
+    30,
+
+  "s5-souplesse":
+    30,
+
+  "s6-jambes":
+    40,
+
+  "s7-prevention":
+    25,
+
+  "s8-pompes-activation":
+    10,
 };
 
-const MAIN_SESSION_IDS = [
+// ─────────────────────────────────────────────────────────────────────────────
+// Séances disponibles
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const REQUESTABLE_SESSION_IDS = [
   "s1-force-doigts",
   "s2-resistance",
   "s3-dos-epaules",
+  "s4-gainage",
+  "s6-jambes",
+];
+
+const AUTO_MAIN_SESSION_IDS = [
+  "s1-force-doigts",
+  "s2-resistance",
+  "s3-dos-epaules",
+  "s4-gainage",
   "s6-jambes",
   "s7-prevention",
 ];
+
+const NON_REQUESTABLE_SESSION_IDS =
+  new Set([
+    "s5-souplesse",
+    "s7-prevention",
+    "s8-pompes-activation",
+  ]);
 
 const KILTER_ANGLES = [
   20,
@@ -154,7 +254,8 @@ const KILTER_ANGLES = [
 function stringHash(
   value: string,
 ): number {
-  let hash = 0;
+  let hash =
+    0;
 
   for (
     let index = 0;
@@ -163,7 +264,8 @@ function stringHash(
   ) {
     hash =
       (
-        hash * 31 +
+        hash *
+          31 +
         value.charCodeAt(
           index,
         )
@@ -186,7 +288,9 @@ function localDateFromDate(
       offset,
   )
     .toISOString()
-    .split("T")[0];
+    .split(
+      "T",
+    )[0];
 }
 
 function differenceInDays(
@@ -243,7 +347,9 @@ function getLogsDuringLastDays(
   days: number,
 ): SessionLog[] {
   return logs.filter(
-    (log) => {
+    (
+      log,
+    ) => {
       const difference =
         differenceInDays(
           date,
@@ -251,8 +357,10 @@ function getLogsDuringLastDays(
         );
 
       return (
-        difference >= 0 &&
-        difference < days
+        difference >=
+          0 &&
+        difference <
+          days
       );
     },
   );
@@ -264,38 +372,80 @@ function hasTodaySession(
   sessionId: string,
 ): boolean {
   return logs.some(
-    (log) =>
-      log.date === date &&
+    (
+      log,
+    ) =>
+      log.date ===
+        date &&
       log.sessionId ===
         sessionId,
   );
 }
 
+/*
+ * Budget réellement utilisable par le générateur.
+ *
+ * Exemples :
+ *
+ * 2 h 30 saisi
+ * = 150 min totales
+ * = 140 min d'entraînement proposées
+ *
+ * 1 h saisi
+ * = 60 min totales
+ * = 50 min d'entraînement proposées
+ *
+ * rien saisi
+ * = 90 min d'entraînement par défaut.
+ */
 function getPlanningBudget(
   availableMinutes:
     | number
     | null,
 ): number {
+  /*
+   * Aucun temps indiqué :
+   *
+   * 1 h 30 TOTAL par défaut
+   * - 10 min de marge
+   * = 1 h 20 maximum d'entraînement.
+   */
   if (
     availableMinutes ===
     null
   ) {
-    return DEFAULT_UNKNOWN_TIME_MINUTES;
+    return Math.max(
+      0,
+      DEFAULT_UNKNOWN_TOTAL_TIME_MINUTES -
+        USER_TIME_MARGIN_MINUTES,
+    );
   }
 
-  const margin =
+  const rounded =
     Math.max(
-      5,
+      0,
       Math.round(
-        availableMinutes *
-          0.06,
+        availableMinutes,
       ),
     );
 
+  if (
+    rounded ===
+    0
+  ) {
+    return 0;
+  }
+
+  /*
+   * Même sur un temps très court, la valeur saisie
+   * représente toujours le temps TOTAL disponible.
+   *
+   * On conserve donc la règle des 10 minutes de marge.
+   */
   return Math.max(
-    15,
-    availableMinutes -
-      margin,
+    0,
+    rounded -
+      USER_TIME_MARGIN_MINUTES,
   );
 }
 
@@ -303,7 +453,9 @@ function getSession(
   sessionId: string,
 ) {
   return SESSIONS.find(
-    (session) =>
+    (
+      session,
+    ) =>
       session.id ===
       sessionId,
   );
@@ -320,15 +472,91 @@ function getSessionName(
   );
 }
 
+function getSessionDuration(
+  sessionId: string,
+): number {
+  return (
+    SESSION_DURATION[
+      sessionId
+    ] ??
+    30
+  );
+}
+
+function getSessionExerciseReferences(
+  sessionId: string,
+  customSessionExercises?: Record<
+    string,
+    SuggestionExerciseReference[]
+  >,
+): SuggestionExerciseReference[] {
+  const session =
+    getSession(
+      sessionId,
+    );
+
+  const builtIn =
+    session?.exercises.map(
+      (
+        exercise,
+      ) => ({
+        id:
+          exercise.id,
+
+        name:
+          exercise.name,
+      }),
+    ) ??
+    [];
+
+  const custom =
+    customSessionExercises?.[
+      sessionId
+    ] ??
+    [];
+
+  const seen =
+    new Set<string>();
+
+  return [
+    ...builtIn,
+    ...custom,
+  ].filter(
+    (
+      exercise,
+    ) => {
+      if (
+        seen.has(
+          exercise.id,
+        )
+      ) {
+        return false;
+      }
+
+      seen.add(
+        exercise.id,
+      );
+
+      return true;
+    },
+  );
+}
+
 function getExerciseName(
   exerciseId: string,
+  customSessionExercises?: Record<
+    string,
+    SuggestionExerciseReference[]
+  >,
 ): string {
   for (
     const session of SESSIONS
   ) {
     const exercise =
       session.exercises.find(
-        (item) =>
+        (
+          item,
+        ) =>
           item.id ===
           exerciseId,
       );
@@ -337,6 +565,31 @@ function getExerciseName(
       exercise
     ) {
       return exercise.name;
+    }
+  }
+
+  if (
+    customSessionExercises
+  ) {
+    for (
+      const exercises of Object.values(
+        customSessionExercises,
+      )
+    ) {
+      const exercise =
+        exercises.find(
+          (
+            item,
+          ) =>
+            item.id ===
+            exerciseId,
+        );
+
+      if (
+        exercise
+      ) {
+        return exercise.name;
+      }
     }
   }
 
@@ -393,9 +646,17 @@ function getNumberValue(
     typeof value ===
     "string"
   ) {
+    const normalized =
+      value
+        .trim()
+        .replace(
+          ",",
+          ".",
+        );
+
     const parsed =
       Number(
-        value,
+        normalized,
       );
 
     if (
@@ -431,6 +692,19 @@ function getPlannedMinutes(
       total +
       step.durationMinutes,
     0,
+  );
+}
+
+function getRemainingMinutes(
+  steps: SuggestedStep[],
+  budget: number,
+): number {
+  return Math.max(
+    0,
+    budget -
+      getPlannedMinutes(
+        steps,
+      ),
   );
 }
 
@@ -476,6 +750,82 @@ function addStepIfFits(
   return true;
 }
 
+function deriveLegacyClimbingPreference(
+  preference: DailyPreference,
+): ClimbingPreference {
+  if (
+    preference ===
+    "climbing"
+  ) {
+    return "climbing";
+  }
+
+  if (
+    preference ===
+    "kilter"
+  ) {
+    return "kilter";
+  }
+
+  if (
+    preference ===
+    "climbing+kilter"
+  ) {
+    return "climbing+kilter";
+  }
+
+  return "none";
+}
+
+function normalizeRequestedSessionIds(
+  requestedSessionIds:
+    | string[]
+    | undefined,
+  legacyPreference: DailyPreference,
+): string[] {
+  const raw =
+    requestedSessionIds &&
+    requestedSessionIds.length >
+      0
+      ? requestedSessionIds
+      : getSession(
+            legacyPreference,
+          ) &&
+          !NON_REQUESTABLE_SESSION_IDS.has(
+            legacyPreference,
+          )
+        ? [
+            legacyPreference,
+          ]
+        : [];
+
+  const unique =
+    new Set<string>();
+
+  raw.forEach(
+    (
+      sessionId,
+    ) => {
+      if (
+        getSession(
+          sessionId,
+        ) &&
+        !NON_REQUESTABLE_SESSION_IDS.has(
+          sessionId,
+        )
+      ) {
+        unique.add(
+          sessionId,
+        );
+      }
+    },
+  );
+
+  return [
+    ...unique,
+  ];
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Séances partielles
 // ─────────────────────────────────────────────────────────────────────────────
@@ -483,18 +833,23 @@ function addStepIfFits(
 function findPartialSession(
   logs: SessionLog[],
   date: string,
+  requestedSessionIds: string[],
+  customSessionExercises?: Record<
+    string,
+    SuggestionExerciseReference[]
+  >,
 ): PartialSession | null {
-  /*
-   * Une vraie séance partielle doit maintenant contenir
-   * explicitement :
-   *
-   * completed: true
-   * ET
-   * completed: false
-   *
-   * Cela évite de prendre les anciennes séances pour
-   * des séances incomplètes.
-   */
+  if (
+    requestedSessionIds.length ===
+    0
+  ) {
+    return null;
+  }
+
+  const requested =
+    new Set(
+      requestedSessionIds,
+    );
 
   const recentLogs =
     getLogsDuringLastDays(
@@ -503,11 +858,11 @@ function findPartialSession(
       4,
     )
       .filter(
-        (log) =>
-          Boolean(
-            getSession(
-              log.sessionId,
-            ),
+        (
+          log,
+        ) =>
+          requested.has(
+            log.sessionId,
           ),
       )
       .sort(
@@ -544,8 +899,13 @@ function findPartialSession(
 
     const currentExerciseIds =
       new Set(
-        session.exercises.map(
-          (exercise) =>
+        getSessionExerciseReferences(
+          session.id,
+          customSessionExercises,
+        ).map(
+          (
+            exercise,
+          ) =>
             exercise.id,
         ),
       );
@@ -553,16 +913,22 @@ function findPartialSession(
     const completedExerciseIds =
       log.exerciseLogs
         .filter(
-          (exercise) =>
+          (
+            exercise,
+          ) =>
             exercise.completed ===
             true,
         )
         .map(
-          (exercise) =>
+          (
+            exercise,
+          ) =>
             exercise.exerciseId,
         )
         .filter(
-          (exerciseId) =>
+          (
+            exerciseId,
+          ) =>
             currentExerciseIds.has(
               exerciseId,
             ),
@@ -571,16 +937,22 @@ function findPartialSession(
     const remainingExerciseIds =
       log.exerciseLogs
         .filter(
-          (exercise) =>
+          (
+            exercise,
+          ) =>
             exercise.completed ===
             false,
         )
         .map(
-          (exercise) =>
+          (
+            exercise,
+          ) =>
             exercise.exerciseId,
         )
         .filter(
-          (exerciseId) =>
+          (
+            exerciseId,
+          ) =>
             currentExerciseIds.has(
               exerciseId,
             ),
@@ -611,7 +983,8 @@ function findPartialSession(
       remainingExerciseIds,
 
       completionRatio:
-        total > 0
+        total >
+        0
           ? completedExerciseIds.length /
             total
           : 0,
@@ -628,16 +1001,21 @@ function findPartialSession(
 function calculateRecoveryLoadScores(
   logs: SessionLog[],
   injuries: Injury[],
+  recoveryExerciseData?: RecoveryExerciseData,
 ): RecoveryLoadScores {
   const recovery =
     calculateMuscleRecovery(
       logs,
       injuries,
+      new Date(),
+      recoveryExerciseData,
     );
 
   return Object.fromEntries(
     recovery.map(
-      (muscle) => [
+      (
+        muscle,
+      ) => [
         muscle.id,
 
         Math.max(
@@ -661,7 +1039,8 @@ function getRecoveryPenalty(
   const forearms =
     recoveryScores[
       "avant-bras"
-    ] ?? 0;
+    ] ??
+    0;
 
   const back =
     recoveryScores.dorsaux ??
@@ -687,6 +1066,14 @@ function getRecoveryPenalty(
     recoveryScores.triceps ??
     0;
 
+  const abs =
+    recoveryScores.abdominaux ??
+    0;
+
+  const obliques =
+    recoveryScores.obliques ??
+    0;
+
   const legs =
     (
       recoveryScores.quadriceps ??
@@ -710,9 +1097,12 @@ function getRecoveryPenalty(
     "s1-force-doigts"
   ) {
     return (
-      fingers * 0.2 +
-      forearms * 0.16 +
-      shoulders * 0.05
+      fingers *
+        0.2 +
+      forearms *
+        0.16 +
+      shoulders *
+        0.05
     );
   }
 
@@ -721,10 +1111,14 @@ function getRecoveryPenalty(
     "s2-resistance"
   ) {
     return (
-      fingers * 0.13 +
-      forearms * 0.16 +
-      back * 0.07 +
-      biceps * 0.06
+      fingers *
+        0.13 +
+      forearms *
+        0.16 +
+      back *
+        0.07 +
+      biceps *
+        0.06
     );
   }
 
@@ -733,11 +1127,16 @@ function getRecoveryPenalty(
     "s3-dos-epaules"
   ) {
     return (
-      back * 0.12 +
-      shoulders * 0.13 +
-      chest * 0.08 +
-      biceps * 0.07 +
-      triceps * 0.07
+      back *
+        0.12 +
+      shoulders *
+        0.13 +
+      chest *
+        0.08 +
+      biceps *
+        0.07 +
+      triceps *
+        0.07
     );
   }
 
@@ -746,8 +1145,14 @@ function getRecoveryPenalty(
     "s4-gainage"
   ) {
     return (
-      lowerBack * 0.05 +
-      shoulders * 0.025
+      lowerBack *
+        0.05 +
+      shoulders *
+        0.025 +
+      abs *
+        0.06 +
+      obliques *
+        0.06
     );
   }
 
@@ -756,8 +1161,10 @@ function getRecoveryPenalty(
     "s6-jambes"
   ) {
     return (
-      legs * 0.07 +
-      lowerBack * 0.09
+      legs *
+        0.07 +
+      lowerBack *
+        0.09
     );
   }
 
@@ -768,7 +1175,8 @@ function getRecoveryPenalty(
     return (
       shoulders +
       forearms
-    ) * 0.012;
+    ) *
+      0.012;
   }
 
   if (
@@ -776,9 +1184,12 @@ function getRecoveryPenalty(
     "s8-pompes-activation"
   ) {
     return (
-      shoulders * 0.08 +
-      chest * 0.11 +
-      triceps * 0.1
+      shoulders *
+        0.08 +
+      chest *
+        0.11 +
+      triceps *
+        0.1
     );
   }
 
@@ -786,50 +1197,28 @@ function getRecoveryPenalty(
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Choix de séance
+// Choix automatique
 // ─────────────────────────────────────────────────────────────────────────────
 
-function chooseMainSession(
+function rankAutomaticMainSessions(
   logs: SessionLog[],
   injuries: Injury[],
   date: string,
   seed: number,
-  preference: DailyPreference,
-): string | null {
+  recoveryExerciseData?: RecoveryExerciseData,
+): AutomaticSessionCandidate[] {
   const recoveryScores =
     calculateRecoveryLoadScores(
       logs,
       injuries,
+      recoveryExerciseData,
     );
 
-  /*
-   * Si une séance spécifique est demandée,
-   * essayer de la respecter tant que la récupération
-   * reste suffisamment correcte.
-   */
-  if (
-    MAIN_SESSION_IDS.includes(
-      preference,
-    )
-  ) {
-    const forcedPenalty =
-      getRecoveryPenalty(
-        preference,
-        recoveryScores,
-      );
-
-    if (
-      forcedPenalty < 42
-    ) {
-      return preference;
-    }
-
-    return null;
-  }
-
   const candidates =
-    MAIN_SESSION_IDS.filter(
-      (sessionId) =>
+    AUTO_MAIN_SESSION_IDS.filter(
+      (
+        sessionId,
+      ) =>
         !hasTodaySession(
           logs,
           date,
@@ -844,8 +1233,8 @@ function chooseMainSession(
       14,
     );
 
-  const scored =
-    candidates.map(
+  return candidates
+    .map(
       (
         sessionId,
         index,
@@ -853,7 +1242,9 @@ function chooseMainSession(
         const lastLog =
           logs
             .filter(
-              (log) =>
+              (
+                log,
+              ) =>
                 log.sessionId ===
                 sessionId,
             )
@@ -880,7 +1271,9 @@ function chooseMainSession(
 
         const countLast14 =
           recentLogs.filter(
-            (log) =>
+            (
+              log,
+            ) =>
               log.sessionId ===
               sessionId,
           ).length;
@@ -906,19 +1299,24 @@ function chooseMainSession(
           (
             (
               seed +
-              index * 7
+              index *
+                7
             ) %
             11
           );
 
         if (
-          daysSince <= 1
+          daysSince <=
+          1
         ) {
-          score -= 110;
+          score -=
+            110;
         } else if (
-          daysSince === 2
+          daysSince ===
+          2
         ) {
-          score -= 40;
+          score -=
+            40;
         }
 
         return {
@@ -927,29 +1325,223 @@ function chooseMainSession(
           recoveryPenalty,
         };
       },
+    )
+    .filter(
+      (
+        candidate,
+      ) =>
+        candidate.recoveryPenalty <
+        45,
+    )
+    .sort(
+      (
+        first,
+        second,
+      ) =>
+        second.score -
+        first.score,
+    );
+}
+
+/*
+ * Évite de mettre automatiquement Force doigts
+ * et Résistance dans la même grosse proposition.
+ *
+ * Les deux sollicitent fortement doigts /
+ * avant-bras.
+ */
+function automaticSessionsAreCompatible(
+  alreadySelected: string[],
+  candidateId: string,
+): boolean {
+  const hasFingerStrength =
+    alreadySelected.includes(
+      "s1-force-doigts",
     );
 
-  scored.sort(
-    (
-      first,
-      second,
-    ) =>
-      second.score -
-      first.score,
-  );
-
-  const best =
-    scored[0];
+  const hasResistance =
+    alreadySelected.includes(
+      "s2-resistance",
+    );
 
   if (
-    !best ||
-    best.recoveryPenalty >=
-      45
+    candidateId ===
+      "s1-force-doigts" &&
+    hasResistance
   ) {
-    return null;
+    return false;
   }
 
-  return best.sessionId;
+  if (
+    candidateId ===
+      "s2-resistance" &&
+    hasFingerStrength
+  ) {
+    return false;
+  }
+
+  return true;
+}
+
+function chooseAutomaticSessionsForBudget(
+  logs: SessionLog[],
+  injuries: Injury[],
+  date: string,
+  seed: number,
+  budget: number,
+  recoveryExerciseData?: RecoveryExerciseData,
+): string[] {
+  const ranked =
+    rankAutomaticMainSessions(
+      logs,
+      injuries,
+      date,
+      seed,
+      recoveryExerciseData,
+    );
+
+  if (
+    ranked.length ===
+      0 ||
+    budget <=
+      0
+  ) {
+    return [];
+  }
+
+  const selected:
+    string[] = [];
+
+  /*
+   * On réserve approximativement un éventuel
+   * finisher de 10 minutes lorsque le temps
+   * le permet.
+   */
+  const sessionBudget =
+    budget >=
+    55
+      ? budget -
+        10
+      : budget;
+
+  let usedMinutes =
+    0;
+
+  for (
+    const candidate of ranked
+  ) {
+    if (
+      !automaticSessionsAreCompatible(
+        selected,
+        candidate.sessionId,
+      )
+    ) {
+      continue;
+    }
+
+    const duration =
+      getSessionDuration(
+        candidate.sessionId,
+      );
+
+    /*
+     * Si la première séance demande un échauffement,
+     * prévoir également celui-ci.
+     */
+    const requiresWarmup =
+      candidate.sessionId ===
+        "s1-force-doigts" ||
+      candidate.sessionId ===
+        "s2-resistance";
+
+    const alreadyNeedsWarmup =
+      selected.some(
+        (
+          sessionId,
+        ) =>
+          sessionId ===
+            "s1-force-doigts" ||
+          sessionId ===
+            "s2-resistance",
+      );
+
+    const additionalWarmup =
+      requiresWarmup &&
+      !alreadyNeedsWarmup
+        ? 15
+        : 0;
+
+    if (
+      usedMinutes +
+        duration +
+        additionalWarmup >
+      sessionBudget
+    ) {
+      continue;
+    }
+
+    selected.push(
+      candidate.sessionId,
+    );
+
+    usedMinutes +=
+      duration +
+      additionalWarmup;
+
+    /*
+     * Trois séances principales maximum.
+     *
+     * Au-delà, la proposition devient inutilement
+     * fragmentée même avec énormément de temps.
+     */
+    if (
+      selected.length >=
+      3
+    ) {
+      break;
+    }
+  }
+
+  /*
+   * S'il n'y a rien qui rentre avec la réserve
+   * du finisher, essayer simplement la meilleure
+   * séance qui tient réellement dans le budget.
+   */
+  if (
+    selected.length ===
+    0
+  ) {
+    for (
+      const candidate of ranked
+    ) {
+      const duration =
+        getSessionDuration(
+          candidate.sessionId,
+        );
+
+      const warmup =
+        candidate.sessionId ===
+          "s1-force-doigts" ||
+        candidate.sessionId ===
+          "s2-resistance"
+          ? 10
+          : 0;
+
+      if (
+        duration +
+          warmup <=
+        budget
+      ) {
+        selected.push(
+          candidate.sessionId,
+        );
+
+        break;
+      }
+    }
+  }
+
+  return selected;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -969,7 +1561,9 @@ function chooseFinisher(
 
   const absCount =
     last30.filter(
-      (log) =>
+      (
+        log,
+      ) =>
         log.finisherType ===
           "abs" ||
         log.sessionId ===
@@ -978,7 +1572,9 @@ function chooseFinisher(
 
   const flexibilityCount =
     last30.filter(
-      (log) =>
+      (
+        log,
+      ) =>
         log.finisherType ===
           "flexibility" ||
         log.sessionId ===
@@ -986,8 +1582,10 @@ function chooseFinisher(
     ).length;
 
   if (
-    absCount === 0 &&
-    flexibilityCount === 0
+    absCount ===
+      0 &&
+    flexibilityCount ===
+      0
   ) {
     return "abs";
   }
@@ -1025,7 +1623,7 @@ function isSuccessfulResult(
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Kilterboard
+// Kilter
 // ─────────────────────────────────────────────────────────────────────────────
 
 function clampKilterGrade(
@@ -1046,10 +1644,13 @@ function extractKilterResults(
   logs: SessionLog[],
 ): KilterResult[] {
   const results:
-    KilterResult[] = [];
+    KilterResult[] =
+    [];
 
   logs.forEach(
-    (log) => {
+    (
+      log,
+    ) => {
       const raw =
         log as unknown as Record<
           string,
@@ -1059,7 +1660,9 @@ function extractKilterResults(
       getArrayValue(
         raw.kilterEntries,
       ).forEach(
-        (value) => {
+        (
+          value,
+        ) => {
           const entry =
             getUnknownRecord(
               value,
@@ -1121,24 +1724,31 @@ function buildKilterAngleProfile(
 ): KilterAngleProfile {
   const atAngle =
     entries.filter(
-      (entry) =>
+      (
+        entry,
+      ) =>
         entry.angle ===
         angle,
     );
 
   const successful =
     atAngle.filter(
-      (entry) =>
+      (
+        entry,
+      ) =>
         isSuccessfulResult(
           entry.result,
         ),
     );
 
   const highestSuccessfulGrade =
-    successful.length > 0
+    successful.length >
+    0
       ? Math.max(
           ...successful.map(
-            (entry) =>
+            (
+              entry,
+            ) =>
               entry.grade,
           ),
         )
@@ -1147,13 +1757,6 @@ function buildKilterAngleProfile(
   let confirmedGrade =
     0;
 
-  /*
-   * Chaque inclinaison est indépendante.
-   *
-   * Il faut au moins 2 réussites au même grade
-   * et à la même inclinaison pour considérer
-   * le niveau comme consolidé.
-   */
   for (
     let grade = 0;
     grade <= 17;
@@ -1161,7 +1764,9 @@ function buildKilterAngleProfile(
   ) {
     const sendsAtGrade =
       successful.filter(
-        (entry) =>
+        (
+          entry,
+        ) =>
           entry.grade ===
           grade,
       );
@@ -1177,32 +1782,30 @@ function buildKilterAngleProfile(
 
   const sendsAtConfirmedGrade =
     successful.filter(
-      (entry) =>
+      (
+        entry,
+      ) =>
         entry.grade ===
         confirmedGrade,
     );
 
   const nextGrade =
     clampKilterGrade(
-      confirmedGrade + 1,
+      confirmedGrade +
+        1,
     );
 
-  /*
-   * Pour débloquer le niveau suivant :
-   *
-   * - deux réussites au grade actuel ;
-   * - au moins une réussite en 4 essais ou moins.
-   *
-   * Un niveau arraché deux fois après énormément
-   * d'essais n'est donc pas traité comme parfaitement maîtrisé.
-   */
   const nextGradeUnlocked =
-    confirmedGrade < 17 &&
+    confirmedGrade <
+      17 &&
     sendsAtConfirmedGrade.length >=
       2 &&
     sendsAtConfirmedGrade.some(
-      (entry) =>
-        entry.attempts <= 4,
+      (
+        entry,
+      ) =>
+        entry.attempts <=
+        4,
     );
 
   return {
@@ -1238,7 +1841,9 @@ function chooseKilterProfile(
 
   const profiles =
     KILTER_ANGLES.map(
-      (angle) =>
+      (
+        angle,
+      ) =>
         buildKilterAngleProfile(
           entries,
           angle,
@@ -1247,18 +1852,18 @@ function chooseKilterProfile(
 
   const practised =
     profiles.filter(
-      (profile) =>
+      (
+        profile,
+      ) =>
         entries.some(
-          (entry) =>
+          (
+            entry,
+          ) =>
             entry.angle ===
             profile.angle,
         ),
     );
 
-  /*
-   * Première utilisation du Kilter :
-   * partir à 30°.
-   */
   if (
     practised.length ===
     0
@@ -1269,12 +1874,10 @@ function chooseKilterProfile(
     );
   }
 
-  /*
-   * Favoriser une inclinaison déjà utilisée
-   * mais encore relativement peu consolidée.
-   */
   const ordered =
-    [...practised].sort(
+    [
+      ...practised,
+    ].sort(
       (
         first,
         second,
@@ -1303,8 +1906,9 @@ function chooseKilterProfile(
     );
 
   if (
-    seed % 100 <
-      70
+    seed %
+      100 <
+    70
   ) {
     return ordered[0];
   }
@@ -1347,7 +1951,8 @@ function getKilterStep(
       description:
         `Commencer par 2 à 3 blocs propres en V${Math.max(
           0,
-          currentGrade - 1,
+          currentGrade -
+            1,
         )} ou V${currentGrade}, puis travailler au maximum deux projets en V${profile.nextGrade}. Garder la même inclinaison pour comparer correctement la progression.`,
 
       durationMinutes:
@@ -1363,7 +1968,8 @@ function getKilterStep(
         minGrade:
           Math.max(
             0,
-            currentGrade - 1,
+            currentGrade -
+              1,
           ),
 
         maxGrade:
@@ -1388,7 +1994,8 @@ function getKilterStep(
     subtitle:
       `${profile.angle}° · V${Math.max(
         0,
-        currentGrade - 1,
+        currentGrade -
+          1,
       )} à V${currentGrade}`,
 
     description:
@@ -1410,7 +2017,8 @@ function getKilterStep(
       minGrade:
         Math.max(
           0,
-          currentGrade - 1,
+          currentGrade -
+            1,
         ),
 
       maxGrade:
@@ -1422,6 +2030,47 @@ function getKilterStep(
   };
 }
 
+function fitKilterStepToTime(
+  step: SuggestedStep,
+  availableMinutes: number,
+): SuggestedStep | null {
+  if (
+    availableMinutes <
+    10
+  ) {
+    return null;
+  }
+
+  const duration =
+    Math.min(
+      step.durationMinutes,
+      availableMinutes,
+    );
+
+  return {
+    ...step,
+
+    durationMinutes:
+      duration,
+
+    description:
+      duration <
+      step.durationMinutes
+        ? `${step.description ?? ""} Séance raccourcie pour respecter le temps disponible.`.trim()
+        : step.description,
+
+    kilterPreset:
+      step.kilterPreset
+        ? {
+            ...step.kilterPreset,
+
+            durationMinutes:
+              duration,
+          }
+        : undefined,
+  };
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Bloc libre
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1430,10 +2079,13 @@ function extractBoulderResults(
   logs: SessionLog[],
 ): BoulderResult[] {
   const results:
-    BoulderResult[] = [];
+    BoulderResult[] =
+    [];
 
   logs.forEach(
-    (log) => {
+    (
+      log,
+    ) => {
       const raw =
         log as unknown as Record<
           string,
@@ -1447,11 +2099,15 @@ function extractBoulderResults(
       ];
 
       possibleArrays.forEach(
-        (possibleArray) => {
+        (
+          possibleArray,
+        ) => {
           getArrayValue(
             possibleArray,
           ).forEach(
-            (value) => {
+            (
+              value,
+            ) => {
               const entry =
                 getUnknownRecord(
                   value,
@@ -1472,7 +2128,8 @@ function extractBoulderResults(
                 );
 
               if (
-                grade < 0
+                grade <
+                0
               ) {
                 return;
               }
@@ -1522,7 +2179,9 @@ function getBoulderGuidance(
 
   const successful =
     entries.filter(
-      (entry) =>
+      (
+        entry,
+      ) =>
         isSuccessfulResult(
           entry.result,
         ),
@@ -1544,14 +2203,18 @@ function getBoulderGuidance(
   const highestGrade =
     Math.max(
       ...successful.map(
-        (entry) =>
+        (
+          entry,
+        ) =>
           entry.grade,
       ),
     );
 
   const sendsAtHighest =
     successful.filter(
-      (entry) =>
+      (
+        entry,
+      ) =>
         entry.grade ===
         highestGrade,
     );
@@ -1572,13 +2235,16 @@ function getBoulderGuidance(
   const bestAttempts =
     Math.min(
       ...sendsAtHighest.map(
-        (entry) =>
+        (
+          entry,
+        ) =>
           entry.attempts,
       ),
     );
 
   if (
-    bestAttempts > 4
+    bestAttempts >
+    4
   ) {
     return {
       title:
@@ -1602,7 +2268,10 @@ function getBoulderGuidance(
 // Étapes
 // ─────────────────────────────────────────────────────────────────────────────
 
-function getWarmupStep(): SuggestedStep {
+function getWarmupStep(
+  durationMinutes =
+    15,
+): SuggestedStep {
   return {
     id:
       "warmup-climbing",
@@ -1617,10 +2286,12 @@ function getWarmupStep(): SuggestedStep {
       "Articulations · épaules · doigts",
 
     description:
-      "Commencer très facilement puis augmenter progressivement l’intensité. Arrêter tout mouvement qui augmente une douleur.",
+      durationMinutes <
+      15
+        ? "Échauffement raccourci : mobiliser les articulations puis augmenter progressivement l’intensité. Ne jamais commencer directement à intensité maximale."
+        : "Commencer très facilement puis augmenter progressivement l’intensité. Arrêter tout mouvement qui augmente une douleur.",
 
-    durationMinutes:
-      15,
+    durationMinutes,
 
     isTemporarySuggestion:
       true,
@@ -1763,10 +2434,9 @@ function buildSessionStep(
       "Réaliser la séance",
 
     durationMinutes:
-      SESSION_DURATION[
-        sessionId
-      ] ??
-      30,
+      getSessionDuration(
+        sessionId,
+      ),
 
     sessionId,
 
@@ -1777,6 +2447,10 @@ function buildSessionStep(
 
 function buildPartialSessionStep(
   partial: PartialSession,
+  customSessionExercises?: Record<
+    string,
+    SuggestionExerciseReference[]
+  >,
 ): SuggestedStep | null {
   if (
     partial.remainingExerciseIds.length ===
@@ -1789,11 +2463,8 @@ function buildPartialSessionStep(
     Math.max(
       10,
       Math.round(
-        (
-          SESSION_DURATION[
-            partial.sessionId
-          ] ??
-          30
+        getSessionDuration(
+          partial.sessionId,
         ) *
           (
             1 -
@@ -1828,7 +2499,7 @@ function buildPartialSessionStep(
       }`,
 
     description:
-      "Reprendre uniquement les exercices explicitement non réalisés. Ne pas refaire les exercices déjà terminés dans cette séance.",
+      "Le temps disponible est court. Reprendre seulement les exercices non réalisés permet de terminer cette séance sans refaire ceux déjà validés.",
 
     durationMinutes:
       estimatedDuration,
@@ -1836,13 +2507,15 @@ function buildPartialSessionStep(
     sessionId:
       partial.sessionId,
 
-    /*
-     * C'est le seul endroit où une séance est volontairement
-     * proposée sous forme de sous-liste d'exercices.
-     */
     exercises:
       partial.remainingExerciseIds.map(
-        getExerciseName,
+        (
+          exerciseId,
+        ) =>
+          getExerciseName(
+            exerciseId,
+            customSessionExercises,
+          ),
       ),
 
     isTemporarySuggestion:
@@ -1851,12 +2524,12 @@ function buildPartialSessionStep(
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Pompes / activation
+// Pompes
 // ─────────────────────────────────────────────────────────────────────────────
 
 function shouldSuggestPushups(
   recoveryScores: RecoveryLoadScores,
-  selectedMain: string | null,
+  selectedSessionIds: string[],
   hasClimbing: boolean,
   hasKilter: boolean,
 ): boolean {
@@ -1868,12 +2541,17 @@ function shouldSuggestPushups(
   }
 
   if (
-    selectedMain ===
-      "s3-dos-epaules" ||
-    selectedMain ===
-      "s1-force-doigts" ||
-    selectedMain ===
-      "s2-resistance"
+    selectedSessionIds.some(
+      (
+        sessionId,
+      ) =>
+        sessionId ===
+          "s3-dos-epaules" ||
+        sessionId ===
+          "s1-force-doigts" ||
+        sessionId ===
+          "s2-resistance",
+    )
   ) {
     return false;
   }
@@ -1891,9 +2569,12 @@ function shouldSuggestPushups(
     0;
 
   return (
-    chest < 40 &&
-    shoulders < 40 &&
-    triceps < 40
+    chest <
+      40 &&
+    shoulders <
+      40 &&
+    triceps <
+      40
   );
 }
 
@@ -1907,7 +2588,9 @@ function getActiveInjuryWarning(
   const active =
     injuries
       .filter(
-        (injury) =>
+        (
+          injury,
+        ) =>
           injury.status !==
           "guerie",
       )
@@ -1942,7 +2625,9 @@ function buildSignature(
 ): string {
   return steps
     .map(
-      (step) => {
+      (
+        step,
+      ) => {
         const preset =
           step.kilterPreset;
 
@@ -1951,6 +2636,8 @@ function buildSignature(
 
           step.sessionId ??
             "",
+
+          step.durationMinutes,
 
           preset?.angle ??
             "",
@@ -1988,6 +2675,11 @@ function buildRecoverySuggestion(
     | null,
   injuryWarning?: string,
 ): DailySuggestion {
+  const budget =
+    getPlanningBudget(
+      availableMinutes,
+    );
+
   const steps:
     SuggestedStep[] = [
       {
@@ -2012,37 +2704,48 @@ function buildRecoverySuggestion(
         warning:
           injuryWarning,
       },
-
-      {
-        id:
-          "mobility",
-
-        type:
-          "flexibility",
-
-        title:
-          "Effectuer une mobilité douce",
-
-        durationMinutes:
-          10,
-
-        sessionId:
-          "s5-souplesse",
-
-        finisherType:
-          "flexibility",
-
-        isTemporarySuggestion:
-          true,
-
-        exercises: [
-          "Dos rond / dos creux",
-          "Papillon",
-          "Étirement mollet contre un mur",
-          "Mobilité cheville sur chapeau mexicain",
-        ],
-      },
     ];
+
+  const mobilityMinutes =
+    Math.min(
+      10,
+      budget,
+    );
+
+  if (
+    mobilityMinutes >
+    0
+  ) {
+    steps.push({
+      id:
+        "mobility",
+
+      type:
+        "flexibility",
+
+      title:
+        "Effectuer une mobilité douce",
+
+      durationMinutes:
+        mobilityMinutes,
+
+      sessionId:
+        "s5-souplesse",
+
+      finisherType:
+        "flexibility",
+
+      isTemporarySuggestion:
+        true,
+
+      exercises: [
+        "Dos rond / dos creux",
+        "Papillon",
+        "Étirement mollet contre un mur",
+        "Mobilité cheville sur chapeau mexicain",
+      ],
+    });
+  }
 
   return {
     date,
@@ -2058,7 +2761,9 @@ function buildRecoverySuggestion(
     availableMinutes,
 
     plannedMinutes:
-      10,
+      getPlannedMinutes(
+        steps,
+      ),
 
     steps,
 
@@ -2090,22 +2795,42 @@ function buildSuggestion(
     options.injuries ??
     [];
 
+  const climbingPreference =
+    options.climbingPreference ??
+    deriveLegacyClimbingPreference(
+      preference,
+    );
+
+  const requestedSessionIds =
+    normalizeRequestedSessionIds(
+      options.requestedSessionIds,
+      preference,
+    );
+
   const todayLogs =
     logs.filter(
-      (log) =>
+      (
+        log,
+      ) =>
         log.date ===
         date,
     );
 
   const seed =
     stringHash(
-      `${date}-${variation}-${seedOffset}-${todayLogs
+      `${date}-${variation}-${seedOffset}-${climbingPreference}-${requestedSessionIds.join(
+        ",",
+      )}-${todayLogs
         .map(
-          (log) =>
+          (
+            log,
+          ) =>
             log.sessionId,
         )
         .sort()
-        .join("-")}`,
+        .join(
+          "-",
+        )}`,
     );
 
   const budget =
@@ -2129,42 +2854,61 @@ function buildSuggestion(
     );
   }
 
+  if (
+    budget <=
+    0
+  ) {
+    return buildRecoverySuggestion(
+      date,
+      availableMinutes,
+      injuryWarning,
+    );
+  }
+
   const recoveryScores =
     calculateRecoveryLoadScores(
       logs,
       injuries,
+      options.recoveryExerciseData,
     );
 
   const fingersLoaded =
     (
       recoveryScores.doigts ??
       0
-    ) >= 55 ||
+    ) >=
+      55 ||
     (
       recoveryScores[
         "avant-bras"
-      ] ?? 0
-    ) >= 60;
+      ] ??
+      0
+    ) >=
+      60;
 
   const upperBodyLoaded =
     (
       recoveryScores.epaules ??
       0
-    ) >= 70 ||
+    ) >=
+      70 ||
     (
       recoveryScores.dorsaux ??
       0
-    ) >= 70;
+    ) >=
+      70;
 
   const legsLoaded =
     (
       recoveryScores.quadriceps ??
       0
-    ) >= 70 ||
+    ) >=
+      70 ||
     (
       recoveryScores.ischios ??
       0
-    ) >= 70;
+    ) >=
+      70;
 
   const globallyVeryTired =
     [
@@ -2175,13 +2919,18 @@ function buildSuggestion(
       "quadriceps",
       "ischios",
     ].filter(
-      (muscleId) =>
+      (
+        muscleId,
+      ) =>
         (
           recoveryScores[
             muscleId
-          ] ?? 0
-        ) >= 75,
-    ).length >= 3;
+          ] ??
+          0
+        ) >=
+        75,
+    ).length >=
+    3;
 
   if (
     globallyVeryTired
@@ -2194,21 +2943,105 @@ function buildSuggestion(
   }
 
   // ───────────────────────────────────────────────────────────────────────────
-  // Priorité aux séances réellement partielles
+  // Grimpe
+  // ───────────────────────────────────────────────────────────────────────────
+
+  let wantsClimbing =
+    climbingPreference ===
+      "climbing" ||
+    climbingPreference ===
+      "climbing+kilter";
+
+  let wantsKilter =
+    climbingPreference ===
+      "kilter" ||
+    climbingPreference ===
+      "climbing+kilter";
+
+  const hasExplicitClimbingChoice =
+    options.climbingPreference !==
+    undefined;
+
+  const hasExplicitSessionChoice =
+    requestedSessionIds.length >
+    0;
+
+  /*
+   * Compatibilité avec l'ancien système.
+   */
+  if (
+    preference ===
+      "unknown" &&
+    !hasExplicitClimbingChoice &&
+    !hasExplicitSessionChoice
+  ) {
+    const randomChoice =
+      seed %
+      100;
+
+    if (
+      !fingersLoaded &&
+      !upperBodyLoaded &&
+      randomChoice <
+        22
+    ) {
+      wantsKilter =
+        true;
+    } else if (
+      !fingersLoaded &&
+      randomChoice >=
+        22 &&
+      randomChoice <
+        42
+    ) {
+      wantsClimbing =
+        true;
+    }
+  }
+
+  if (
+    fingersLoaded
+  ) {
+    wantsClimbing =
+      false;
+
+    wantsKilter =
+      false;
+  }
+
+  if (
+    upperBodyLoaded
+  ) {
+    wantsKilter =
+      false;
+  }
+
+  // ───────────────────────────────────────────────────────────────────────────
+  // Séance partielle
   // ───────────────────────────────────────────────────────────────────────────
 
   const partial =
-    findPartialSession(
-      logs,
-      date,
-    );
+    availableMinutes !==
+      null
+      ? findPartialSession(
+          logs,
+          date,
+          requestedSessionIds,
+          options.customSessionExercises,
+        )
+      : null;
 
   if (
-    partial
+    partial &&
+    budget <
+      getSessionDuration(
+        partial.sessionId,
+      )
   ) {
     const partialStep =
       buildPartialSessionStep(
         partial,
+        options.customSessionExercises,
       );
 
     if (
@@ -2217,41 +3050,67 @@ function buildSuggestion(
       const steps:
         SuggestedStep[] = [];
 
-      /*
-       * Échauffement uniquement pour les séances
-       * qui le nécessitent vraiment.
-       */
-      if (
+      const needsWarmup =
         partial.sessionId ===
           "s1-force-doigts" ||
         partial.sessionId ===
-          "s2-resistance"
+          "s2-resistance";
+
+      if (
+        needsWarmup
       ) {
-        const warmup =
-          getWarmupStep();
+        const maximumWarmup =
+          budget -
+          Math.min(
+            partialStep.durationMinutes,
+            budget,
+          );
 
         if (
-          injuryWarning
+          maximumWarmup >=
+          8
         ) {
-          warmup.warning =
-            injuryWarning;
-        }
+          const warmup =
+            getWarmupStep(
+              Math.min(
+                15,
+                maximumWarmup,
+              ),
+            );
 
-        addStepIfFits(
-          steps,
-          warmup,
-          budget,
-        );
+          if (
+            injuryWarning
+          ) {
+            warmup.warning =
+              injuryWarning;
+          }
+
+          steps.push(
+            warmup,
+          );
+        }
       }
 
-      /*
-       * Même si le temps annoncé est légèrement inférieur
-       * à l'estimation, la séance partielle reste l'objectif
-       * principal plutôt que d'être remplacée par une autre séance.
-       */
-      steps.push(
-        partialStep,
-      );
+      const remainingForPartial =
+        getRemainingMinutes(
+          steps,
+          budget,
+        );
+
+      if (
+        remainingForPartial >
+        0
+      ) {
+        steps.push({
+          ...partialStep,
+
+          durationMinutes:
+            Math.min(
+              partialStep.durationMinutes,
+              remainingForPartial,
+            ),
+        });
+      }
 
       const finisherType =
         legsLoaded ||
@@ -2262,15 +3121,12 @@ function buildSuggestion(
               date,
             );
 
-      const finisher =
+      addStepIfFits(
+        steps,
         getFinisher(
           finisherType,
           seed,
-        );
-
-      addStepIfFits(
-        steps,
-        finisher,
+        ),
         budget,
       );
 
@@ -2281,7 +3137,7 @@ function buildSuggestion(
           "Terminer la séance commencée",
 
         explanation:
-          "La priorité est donnée uniquement aux exercices explicitement non réalisés de la séance commencée. Les exercices déjà réalisés ne sont pas proposés une deuxième fois.",
+          "Tu as choisi cette séance mais le temps disponible est trop court pour la refaire entièrement. Seuls les exercices qui restaient sont donc proposés.",
 
         availableMinutes,
 
@@ -2301,105 +3157,68 @@ function buildSuggestion(
   }
 
   // ───────────────────────────────────────────────────────────────────────────
-  // Préférence de la journée
+  // Séances principales
   // ───────────────────────────────────────────────────────────────────────────
 
-  const forcedMain =
-    MAIN_SESSION_IDS.includes(
-      preference,
-    );
-
-  let wantsClimbing =
-    preference ===
-      "climbing" ||
-    preference ===
-      "climbing+kilter";
-
-  let wantsKilter =
-    preference ===
-      "kilter" ||
-    preference ===
-      "climbing+kilter";
+  const selectedSessionIds:
+    string[] = [];
 
   /*
-   * "unknown" ne veut pas dire automatiquement
-   * grimpe libre.
+   * Choix manuels :
+   * uniquement ce que l'utilisateur demande.
+   */
+  requestedSessionIds.forEach(
+    (
+      sessionId,
+    ) => {
+      const penalty =
+        getRecoveryPenalty(
+          sessionId,
+          recoveryScores,
+        );
+
+      if (
+        penalty <
+        45
+      ) {
+        selectedSessionIds.push(
+          sessionId,
+        );
+      }
+    },
+  );
+
+  /*
+   * Aucun choix explicite :
    *
-   * On varie entre :
-   * - séance structurée ;
-   * - bloc libre ;
-   * - Kilter.
+   * on peut sélectionner PLUSIEURS séances
+   * afin d'utiliser réellement le temps disponible.
    */
   if (
-    preference ===
-    "unknown"
+    selectedSessionIds.length ===
+      0 &&
+    !hasExplicitSessionChoice &&
+    !wantsClimbing &&
+    !wantsKilter
   ) {
-    const randomChoice =
-      seed % 100;
+    const automaticSessions =
+      chooseAutomaticSessionsForBudget(
+        logs,
+        injuries,
+        date,
+        seed,
+        budget,
+        options.recoveryExerciseData,
+      );
 
-    if (
-      !fingersLoaded &&
-      !upperBodyLoaded &&
-      randomChoice < 22
-    ) {
-      wantsKilter =
-        true;
-    } else if (
-      !fingersLoaded &&
-      randomChoice >= 22 &&
-      randomChoice < 42
-    ) {
-      wantsClimbing =
-        true;
-    }
-  }
-
-  /*
-   * La récupération garde priorité sur la préférence.
-   */
-  if (
-    fingersLoaded
-  ) {
-    wantsClimbing =
-      false;
-
-    wantsKilter =
-      false;
-  }
-
-  if (
-    upperBodyLoaded
-  ) {
-    wantsKilter =
-      false;
-  }
-
-  const shouldChooseMain =
-    forcedMain ||
-    (
-      preference ===
-        "unknown" &&
-      !wantsClimbing &&
-      !wantsKilter
+    selectedSessionIds.push(
+      ...automaticSessions,
     );
-
-  const selectedMain =
-    shouldChooseMain &&
-    (
-      budget >= 35 ||
-      forcedMain
-    )
-      ? chooseMainSession(
-          logs,
-          injuries,
-          date,
-          seed,
-          preference,
-        )
-      : null;
+  }
 
   const steps:
-    SuggestedStep[] = [];
+    SuggestedStep[] =
+    [];
 
   // ───────────────────────────────────────────────────────────────────────────
   // Échauffement
@@ -2408,47 +3227,99 @@ function buildSuggestion(
   const needsWarmup =
     wantsClimbing ||
     wantsKilter ||
-    selectedMain ===
-      "s1-force-doigts" ||
-    selectedMain ===
-      "s2-resistance";
+    selectedSessionIds.some(
+      (
+        sessionId,
+      ) =>
+        sessionId ===
+          "s1-force-doigts" ||
+        sessionId ===
+          "s2-resistance",
+    );
 
   if (
     needsWarmup
   ) {
-    const warmup =
-      getWarmupStep();
+    const totalSelectedSessionMinutes =
+      selectedSessionIds.reduce(
+        (
+          total,
+          sessionId,
+        ) =>
+          total +
+          getSessionDuration(
+            sessionId,
+          ),
+        0,
+      );
 
+    let warmupDuration =
+      15;
+
+    /*
+     * Lorsque les séances demandées remplissent presque
+     * tout le budget, garder au minimum un échauffement
+     * court plutôt que supprimer une séance demandée.
+     */
     if (
-      injuryWarning
+      totalSelectedSessionMinutes +
+        warmupDuration >
+      budget
     ) {
-      warmup.warning =
-        injuryWarning;
+      warmupDuration =
+        Math.max(
+          8,
+          Math.min(
+            10,
+            budget -
+              totalSelectedSessionMinutes,
+          ),
+        );
     }
 
-    addStepIfFits(
-      steps,
-      warmup,
-      budget,
-    );
+    if (
+      warmupDuration >
+        0 &&
+      warmupDuration <=
+        budget
+    ) {
+      const warmup =
+        getWarmupStep(
+          warmupDuration,
+        );
+
+      if (
+        injuryWarning
+      ) {
+        warmup.warning =
+          injuryWarning;
+      }
+
+      addStepIfFits(
+        steps,
+        warmup,
+        budget,
+      );
+    }
   }
 
   // ───────────────────────────────────────────────────────────────────────────
-  // Force doigts
+  // Séances demandées / automatiques
   // ───────────────────────────────────────────────────────────────────────────
 
-  if (
-    selectedMain ===
-    "s1-force-doigts"
-  ) {
-    addStepIfFits(
-      steps,
-      buildSessionStep(
-        selectedMain,
-      ),
-      budget,
-    );
-  }
+  selectedSessionIds.forEach(
+    (
+      sessionId,
+    ) => {
+      addStepIfFits(
+        steps,
+        buildSessionStep(
+          sessionId,
+        ),
+        budget,
+      );
+    },
+  );
 
   // ───────────────────────────────────────────────────────────────────────────
   // Kilter
@@ -2457,14 +3328,29 @@ function buildSuggestion(
   if (
     wantsKilter
   ) {
-    addStepIfFits(
-      steps,
-      getKilterStep(
-        logs,
-        seed + 71,
-      ),
-      budget,
-    );
+    const remaining =
+      getRemainingMinutes(
+        steps,
+        budget,
+      );
+
+    const kilterStep =
+      fitKilterStepToTime(
+        getKilterStep(
+          logs,
+          seed +
+            71,
+        ),
+        remaining,
+      );
+
+    if (
+      kilterStep
+    ) {
+      steps.push(
+        kilterStep,
+      );
+    }
   }
 
   // ───────────────────────────────────────────────────────────────────────────
@@ -2485,17 +3371,33 @@ function buildSuggestion(
       );
 
     const remainingBudget =
-      budget -
-      getPlannedMinutes(
+      getRemainingMinutes(
         steps,
+        budget,
       );
 
     if (
-      remainingBudget >= 25
+      remainingBudget >=
+      20
     ) {
+      /*
+       * Si l'utilisateur a demandé uniquement
+       * de la grimpe et dispose de beaucoup de temps,
+       * on peut aller jusqu'à 2 h.
+       *
+       * S'il a aussi demandé d'autres séances,
+       * on limite la grimpe à 90 min.
+       */
+      const climbingMaximum =
+        requestedSessionIds.length ===
+          0 &&
+        !wantsKilter
+          ? 120
+          : 90;
+
       const climbingMinutes =
         Math.min(
-          90,
+          climbingMaximum,
           remainingBudget,
         );
 
@@ -2528,32 +3430,90 @@ function buildSuggestion(
   }
 
   // ───────────────────────────────────────────────────────────────────────────
-  // Autres séances principales
+  // Séance manuelle impossible à faire entrer
   // ───────────────────────────────────────────────────────────────────────────
 
   if (
-    selectedMain &&
-    selectedMain !==
-      "s1-force-doigts"
+    steps.length ===
+      0 &&
+    requestedSessionIds.length >
+      0
   ) {
-    addStepIfFits(
-      steps,
+    const firstRequested =
+      requestedSessionIds[0];
+
+    const requestedStep =
       buildSessionStep(
-        selectedMain,
-      ),
-      budget,
-    );
+        firstRequested,
+      );
+
+    if (
+      requestedStep &&
+      budget >
+        0
+    ) {
+      return {
+        date,
+
+        title:
+          "Temps disponible trop court",
+
+        explanation:
+          `La séance ${getSessionName(
+            firstRequested,
+          )} dure environ ${requestedStep.durationMinutes} min. Aucune séance partielle récente à terminer n’a été trouvée.`,
+
+        availableMinutes,
+
+        plannedMinutes:
+          0,
+
+        steps: [
+          {
+            id:
+              `time-warning-${firstRequested}`,
+
+            type:
+              "rest",
+
+            title:
+              getSessionName(
+                firstRequested,
+              ),
+
+            subtitle:
+              `≈ ${requestedStep.durationMinutes} min nécessaires`,
+
+            description:
+              "Augmente le temps disponible ou choisis une séance plus courte.",
+
+            durationMinutes:
+              0,
+
+            isTemporarySuggestion:
+              true,
+
+            warning:
+              injuryWarning,
+          },
+        ],
+
+        signature:
+          `time-warning-${firstRequested}-${budget}`,
+      };
+    }
   }
 
   // ───────────────────────────────────────────────────────────────────────────
-  // Pompes / activation + mobilité
+  // Pompes / activation
   // ───────────────────────────────────────────────────────────────────────────
 
   if (
-    steps.length === 0 &&
+    steps.length ===
+      0 &&
     shouldSuggestPushups(
       recoveryScores,
-      selectedMain,
+      selectedSessionIds,
       wantsClimbing,
       wantsKilter,
     )
@@ -2578,10 +3538,6 @@ function buildSuggestion(
       );
     }
 
-    /*
-     * Association volontaire :
-     * Pompes / activation puis Souplesse.
-     */
     addStepIfFits(
       steps,
       getFinisher(
@@ -2593,11 +3549,12 @@ function buildSuggestion(
   }
 
   // ───────────────────────────────────────────────────────────────────────────
-  // Prévention légère
+  // Prévention
   // ───────────────────────────────────────────────────────────────────────────
 
   if (
-    steps.length === 0
+    steps.length ===
+    0
   ) {
     const prevention =
       buildSessionStep(
@@ -2632,15 +3589,26 @@ function buildSuggestion(
 
   const alreadyHasFinisher =
     steps.some(
-      (step) =>
+      (
+        step,
+      ) =>
         step.type ===
           "abs" ||
         step.type ===
-          "flexibility",
+          "flexibility" ||
+        step.sessionId ===
+          "s4-gainage" ||
+        step.sessionId ===
+          "s5-souplesse",
     );
 
   if (
-    !alreadyHasFinisher
+    !alreadyHasFinisher &&
+    getRemainingMinutes(
+      steps,
+      budget,
+    ) >=
+      10
   ) {
     const finisherType =
       legsLoaded ||
@@ -2661,8 +3629,177 @@ function buildSuggestion(
     );
   }
 
+  // ───────────────────────────────────────────────────────────────────────────
+  // Compléter intelligemment le temps automatique
+  // ───────────────────────────────────────────────────────────────────────────
+
+  /*
+   * Important :
+   *
+   * Cette partie ne s'active QUE si l'utilisateur
+   * n'a demandé ni séance précise ni grimpe précise.
+   *
+   * Elle permet par exemple à 2 h 30 saisi de ne plus
+   * produire seulement 1 h 10 de contenu.
+   */
+  const fullyAutomatic =
+    !hasExplicitSessionChoice &&
+    !wantsClimbing &&
+    !wantsKilter;
+
   if (
-    steps.length === 0
+    fullyAutomatic
+  ) {
+    const alreadySelected =
+      steps
+        .map(
+          (
+            step,
+          ) =>
+            step.sessionId,
+        )
+        .filter(
+          (
+            sessionId,
+          ): sessionId is string =>
+            Boolean(
+              sessionId,
+            ),
+        );
+
+    const ranked =
+      rankAutomaticMainSessions(
+        logs,
+        injuries,
+        date,
+        seed +
+          137,
+        options.recoveryExerciseData,
+      );
+
+    for (
+      const candidate of ranked
+    ) {
+      const remaining =
+        getRemainingMinutes(
+          steps,
+          budget,
+        );
+
+      if (
+        remaining <
+        20
+      ) {
+        break;
+      }
+
+      if (
+        alreadySelected.includes(
+          candidate.sessionId,
+        )
+      ) {
+        continue;
+      }
+
+      if (
+        !automaticSessionsAreCompatible(
+          alreadySelected,
+          candidate.sessionId,
+        )
+      ) {
+        continue;
+      }
+
+      const step =
+        buildSessionStep(
+          candidate.sessionId,
+        );
+
+      if (
+        !step
+      ) {
+        continue;
+      }
+
+      if (
+        step.durationMinutes >
+        remaining
+      ) {
+        continue;
+      }
+
+      steps.push(
+        step,
+      );
+
+      alreadySelected.push(
+        candidate.sessionId,
+      );
+
+      if (
+        alreadySelected.filter(
+          (
+            sessionId,
+          ) =>
+            AUTO_MAIN_SESSION_IDS.includes(
+              sessionId,
+            ),
+        ).length >=
+        3
+      ) {
+        break;
+      }
+    }
+
+    /*
+     * S'il reste encore 10 minutes ou plus,
+     * terminer avec mobilité/gainage selon la récup.
+     */
+    const hasAnyFinisherNow =
+      steps.some(
+        (
+          step,
+        ) =>
+          step.type ===
+            "abs" ||
+          step.type ===
+            "flexibility" ||
+          step.sessionId ===
+            "s5-souplesse",
+      );
+
+    if (
+      !hasAnyFinisherNow &&
+      getRemainingMinutes(
+        steps,
+        budget,
+      ) >=
+        10
+    ) {
+      const finisherType =
+        legsLoaded ||
+        upperBodyLoaded
+          ? "flexibility"
+          : chooseFinisher(
+              logs,
+              date,
+            );
+
+      addStepIfFits(
+        steps,
+        getFinisher(
+          finisherType,
+          seed +
+            211,
+        ),
+        budget,
+      );
+    }
+  }
+
+  if (
+    steps.length ===
+    0
   ) {
     return buildRecoverySuggestion(
       date,
@@ -2671,30 +3808,83 @@ function buildSuggestion(
     );
   }
 
+  const explicitCount =
+    requestedSessionIds.length +
+    (
+      wantsClimbing
+        ? 1
+        : 0
+    ) +
+    (
+      wantsKilter
+        ? 1
+        : 0
+    );
+
+  const plannedMinutes =
+    getPlannedMinutes(
+      steps,
+    );
+
+  const remainingMinutes =
+    Math.max(
+      0,
+      budget -
+        plannedMinutes,
+    );
+
+  let explanation:
+    string;
+
+    if (
+      availableMinutes ===
+      null
+    ) {
+      explanation =
+        explicitCount >
+        0
+          ? "Proposition basée sur tes envies, ta récupération et tes séances précédentes. Sans temps indiqué, 1 h 30 au total est prévu par défaut, dont 10 min de marge."
+          : "Proposition basée sur 1 h 30 au total par défaut, avec 10 min de marge, ta récupération et tes séances précédentes.";
+  } else if (
+    injuryWarning
+  ) {
+    explanation =
+      "Proposition adaptée au temps disponible, à la récupération, aux séances précédentes et à la blessure enregistrée. Une marge de 10 min est conservée.";
+  } else {
+    explanation =
+      "Proposition adaptée au temps disponible, à la récupération et aux séances précédentes. Une marge de 10 min est conservée pour se changer, se doucher ou ranger.";
+  }
+
+  /*
+   * Éviter un texte bizarre lorsque seuls quelques
+   * minutes restent non utilisées.
+   */
+  if (
+    availableMinutes !==
+      null &&
+    remainingMinutes >=
+      20 &&
+    explicitCount >
+      0
+  ) {
+    explanation +=
+      " Le temps restant n’est pas rempli avec une grosse séance non demandée.";
+  }
+
   return {
     date,
 
     title:
-      todayLogs.length > 0
+      todayLogs.length >
+      0
         ? "Continuer aujourd’hui"
         : "Proposition du jour",
 
-    explanation:
-      availableMinutes ===
-      null
-        ? injuryWarning
-          ? "Proposition temporaire adaptée à la récupération, aux séances précédentes et à la blessure enregistrée."
-          : "Proposition temporaire basée sur environ 1 h 45, la récupération et les séances précédentes."
-        : injuryWarning
-          ? "Proposition temporaire adaptée au temps disponible, à la récupération, aux séances précédentes et à la blessure enregistrée."
-          : "Proposition temporaire adaptée au temps disponible, à la récupération et aux séances précédentes.",
+    explanation,
 
     availableMinutes,
 
-    plannedMinutes:
-      getPlannedMinutes(
-        steps,
-      ),
+    plannedMinutes,
 
     steps,
 
@@ -2718,8 +3908,10 @@ export function generateDailySuggestion(
 
   for (
     let attempt = 0;
-    attempt < 8;
-    attempt += 1
+    attempt <
+    8;
+    attempt +=
+      1
   ) {
     const suggestion =
       buildSuggestion(

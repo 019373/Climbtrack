@@ -1,4 +1,5 @@
 import {
+  useEffect,
   useMemo,
   useState,
   type ReactNode,
@@ -18,6 +19,7 @@ import {
   Pencil,
   Plus,
   RotateCcw,
+  Sparkles,
   Trash2,
   X,
 } from "lucide-react";
@@ -33,14 +35,23 @@ import type {
 
 import {
   ASSISTANCE_OPTIONS,
+  MUSCLE_CATALOG,
   RESISTANCE_BAND_OPTIONS,
   SESSIONS,
 } from "@/data/sessions";
 
 import type {
   ExerciseDef,
+  ExerciseMuscleLoad,
+  MuscleId,
+  MuscleIntensity,
   TrackingType,
 } from "@/data/sessions";
+
+import {
+  resolveExerciseMuscleLoads,
+  suggestMusclesForExercise,
+} from "@/data/exerciseMuscleLibrary";
 
 import {
   BUILTIN_CATEGORIES,
@@ -278,6 +289,156 @@ const TRACKING_HAS: Record<
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Muscles
+// ─────────────────────────────────────────────────────────────────────────────
+
+const MUSCLE_INTENSITY_OPTIONS: {
+  value: MuscleIntensity;
+  label: string;
+}[] = [
+  {
+    value: "low",
+    label: "Faible",
+  },
+
+  {
+    value: "medium",
+    label: "Moyen",
+  },
+
+  {
+    value: "high",
+    label: "Fort",
+  },
+];
+
+function getMuscleLabel(
+  muscleId: MuscleId,
+): string {
+  return (
+    MUSCLE_CATALOG.find(
+      (muscle) =>
+        muscle.id ===
+        muscleId,
+    )?.label ??
+    muscleId
+  );
+}
+
+function getMuscleRegionLabel(
+  muscleId: MuscleId,
+): string {
+  const region =
+    MUSCLE_CATALOG.find(
+      (muscle) =>
+        muscle.id ===
+        muscleId,
+    )?.region;
+
+  if (
+    region ===
+    "main"
+  ) {
+    return "Main / doigts";
+  }
+
+  if (
+    region ===
+    "avant-bras"
+  ) {
+    return "Avant-bras";
+  }
+
+  if (
+    region ===
+    "bras"
+  ) {
+    return "Bras";
+  }
+
+  if (
+    region ===
+    "epaule"
+  ) {
+    return "Épaule";
+  }
+
+  if (
+    region ===
+    "poitrine"
+  ) {
+    return "Poitrine";
+  }
+
+  if (
+    region ===
+    "dos"
+  ) {
+    return "Dos";
+  }
+
+  if (
+    region ===
+    "tronc"
+  ) {
+    return "Tronc";
+  }
+
+  if (
+    region ===
+    "hanche"
+  ) {
+    return "Hanche";
+  }
+
+  if (
+    region ===
+    "cuisse"
+  ) {
+    return "Cuisse";
+  }
+
+  if (
+    region ===
+    "jambe"
+  ) {
+    return "Jambe";
+  }
+
+  if (
+    region ===
+    "pied"
+  ) {
+    return "Pied";
+  }
+
+  return "Autre";
+}
+
+function getConfidenceLabel(
+  confidence:
+    | "high"
+    | "medium"
+    | "low",
+): string {
+  if (
+    confidence ===
+    "high"
+  ) {
+    return "Confiance élevée";
+  }
+
+  if (
+    confidence ===
+    "medium"
+  ) {
+    return "Confiance moyenne";
+  }
+
+  return "Correspondance incertaine";
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // État d'édition
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -315,6 +476,8 @@ type EditState = {
   secondaryRepsLabel: string;
   primaryWeightLabel: string;
   secondaryWeightLabel: string;
+
+  muscleLoads: ExerciseMuscleLoad[];
 };
 
 function createEmptyEdit(
@@ -355,6 +518,8 @@ function createEmptyEdit(
     secondaryRepsLabel: "",
     primaryWeightLabel: "",
     secondaryWeightLabel: "",
+
+    muscleLoads: [],
   };
 }
 
@@ -369,6 +534,26 @@ function exerciseToEditState(
       exercise.id
     ] ??
     exercise.defaultValues;
+
+  const savedMuscleLoads =
+    data.exerciseOverrides[
+      exercise.id
+    ]?.muscleLoads ??
+    exercise.muscleLoads;
+
+  const muscleLoads =
+    resolveExerciseMuscleLoads({
+      exerciseId:
+        exercise.id,
+
+      name:
+        exercise.name,
+
+      description:
+        exercise.description,
+
+      savedMuscleLoads,
+    });
 
   return {
     id:
@@ -469,6 +654,8 @@ function exerciseToEditState(
     secondaryWeightLabel:
       exercise.secondaryWeightLabel ??
       "",
+
+    muscleLoads,
   };
 }
 
@@ -691,7 +878,7 @@ function TextInput({
   value,
   onChange,
   type = "text",
-  min,
+  min = 0,
   step,
   placeholder,
 }: {
@@ -706,20 +893,313 @@ function TextInput({
   step?: number;
   placeholder?: string;
 }) {
+  const numeric =
+    type ===
+    "number";
+
+  const [
+    draft,
+    setDraft,
+  ] =
+    useState(
+      numeric &&
+      typeof value ===
+        "number"
+        ? formatNumber(
+            value,
+          )
+        : String(
+            value,
+          ),
+    );
+
+  useEffect(
+    () => {
+      if (
+        !numeric
+      ) {
+        const external =
+          String(
+            value,
+          );
+
+        if (
+          draft !==
+          external
+        ) {
+          setDraft(
+            external,
+          );
+        }
+
+        return;
+      }
+
+      if (
+        typeof value !==
+        "number"
+      ) {
+        return;
+      }
+
+      const normalizedDraft =
+        draft
+          .trim()
+          .replace(
+            ",",
+            ".",
+          );
+
+      const isIntermediateDecimal =
+        normalizedDraft.endsWith(
+          ".",
+        );
+
+      if (
+        isIntermediateDecimal
+      ) {
+        return;
+      }
+
+      if (
+        normalizedDraft ===
+        ""
+      ) {
+        return;
+      }
+
+      const parsed =
+        Number(
+          normalizedDraft,
+        );
+
+      if (
+        Number.isFinite(
+          parsed,
+        ) &&
+        parsed ===
+          value
+      ) {
+        return;
+      }
+
+      setDraft(
+        formatNumber(
+          value,
+        ),
+      );
+    },
+    [
+      value,
+      numeric,
+    ],
+  );
+
+  function handleNumericChange(
+    rawValue: string,
+  ) {
+    const integerOnly =
+      step ===
+      1;
+
+    const accepted =
+      integerOnly
+        ? /^\d*$/.test(
+            rawValue,
+          )
+        : /^\d*(?:[.,]\d*)?$/.test(
+            rawValue,
+          );
+
+    if (
+      !accepted
+    ) {
+      return;
+    }
+
+    setDraft(
+      rawValue,
+    );
+
+    if (
+      rawValue.trim() ===
+      ""
+    ) {
+      return;
+    }
+
+    const normalized =
+      rawValue.replace(
+        ",",
+        ".",
+      );
+
+    /*
+     * Autoriser temporairement :
+     * 12,
+     * 12.
+     *
+     * sans écraser le séparateur immédiatement.
+     */
+    if (
+      normalized.endsWith(
+        ".",
+      )
+    ) {
+      const beforeSeparator =
+        normalized.slice(
+          0,
+          -1,
+        );
+
+      if (
+        beforeSeparator !==
+        ""
+      ) {
+        onChange(
+          beforeSeparator,
+        );
+      }
+
+      return;
+    }
+
+    const parsed =
+      Number(
+        normalized,
+      );
+
+    if (
+      !Number.isFinite(
+        parsed,
+      )
+    ) {
+      return;
+    }
+
+    onChange(
+      String(
+        Math.max(
+          min,
+          parsed,
+        ),
+      ),
+    );
+  }
+
+  function handleBlur() {
+    if (
+      !numeric
+    ) {
+      return;
+    }
+
+    if (
+      draft.trim() ===
+      ""
+    ) {
+      const fallback =
+        typeof value ===
+        "number"
+          ? Math.max(
+              min,
+              value,
+            )
+          : min;
+
+      setDraft(
+        formatNumber(
+          fallback,
+        ),
+      );
+
+      onChange(
+        String(
+          fallback,
+        ),
+      );
+
+      return;
+    }
+
+    const parsed =
+      Math.max(
+        min,
+        parseNumber(
+          draft,
+        ),
+      );
+
+    setDraft(
+      formatNumber(
+        parsed,
+      ),
+    );
+
+    onChange(
+      String(
+        parsed,
+      ),
+    );
+  }
+
+  if (
+    numeric
+  ) {
+    return (
+      <input
+        type="text"
+        inputMode={
+          step ===
+          1
+            ? "numeric"
+            : "decimal"
+        }
+        value={
+          draft
+        }
+        placeholder={
+          placeholder
+        }
+        onChange={(
+          event,
+        ) =>
+          handleNumericChange(
+            event.target.value,
+          )
+        }
+        onBlur={
+          handleBlur
+        }
+        autoComplete="off"
+        className="w-full rounded-xl border border-border bg-card px-3 py-3 text-sm text-white outline-none placeholder:text-muted-foreground/50 focus:border-white/40"
+      />
+    );
+  }
+
   return (
     <input
-      type={type}
-      value={value}
-      min={min}
-      step={step}
-      placeholder={placeholder}
+      type="text"
+      value={
+        draft
+      }
+      placeholder={
+        placeholder
+      }
       onChange={(
         event,
-      ) =>
+      ) => {
+        const next =
+          event.target.value;
+
+        setDraft(
+          next,
+        );
+
         onChange(
-          event.target.value,
-        )
-      }
+          next,
+        );
+      }}
       className="w-full rounded-xl border border-border bg-card px-3 py-3 text-sm text-white outline-none placeholder:text-muted-foreground/50 focus:border-white/40"
     />
   );
@@ -773,6 +1253,406 @@ function ToggleRow({
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Muscle editor
+// ─────────────────────────────────────────────────────────────────────────────
+
+function MuscleEditor({
+  state,
+  onChange,
+}: {
+  state: EditState;
+
+  onChange: (
+    state: EditState,
+  ) => void;
+}) {
+  const [
+    muscleToAdd,
+    setMuscleToAdd,
+  ] =
+    useState<MuscleId | "">(
+      "",
+    );
+
+  const suggestion =
+    useMemo(
+      () =>
+        suggestMusclesForExercise(
+          state.name,
+          state.description,
+        ),
+      [
+        state.name,
+        state.description,
+      ],
+    );
+
+  const availableMuscles =
+    useMemo(
+      () =>
+        MUSCLE_CATALOG.filter(
+          (muscle) =>
+            !state.muscleLoads.some(
+              (load) =>
+                load.muscleId ===
+                muscle.id,
+            ),
+        ),
+      [
+        state.muscleLoads,
+      ],
+    );
+
+  function applySuggestion() {
+    if (
+      suggestion.muscleLoads.length ===
+      0
+    ) {
+      return;
+    }
+
+    onChange({
+      ...state,
+
+      muscleLoads:
+        suggestion.muscleLoads.map(
+          (load) => ({
+            ...load,
+          }),
+        ),
+    });
+  }
+
+  function addMuscle() {
+    if (
+      !muscleToAdd
+    ) {
+      return;
+    }
+
+    if (
+      state.muscleLoads.some(
+        (load) =>
+          load.muscleId ===
+          muscleToAdd,
+      )
+    ) {
+      return;
+    }
+
+    onChange({
+      ...state,
+
+      muscleLoads: [
+        ...state.muscleLoads,
+
+        {
+          muscleId:
+            muscleToAdd,
+
+          intensity:
+            "medium",
+        },
+      ],
+    });
+
+    setMuscleToAdd(
+      "",
+    );
+  }
+
+  function removeMuscle(
+    muscleId: MuscleId,
+  ) {
+    onChange({
+      ...state,
+
+      muscleLoads:
+        state.muscleLoads.filter(
+          (load) =>
+            load.muscleId !==
+            muscleId,
+        ),
+    });
+  }
+
+  function updateIntensity(
+    muscleId: MuscleId,
+    intensity: MuscleIntensity,
+  ) {
+    onChange({
+      ...state,
+
+      muscleLoads:
+        state.muscleLoads.map(
+          (load) =>
+            load.muscleId ===
+            muscleId
+              ? {
+                  ...load,
+
+                  intensity,
+                }
+              : load,
+        ),
+    });
+  }
+
+  return (
+    <section className="space-y-4 rounded-2xl border border-border bg-card/40 p-4">
+      <div className="flex items-center gap-2">
+        <Sparkles
+          size={16}
+          className="text-white"
+        />
+
+        <div className="min-w-0">
+          <h3 className="text-xs font-black uppercase tracking-wider text-white">
+            Muscles sollicités
+          </h3>
+
+          <p className="mt-1 text-[10px] leading-relaxed text-muted-foreground">
+            Utilisés pour calculer la récupération et la fatigue du corps.
+          </p>
+        </div>
+      </div>
+
+      {state.name.trim() ? (
+        <div className="rounded-xl border border-border bg-background p-3">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">
+                Analyse automatique
+              </p>
+
+              {suggestion.matchedName ? (
+                <>
+                  <p className="mt-1 break-words text-sm font-bold text-white">
+                    {
+                      suggestion.matchedName
+                    }
+                  </p>
+
+                  <p
+                    className={cn(
+                      "mt-1 text-xs font-bold",
+
+                      suggestion.confidence ===
+                        "high"
+                        ? "text-green-300"
+                        : suggestion.confidence ===
+                            "medium"
+                          ? "text-yellow-300"
+                          : "text-orange-300",
+                    )}
+                  >
+                    {getConfidenceLabel(
+                      suggestion.confidence,
+                    )}
+                  </p>
+                </>
+              ) : (
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Mouvement non reconnu avec assez de précision.
+                </p>
+              )}
+            </div>
+
+            {suggestion.muscleLoads.length >
+              0 && (
+              <button
+                type="button"
+                onClick={
+                  applySuggestion
+                }
+                className="flex flex-shrink-0 items-center gap-1.5 rounded-lg bg-white px-3 py-2 text-[10px] font-black text-black active:scale-95"
+              >
+                <Sparkles
+                  size={13}
+                />
+
+                Appliquer
+              </button>
+            )}
+          </div>
+
+          {suggestion.confidence ===
+            "low" && (
+            <p className="mt-2 text-[10px] leading-relaxed text-muted-foreground">
+              L’app préfère ne rien attribuer automatiquement plutôt que de deviner des muscles incorrects.
+            </p>
+          )}
+        </div>
+      ) : (
+        <div className="rounded-xl border border-border bg-background px-3 py-3">
+          <p className="text-xs text-muted-foreground">
+            Donner un nom à l’exercice pour permettre l’analyse automatique.
+          </p>
+        </div>
+      )}
+
+      {state.muscleLoads.length >
+      0 ? (
+        <div className="space-y-2">
+          {state.muscleLoads.map(
+            (
+              muscleLoad,
+            ) => (
+              <div
+                key={
+                  muscleLoad.muscleId
+                }
+                className="rounded-xl border border-border bg-background p-3"
+              >
+                <div className="flex items-start gap-3">
+                  <div className="min-w-0 flex-1">
+                    <p className="break-words text-sm font-bold text-white">
+                      {getMuscleLabel(
+                        muscleLoad.muscleId,
+                      )}
+                    </p>
+
+                    <p className="mt-0.5 text-[10px] uppercase tracking-wide text-muted-foreground">
+                      {getMuscleRegionLabel(
+                        muscleLoad.muscleId,
+                      )}
+                    </p>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() =>
+                      removeMuscle(
+                        muscleLoad.muscleId,
+                      )
+                    }
+                    className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg text-muted-foreground"
+                    aria-label="Retirer ce muscle"
+                  >
+                    <X
+                      size={14}
+                    />
+                  </button>
+                </div>
+
+                <div className="mt-3 grid grid-cols-3 gap-1.5">
+                  {MUSCLE_INTENSITY_OPTIONS.map(
+                    (
+                      option,
+                    ) => (
+                      <button
+                        key={
+                          option.value
+                        }
+                        type="button"
+                        onClick={() =>
+                          updateIntensity(
+                            muscleLoad.muscleId,
+                            option.value,
+                          )
+                        }
+                        className={cn(
+                          "rounded-lg border px-1.5 py-2 text-[10px] font-black transition-all",
+
+                          muscleLoad.intensity ===
+                            option.value
+                            ? "border-white bg-white text-black"
+                            : "border-border bg-card text-muted-foreground",
+                        )}
+                      >
+                        {
+                          option.label
+                        }
+                      </button>
+                    ),
+                  )}
+                </div>
+              </div>
+            ),
+          )}
+        </div>
+      ) : (
+        <div className="rounded-xl border border-dashed border-border px-3 py-4 text-center">
+          <p className="text-xs text-muted-foreground">
+            Aucun muscle sélectionné.
+          </p>
+        </div>
+      )}
+
+      <div className="space-y-2">
+        <p className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">
+          Ajouter manuellement
+        </p>
+
+        <div className="flex gap-2">
+          <select
+            value={
+              muscleToAdd
+            }
+            onChange={(
+              event,
+            ) =>
+              setMuscleToAdd(
+                event.target
+                  .value as MuscleId | "",
+              )
+            }
+            className="min-w-0 flex-1 rounded-xl border border-border bg-background px-3 py-3 text-sm text-white"
+          >
+            <option value="">
+              Choisir un muscle…
+            </option>
+
+            {availableMuscles.map(
+              (
+                muscle,
+              ) => (
+                <option
+                  key={
+                    muscle.id
+                  }
+                  value={
+                    muscle.id
+                  }
+                >
+                  {getMuscleRegionLabel(
+                    muscle.id,
+                  )}{" "}
+                  —{" "}
+                  {
+                    muscle.label
+                  }
+                </option>
+              ),
+            )}
+          </select>
+
+          <button
+            type="button"
+            onClick={
+              addMuscle
+            }
+            disabled={
+              !muscleToAdd
+            }
+            className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-xl bg-white text-black disabled:opacity-30"
+            aria-label="Ajouter le muscle"
+          >
+            <Plus
+              size={18}
+            />
+          </button>
+        </div>
+
+        <p className="text-[10px] leading-relaxed text-muted-foreground">
+          La liste contient tous les groupes anatomiques détaillés actuellement utilisés par ClimbTrack.
+        </p>
+      </div>
+    </section>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Modal
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -806,6 +1686,7 @@ function ExerciseEditModal({
   ) {
     onChange({
       ...state,
+
       [key]:
         value,
     });
@@ -833,10 +1714,10 @@ function ExerciseEditModal({
   }
 
   return createPortal(
-    <div className="fixed inset-0 z-[100000] bg-black/80 backdrop-blur-sm">
-      <div className="flex h-[100dvh] flex-col bg-background pt-safe">
+    <div className="fixed inset-0 z-[100000] overflow-x-hidden bg-black/80 backdrop-blur-sm">
+      <div className="flex h-[100dvh] w-full max-w-full flex-col overflow-x-hidden bg-background pt-safe">
         <header className="flex items-start justify-between gap-4 border-b border-border px-5 py-4">
-          <div>
+          <div className="min-w-0">
             <h2 className="text-xl font-black text-white">
               {state.id
                 ? "Modifier l’exercice"
@@ -862,7 +1743,7 @@ function ExerciseEditModal({
           </button>
         </header>
 
-        <div className="flex-1 space-y-5 overflow-y-auto p-5 pb-32">
+        <div className="flex-1 space-y-5 overflow-x-hidden overflow-y-auto p-5 pb-32">
           {state.id && (
             <div className="rounded-xl border border-border bg-card/50 px-3 py-2">
               <p className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">
@@ -908,6 +1789,7 @@ function ExerciseEditModal({
                   event.target.value,
                 )
               }
+              placeholder="Décrire le mouvement, la position ou le matériel utilisé aide la reconnaissance automatique."
               className="min-h-24 w-full resize-none rounded-xl border border-border bg-card px-3 py-3 text-sm text-white outline-none focus:border-white/40"
             />
           </Field>
@@ -1088,7 +1970,7 @@ function ExerciseEditModal({
                   <TextInput
                     type="number"
                     min={0}
-                    step={1}
+                    step={0.25}
                     value={
                       state.duration
                     }
@@ -1166,7 +2048,7 @@ function ExerciseEditModal({
                   <TextInput
                     type="number"
                     min={0}
-                    step={1}
+                    step={0.25}
                     value={
                       state.progressionValue
                     }
@@ -1285,6 +2167,15 @@ function ExerciseEditModal({
               </div>
             )}
           </section>
+
+          <MuscleEditor
+            state={
+              state
+            }
+            onChange={
+              onChange
+            }
+          />
 
           {fields.variant && (
             <Field label="Variantes — une par ligne">
@@ -1580,9 +2471,7 @@ export function ExerciseManager() {
     addingCategory,
     setAddingCategory,
   ] =
-    useState(
-      false,
-    );
+    useState(false);
 
   const [
     newCategoryName,
@@ -1807,14 +2696,26 @@ export function ExerciseManager() {
           Boolean,
         );
 
-    /*
-     * Un exercice de hangboard doit conserver ses options
-     * d'assistance même si le type de tracking lui-même
-     * n'est pas "assistance".
-     */
     const shouldKeepAssistanceOptions =
       fields.assistance ||
       editState.isHangboard;
+
+    const automaticSuggestion =
+      suggestMusclesForExercise(
+        editState.name,
+        editState.description,
+      );
+
+    const finalMuscleLoads =
+      editState.muscleLoads.length >
+      0
+        ? editState.muscleLoads
+        : automaticSuggestion.confidence !==
+              "low" &&
+            automaticSuggestion.muscleLoads.length >
+              0
+          ? automaticSuggestion.muscleLoads
+          : [];
 
     const commonDefinition = {
       name:
@@ -1840,6 +2741,13 @@ export function ExerciseManager() {
 
       perSide:
         editState.perSide,
+
+      muscleLoads:
+        finalMuscleLoads.map(
+          (load) => ({
+            ...load,
+          }),
+        ),
 
       variantOptions:
         fields.variant
@@ -1890,14 +2798,24 @@ export function ExerciseManager() {
       toast({
         title:
           "Exercice ajouté",
+
+        description:
+          finalMuscleLoads.length >
+          0
+            ? `${finalMuscleLoads.length} muscle${
+                finalMuscleLoads.length >
+                1
+                  ? "s"
+                  : ""
+              } associé${
+                finalMuscleLoads.length >
+                1
+                  ? "s"
+                  : ""
+              }.`
+            : "Aucun muscle n’a été attribué.",
       });
     } else {
-      /*
-       * Modifier directement l'exercice existant.
-       *
-       * L'ID ne change jamais :
-       * l'historique associé reste donc intact.
-       */
       updateExerciseOverride(
         editState.id,
         {
@@ -1924,6 +2842,9 @@ export function ExerciseManager() {
 
           perSide:
             commonDefinition.perSide,
+
+          muscleLoads:
+            commonDefinition.muscleLoads,
 
           variantOptions:
             commonDefinition.variantOptions,

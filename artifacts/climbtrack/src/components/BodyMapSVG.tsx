@@ -52,10 +52,12 @@ function effortColor(score: number): string {
 
 type BodyProps = {
   scores: Record<string, number>;
-  onSelect: (
+
+  onMuscleSelect: (
     muscle: string,
     anatomicalName?: string,
   ) => void;
+
   selected: string | null;
 };
 
@@ -65,7 +67,8 @@ type MuscleShapeProps =
     anatomicalName: string;
     scores: Record<string, number>;
     selected: string | null;
-    onSelect: (
+
+    onMuscleSelect: (
       muscle: string,
       anatomicalName?: string,
     ) => void;
@@ -80,16 +83,21 @@ function MuscleShape({
   anatomicalName,
   scores,
   selected,
-  onSelect,
+  onMuscleSelect,
   ...pathProps
 }: MuscleShapeProps) {
-  const active = selected === muscle;
-  const score = scores[muscle] ?? 0;
+  const active =
+    selected === muscle;
+
+  const score =
+    scores[muscle] ?? 0;
 
   return (
     <path
       {...pathProps}
-      fill={effortColor(score)}
+      fill={
+        effortColor(score)
+      }
       stroke={
         active
           ? "#ffffff"
@@ -97,7 +105,11 @@ function MuscleShape({
             ? "#101010"
             : "#343434"
       }
-      strokeWidth={active ? 2.5 : 1.15}
+      strokeWidth={
+        active
+          ? 2.5
+          : 1.15
+      }
       strokeLinejoin="round"
       strokeLinecap="round"
       role="button"
@@ -105,18 +117,30 @@ function MuscleShape({
       aria-label={`${anatomicalName} — ${
         MUSCLE_LABELS[muscle] ?? muscle
       } : ${score} points`}
-      data-muscle-zone={muscle}
-      data-anatomical-name={anatomicalName}
-      onClick={() =>
-        onSelect(muscle, anatomicalName)
+      data-muscle-zone={
+        muscle
       }
-      onKeyDown={(event) => {
+      data-anatomical-name={
+        anatomicalName
+      }
+      onClick={() =>
+        onMuscleSelect(
+          muscle,
+          anatomicalName,
+        )
+      }
+      onKeyDown={(
+        event,
+      ) => {
         if (
-          event.key === "Enter" ||
-          event.key === " "
+          event.key ===
+            "Enter" ||
+          event.key ===
+            " "
         ) {
           event.preventDefault();
-          onSelect(
+
+          onMuscleSelect(
             muscle,
             anatomicalName,
           );
@@ -124,18 +148,26 @@ function MuscleShape({
       }}
       style={
         {
-          cursor: "pointer",
+          cursor:
+            "pointer",
+
           transition:
             "fill 220ms ease, stroke 180ms ease, opacity 180ms ease",
-          outline: "none",
+
+          outline:
+            "none",
         } as CSSProperties
       }
     >
       <title>
         {anatomicalName} —{" "}
-        {MUSCLE_LABELS[muscle] ?? muscle} :{" "}
+        {MUSCLE_LABELS[
+          muscle
+        ] ?? muscle} :{" "}
         {score} point
-        {score > 1 ? "s" : ""}
+        {score > 1
+          ? "s"
+          : ""}
       </title>
     </path>
   );
@@ -356,13 +388,13 @@ function SkeletonDetails() {
 
 function FrontBody({
   scores,
-  onSelect,
+  onMuscleSelect,
   selected,
 }: BodyProps) {
   const common = {
     scores,
     selected,
-    onSelect,
+    onMuscleSelect,
   };
 
   return (
@@ -455,7 +487,7 @@ function FrontBody({
         "
       />
 
-      {/* Pectoraux : portion claviculaire */}
+      {/* Pectoraux */}
       <MuscleShape
         {...common}
         muscle="pectoraux"
@@ -482,7 +514,6 @@ function FrontBody({
         "
       />
 
-      {/* Pectoraux : portion sternale */}
       <MuscleShape
         {...common}
         muscle="pectoraux"
@@ -546,7 +577,7 @@ function FrontBody({
         "
       />
 
-      {/* Biceps brachial */}
+      {/* Biceps */}
       <MuscleShape
         {...common}
         muscle="biceps"
@@ -575,7 +606,6 @@ function FrontBody({
         "
       />
 
-      {/* Brachial */}
       <MuscleShape
         {...common}
         muscle="biceps"
@@ -602,7 +632,7 @@ function FrontBody({
         "
       />
 
-      {/* Avant-bras : brachio-radial */}
+      {/* Avant-bras */}
       <MuscleShape
         {...common}
         muscle="avant-bras"
@@ -631,7 +661,6 @@ function FrontBody({
         "
       />
 
-      {/* Avant-bras : fléchisseurs */}
       <MuscleShape
         {...common}
         muscle="avant-bras"
@@ -687,7 +716,6 @@ function FrontBody({
         "
       />
 
-      {/* Doigts séparés gauche */}
       <MuscleShape
         {...common}
         muscle="doigts"
@@ -709,7 +737,6 @@ function FrontBody({
         d="M37 215 C36 222 39 225 42 222 L42 214 Z"
       />
 
-      {/* Doigts séparés droite */}
       <MuscleShape
         {...common}
         muscle="doigts"
@@ -731,7 +758,6 @@ function FrontBody({
         d="M143 215 C144 222 141 225 138 222 L138 214 Z"
       />
 
-      {/* Abdominaux : ligne blanche */}
       <path
         d="M90 104 L90 187"
         fill="none"
@@ -740,7 +766,7 @@ function FrontBody({
         pointerEvents="none"
       />
 
-      {/* Droit de l’abdomen, 8 segments */}
+      {/* Abdominaux */}
       <MuscleShape
         {...common}
         muscle="abdominaux"
@@ -797,7 +823,7 @@ function FrontBody({
         d="M103 169 C99 167 95 167 92 169 L92 187 C96 190 100 188 103 184 Z"
       />
 
-      {/* Obliques externes */}
+      {/* Obliques */}
       <MuscleShape
         {...common}
         muscle="obliques"
@@ -857,7 +883,7 @@ function FrontBody({
         "
       />
 
-      {/* Quadriceps : vaste latéral */}
+      {/* Quadriceps */}
       <MuscleShape
         {...common}
         muscle="quadriceps"
@@ -886,7 +912,6 @@ function FrontBody({
         "
       />
 
-      {/* Quadriceps : droit fémoral */}
       <MuscleShape
         {...common}
         muscle="quadriceps"
@@ -915,7 +940,6 @@ function FrontBody({
         "
       />
 
-      {/* Quadriceps : vaste médial */}
       <MuscleShape
         {...common}
         muscle="quadriceps"
@@ -999,7 +1023,6 @@ function FrontBody({
         "
       />
 
-      {/* Genoux */}
       <ellipse
         cx="62"
         cy="303"
@@ -1049,7 +1072,6 @@ function FrontBody({
         "
       />
 
-      {/* Extenseurs des orteils */}
       <MuscleShape
         {...common}
         muscle="tibial-anterieur"
@@ -1087,13 +1109,13 @@ function FrontBody({
 
 function BackBody({
   scores,
-  onSelect,
+  onMuscleSelect,
   selected,
 }: BodyProps) {
   const common = {
     scores,
     selected,
-    onSelect,
+    onMuscleSelect,
   };
 
   return (
@@ -1274,7 +1296,7 @@ function BackBody({
         "
       />
 
-      {/* Triceps — chef long */}
+      {/* Triceps */}
       <MuscleShape
         {...common}
         muscle="triceps"
@@ -1303,7 +1325,6 @@ function BackBody({
         "
       />
 
-      {/* Triceps — chef latéral */}
       <MuscleShape
         {...common}
         muscle="triceps"
@@ -1330,7 +1351,7 @@ function BackBody({
         "
       />
 
-      {/* Avant-bras : extenseurs */}
+      {/* Avant-bras */}
       <MuscleShape
         {...common}
         muscle="avant-bras"
@@ -1414,7 +1435,7 @@ function BackBody({
         "
       />
 
-      {/* Érecteurs du rachis */}
+      {/* Lombaires */}
       <MuscleShape
         {...common}
         muscle="lombaires"
@@ -1443,7 +1464,6 @@ function BackBody({
         "
       />
 
-      {/* Carré des lombes */}
       <MuscleShape
         {...common}
         muscle="lombaires"
@@ -1470,7 +1490,7 @@ function BackBody({
         "
       />
 
-      {/* Moyen fessier */}
+      {/* Fessiers */}
       <MuscleShape
         {...common}
         muscle="fessiers"
@@ -1499,7 +1519,6 @@ function BackBody({
         "
       />
 
-      {/* Grand fessier */}
       <MuscleShape
         {...common}
         muscle="fessiers"
@@ -1528,7 +1547,7 @@ function BackBody({
         "
       />
 
-      {/* Ischio : biceps fémoral */}
+      {/* Ischio-jambiers */}
       <MuscleShape
         {...common}
         muscle="ischio-jambiers"
@@ -1557,7 +1576,6 @@ function BackBody({
         "
       />
 
-      {/* Ischio : semi-tendineux */}
       <MuscleShape
         {...common}
         muscle="ischio-jambiers"
@@ -1584,7 +1602,6 @@ function BackBody({
         "
       />
 
-      {/* Ischio : semi-membraneux */}
       <MuscleShape
         {...common}
         muscle="ischio-jambiers"
@@ -1611,7 +1628,6 @@ function BackBody({
         "
       />
 
-      {/* Arrière des genoux */}
       <ellipse
         cx="62"
         cy="307"
@@ -1632,7 +1648,7 @@ function BackBody({
         strokeWidth="1"
       />
 
-      {/* Gastrocnémien médial */}
+      {/* Mollets */}
       <MuscleShape
         {...common}
         muscle="mollets"
@@ -1661,7 +1677,6 @@ function BackBody({
         "
       />
 
-      {/* Gastrocnémien latéral */}
       <MuscleShape
         {...common}
         muscle="mollets"
@@ -1690,7 +1705,6 @@ function BackBody({
         "
       />
 
-      {/* Soléaire */}
       <MuscleShape
         {...common}
         muscle="mollets"
@@ -1719,7 +1733,6 @@ function BackBody({
         "
       />
 
-      {/* Tendon d’Achille */}
       <MuscleShape
         {...common}
         muscle="mollets"
@@ -1748,7 +1761,6 @@ function BackBody({
 
       <SkeletonDetails />
 
-      {/* Colonne vertébrale */}
       <path
         d="M90 58 C88 90 92 121 90 153 C88 174 91 192 90 203"
         fill="none"
@@ -1770,58 +1782,79 @@ function HeatmapLegend() {
   const steps = [
     {
       label: "0",
-      color: effortColor(0),
+      color:
+        effortColor(0),
     },
+
     {
       label: "1–9",
-      color: effortColor(5),
+      color:
+        effortColor(5),
     },
+
     {
       label: "10–19",
-      color: effortColor(15),
+      color:
+        effortColor(15),
     },
+
     {
       label: "20–34",
-      color: effortColor(25),
+      color:
+        effortColor(25),
     },
+
     {
       label: "35–49",
-      color: effortColor(40),
+      color:
+        effortColor(40),
     },
+
     {
       label: "50–64",
-      color: effortColor(55),
+      color:
+        effortColor(55),
     },
+
     {
       label: "65–79",
-      color: effortColor(70),
+      color:
+        effortColor(70),
     },
+
     {
       label: "80+",
-      color: effortColor(85),
+      color:
+        effortColor(85),
     },
   ];
 
   return (
     <div className="flex flex-wrap justify-center gap-x-3 gap-y-2">
-      {steps.map((step) => (
-        <div
-          key={step.label}
-          className="flex items-center gap-1.5"
-        >
-          <span
-            className="h-3 w-3 flex-shrink-0 rounded-full border border-white/15"
-            style={{
-              backgroundColor:
-                step.color,
-            }}
-          />
+      {steps.map(
+        (step) => (
+          <div
+            key={
+              step.label
+            }
+            className="flex items-center gap-1.5"
+          >
+            <span
+              className="h-3 w-3 flex-shrink-0 rounded-full border border-white/15"
+              style={{
+                backgroundColor:
+                  step.color,
+              }}
+            />
 
-          <span className="text-[10px] font-medium text-muted-foreground">
-            {step.label}
-          </span>
-        </div>
-      ))}
+            <span className="text-[10px] font-medium text-muted-foreground">
+              {
+                step.label
+              }
+            </span>
+          </div>
+        ),
+      )}
     </div>
   );
 }
@@ -1833,40 +1866,70 @@ function HeatmapLegend() {
 export function BodyMapSVG({
   scores,
 }: {
-  scores: Record<string, number>;
+  scores: Record<
+    string,
+    number
+  >;
+
   maxScore: number;
 }) {
-  const [selected, setSelected] =
-    useState<string | null>(null);
+  const [
+    selected,
+    setSelected,
+  ] =
+    useState<
+      string | null
+    >(
+      null,
+    );
 
   const [
     selectedAnatomicalName,
     setSelectedAnatomicalName,
-  ] = useState<string | null>(null);
+  ] =
+    useState<
+      string | null
+    >(
+      null,
+    );
 
   const handleSelect = (
     muscle: string,
     anatomicalName?: string,
   ) => {
     if (
-      selected === muscle &&
+      selected ===
+        muscle &&
       selectedAnatomicalName ===
         anatomicalName
     ) {
-      setSelected(null);
-      setSelectedAnatomicalName(null);
+      setSelected(
+        null,
+      );
+
+      setSelectedAnatomicalName(
+        null,
+      );
+
       return;
     }
 
-    setSelected(muscle);
+    setSelected(
+      muscle,
+    );
+
     setSelectedAnatomicalName(
-      anatomicalName ?? null,
+      anatomicalName ??
+        null,
     );
   };
 
-  const selectedScore = selected
-    ? scores[selected] ?? 0
-    : 0;
+  const selectedScore =
+    selected
+      ? scores[
+          selected
+        ] ?? 0
+      : 0;
 
   return (
     <div className="w-full space-y-5">
@@ -1875,7 +1938,10 @@ export function BodyMapSVG({
           <button
             type="button"
             onClick={() => {
-              setSelected(null);
+              setSelected(
+                null,
+              );
+
               setSelectedAnatomicalName(
                 null,
               );
@@ -1906,22 +1972,26 @@ export function BodyMapSVG({
                   Zone :{" "}
                   {MUSCLE_LABELS[
                     selected
-                  ] ?? selected}
+                  ] ??
+                    selected}
                 </span>
               )}
             </span>
 
             <span className="ml-auto flex-shrink-0 font-mono text-xs text-muted-foreground">
-              {selectedScore} pt
-              {selectedScore > 1
+              {
+                selectedScore
+              }{" "}
+              pt
+              {selectedScore >
+              1
                 ? "s"
                 : ""}
             </span>
           </button>
         ) : (
           <p className="text-center text-xs text-muted-foreground">
-            Appuie sur un muscle précis pour
-            voir son nom et l’effort de sa zone
+            Appuie sur un muscle précis pour voir son nom et l’effort de sa zone
           </p>
         )}
       </div>
@@ -1934,9 +2004,15 @@ export function BodyMapSVG({
 
           <div className="w-full max-w-[180px]">
             <FrontBody
-              scores={scores}
-              onSelect={handleSelect}
-              selected={selected}
+              scores={
+                scores
+              }
+              onMuscleSelect={
+                handleSelect
+              }
+              selected={
+                selected
+              }
             />
           </div>
         </div>
@@ -1948,9 +2024,15 @@ export function BodyMapSVG({
 
           <div className="w-full max-w-[180px]">
             <BackBody
-              scores={scores}
-              onSelect={handleSelect}
-              selected={selected}
+              scores={
+                scores
+              }
+              onMuscleSelect={
+                handleSelect
+              }
+              selected={
+                selected
+              }
             />
           </div>
         </div>

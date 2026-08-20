@@ -21,63 +21,108 @@ import {
   BadgeHex,
 } from "@/components/BadgeHex";
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Types locaux
+// ─────────────────────────────────────────────────────────────────────────────
+
+type BadgeDefinition =
+  (typeof BADGE_BY_ID)[keyof typeof BADGE_BY_ID];
+
+type BadgeLevelMeta =
+  (typeof BADGE_LEVEL_META)[keyof typeof BADGE_LEVEL_META];
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Composant
+// ─────────────────────────────────────────────────────────────────────────────
+
 export function BadgeUnlockNotifier() {
   const {
     data,
     clearBadgeNotification,
-  } = useClimbTrack();
+  } =
+    useClimbTrack();
 
   const [
     isVisible,
     setIsVisible,
-  ] = useState(false);
+  ] =
+    useState(false);
 
   const notification =
-    data.pendingBadgeNotifications[0];
+    data.pendingBadgeNotifications[
+      0
+    ];
+
+  /*
+   * On passe volontairement par un Record<string, ...>.
+   *
+   * Cela évite qu'un ancien niveau ou badge sauvegardé
+   * dans le localStorage fasse échouer TypeScript après
+   * une modification du catalogue de badges.
+   */
+  const badgeMap =
+    BADGE_BY_ID as Record<
+      string,
+      BadgeDefinition | undefined
+    >;
+
+  const levelMetaMap =
+    BADGE_LEVEL_META as Record<
+      string,
+      BadgeLevelMeta | undefined
+    >;
 
   const badge =
     notification
-      ? BADGE_BY_ID[
+      ? badgeMap[
           notification.badgeId
         ]
       : undefined;
 
   const levelMeta =
     notification
-      ? BADGE_LEVEL_META[
+      ? levelMetaMap[
           notification.level
         ]
       : undefined;
 
-  useEffect(() => {
-    if (
-      notification &&
-      badge
-    ) {
-      const timer =
-        window.setTimeout(
-          () => {
-            setIsVisible(
-              true,
-            );
-          },
-          150,
-        );
+  useEffect(
+    () => {
+      if (
+        notification &&
+        badge &&
+        levelMeta
+      ) {
+        const timer =
+          window.setTimeout(
+            () => {
+              setIsVisible(
+                true,
+              );
+            },
+            150,
+          );
 
-      return () =>
-        window.clearTimeout(
-          timer,
-        );
-    }
+        return () => {
+          window.clearTimeout(
+            timer,
+          );
+        };
+      }
 
-    setIsVisible(
-      false,
-    );
-  }, [
-    notification?.badgeId,
-    notification?.level,
-    badge,
-  ]);
+      setIsVisible(
+        false,
+      );
+
+      return undefined;
+    },
+    [
+      notification?.badgeId,
+      notification?.level,
+      badge,
+      levelMeta,
+    ],
+  );
 
   if (
     !notification ||
@@ -95,7 +140,8 @@ export function BadgeUnlockNotifier() {
     );
 
   const routeLabel =
-    badge.kind === "route"
+    badge.kind ===
+    "route"
       ? notification.level ===
         "diamond"
         ? "Réussie en tête"
@@ -107,11 +153,17 @@ export function BadgeUnlockNotifier() {
       false,
     );
 
+    const badgeId =
+      notification.badgeId;
+
+    const level =
+      notification.level;
+
     window.setTimeout(
       () => {
         clearBadgeNotification(
-          notification.badgeId,
-          notification.level,
+          badgeId,
+          level,
         );
       },
       220,
@@ -137,9 +189,9 @@ export function BadgeUnlockNotifier() {
         }`}
         onClick={(
           event,
-        ) =>
-          event.stopPropagation()
-        }
+        ) => {
+          event.stopPropagation();
+        }}
       >
         <button
           type="button"
@@ -181,7 +233,9 @@ export function BadgeUnlockNotifier() {
           </div>
 
           <h2 className="mt-2 text-2xl font-black tracking-tight text-white">
-            {badge.name}
+            {
+              badge.name
+            }
           </h2>
 
           <p
