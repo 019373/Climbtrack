@@ -1,4 +1,6 @@
 import {
+  memo,
+  useCallback,
   useEffect,
   useMemo,
   useState,
@@ -477,21 +479,6 @@ function getLogDate(
   return parsed;
 }
 
-function getLogsForDay(
-  logs: SessionLog[],
-  date: Date,
-): SessionLog[] {
-  return logs.filter(
-    (log) =>
-      isSameDay(
-        getLogDate(
-          log,
-        ),
-        date,
-      ),
-  );
-}
-
 // ─────────────────────────────────────────────────────────────────────────────
 // Calendrier
 // ─────────────────────────────────────────────────────────────────────────────
@@ -545,6 +532,17 @@ function MonthlyCalendar({
           1,
       },
     );
+
+  // CLIMBTRACK_HISTORY_PERF_V1
+  // Index des dates calculé une seule fois.
+  const daysWithSessions = useMemo(
+    () => new Set(
+      logs.map(
+        (log) => format(getLogDate(log), 'yyyy-MM-dd')
+      )
+    ),
+    [logs],
+  );
 
   const days =
     eachDayOfInterval({
@@ -634,15 +632,9 @@ function MonthlyCalendar({
                   month,
                 );
 
-              const dayLogs =
-                getLogsForDay(
-                  logs,
-                  day,
-                );
-
-              const hasLogs =
-                dayLogs.length >
-                0;
+              const hasLogs = daysWithSessions.has(
+                format(day, 'yyyy-MM-dd'),
+              );
 
               const selected =
                 selectedDate
@@ -785,7 +777,7 @@ function IncompleteExerciseRow({
 // Carte de séance
 // ─────────────────────────────────────────────────────────────────────────────
 
-function HistorySessionCard({
+const HistorySessionCard = memo(function HistorySessionCard({
   log,
   data,
   onDelete,
@@ -794,7 +786,7 @@ function HistorySessionCard({
 
   data: AppData;
 
-  onDelete: () => void;
+  onDelete: (log: SessionLog) => void;
 }) {
   const [
     isExpanded,
@@ -1401,9 +1393,7 @@ function HistorySessionCard({
 
           <button
             type="button"
-            onClick={
-              onDelete
-            }
+            onClick={() => onDelete(log)}
             className="flex w-full items-center justify-center gap-2 rounded-xl border border-destructive/30 py-3 text-sm font-bold text-destructive active:scale-[0.99]"
           >
             <Trash2
@@ -1416,7 +1406,7 @@ function HistorySessionCard({
       )}
     </article>
   );
-}
+});
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Page
@@ -1540,9 +1530,9 @@ export function HistoriquePage() {
     );
   }
 
-  function handleDelete(
+  const handleDelete = useCallback((
     log: SessionLog,
-  ) {
+  ) => {
     const confirmed =
       window.confirm(
         `Supprimer la séance « ${getSessionName(
@@ -1557,7 +1547,7 @@ export function HistoriquePage() {
         log.id,
       );
     }
-  }
+  }, [deleteSessionLog]);
 
   return (
     <div className="min-h-screen w-full overflow-x-hidden bg-background pb-24 pt-safe">
@@ -1669,11 +1659,7 @@ export function HistoriquePage() {
                   data={
                     data
                   }
-                  onDelete={() =>
-                    handleDelete(
-                      log,
-                    )
-                  }
+                  onDelete={handleDelete}
                 />
               ),
             )}

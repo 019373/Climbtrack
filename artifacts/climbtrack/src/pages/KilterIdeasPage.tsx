@@ -238,6 +238,7 @@ export function KilterIdeasPage() {
       {/* Content */}
 
       <main className="mx-auto w-full max-w-2xl space-y-4 p-4">
+        <button type="button" onClick={() => navigate("/jeu-kilter")} className="w-full rounded-2xl border border-border bg-card p-4 text-left text-sm font-black">Kilter Game</button>
         {sortedIdeas.length ===
         0 ? (
           <section className="rounded-2xl border border-dashed border-border bg-card px-5 py-10 text-center">

@@ -53,6 +53,7 @@ import {
 import {
   KilterIdeasPage,
 } from "@/pages/KilterIdeasPage";
+import { KilterLocalGamePage } from "@/pages/KilterLocalGamePage";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Router
@@ -84,9 +85,9 @@ function AppLayout() {
     useLocation();
 
   const hideBottomNav =
-    location.pathname.startsWith(
-      "/seance/",
-    );
+    location.pathname.startsWith("/seance/") ||
+    location.pathname === "/jeu-kilter" ||
+    location.pathname.startsWith("/jeu-kilter/");
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -156,6 +157,8 @@ function AppLayout() {
             <BlessuresPage />
           }
         />
+
+        <Route path="/jeu-kilter" element={<KilterLocalGamePage />} />
 
         <Route
           path="/kilter"
