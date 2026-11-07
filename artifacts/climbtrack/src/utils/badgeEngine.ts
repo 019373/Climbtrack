@@ -1,5 +1,6 @@
 import type {
   ExerciseLog,
+  HangboardGripSizeMm,
   SessionLog,
 } from "@/context/ClimbTrackContext";
 
@@ -64,9 +65,11 @@ function getSessionTimestamp(
     }
   }
 
-  return new Date(
+  const fallback = new Date(
     `${log.date}T12:00:00`,
   ).getTime();
+
+  return Number.isFinite(fallback) ? fallback : 0;
 }
 
 function createEarnedAt(
@@ -95,18 +98,84 @@ function createEarnedAt(
 function isCompletedExercise(
   exerciseLog: ExerciseLog,
 ): boolean {
-  /*
-   * Compatibilité historique :
-   *
-   * les anciennes sauvegardes peuvent ne pas
-   * avoir la propriété completed.
-   *
-   * Seul false signifie explicitement
-   * "non réalisé".
-   */
   return (
     exerciseLog.completed !==
     false
+  );
+}
+
+/*
+ * Compatibilité historique pour les logs créés
+ * avant l'ajout de gripSizeMm.
+ */
+function matchesLegacyGripSize(
+  exerciseLog: ExerciseLog,
+  targetGripSizeMm: HangboardGripSizeMm,
+): boolean {
+  if (
+    exerciseLog.gripSizeMm !==
+    undefined
+  ) {
+    return false;
+  }
+
+  /*
+   * L'ancien exercice Suspension 20 mm
+   * était nécessairement réalisé sur 20 mm.
+   */
+  if (
+    targetGripSizeMm ===
+      20 &&
+    exerciseLog.exerciseId ===
+      "suspension-20mm"
+  ) {
+    return true;
+  }
+
+  /*
+   * L'ancien badge 25 mm utilisait dead-hang.
+   *
+   * Cette exception ne concerne que les anciens
+   * logs sans gripSizeMm.
+   */
+  if (
+    targetGripSizeMm ===
+      25 &&
+    exerciseLog.exerciseId ===
+      "dead-hang"
+  ) {
+    return true;
+  }
+
+  return false;
+}
+
+function matchesGripSize(
+  exerciseLog: ExerciseLog,
+  targetGripSizeMm:
+    | HangboardGripSizeMm
+    | undefined,
+): boolean {
+  if (
+    targetGripSizeMm ===
+    undefined
+  ) {
+    return true;
+  }
+
+  if (
+    exerciseLog.gripSizeMm !==
+    undefined
+  ) {
+    return (
+      exerciseLog.gripSizeMm ===
+      targetGripSizeMm
+    );
+  }
+
+  return matchesLegacyGripSize(
+    exerciseLog,
+    targetGripSizeMm,
   );
 }
 
@@ -120,15 +189,58 @@ function getExerciseLogs(
     return [];
   }
 
+  const targetGripSizeMm =
+    badge.targetGripSizeMm;
+
   return logs.flatMap(
     (session) =>
       session.exerciseLogs.filter(
-        (exerciseLog) =>
-          exerciseLog.exerciseId ===
-            badge.exerciseId &&
-          isCompletedExercise(
-            exerciseLog,
-          ),
+        (
+          exerciseLog,
+        ) => {
+          if (
+            !isCompletedExercise(
+              exerciseLog,
+            )
+          ) {
+            return false;
+          }
+
+          /*
+           * Cas normal :
+           * le log appartient exactement
+           * à l'exercice du badge.
+           */
+          if (
+            exerciseLog.exerciseId ===
+            badge.exerciseId
+          ) {
+            return matchesGripSize(
+              exerciseLog,
+              targetGripSizeMm,
+            );
+          }
+
+          /*
+           * Exception uniquement pour l'ancien
+           * badge 25 mm basé sur dead-hang.
+           *
+           * Aucun nouveau log d'un autre exercice
+           * ne peut donc débloquer un badge de réglette.
+           */
+          if (
+            targetGripSizeMm ===
+              25 &&
+            exerciseLog.exerciseId ===
+              "dead-hang" &&
+            exerciseLog.gripSizeMm ===
+              undefined
+          ) {
+            return true;
+          }
+
+          return false;
+        },
       ),
   );
 }
@@ -268,6 +380,15 @@ function getBestKilterAngle(
             return;
           }
 
+          if (
+            typeof entry.angle !== "number" ||
+            !Number.isFinite(entry.angle) ||
+            entry.angle < 0 ||
+            entry.angle > 70
+          ) {
+            return;
+          }
+
           best =
             Math.max(
               best,
@@ -339,10 +460,6 @@ function hasExactRouteSuccess(
         []
       ).some(
         (entry) => {
-          /*
-           * Toujours exiger EXACTEMENT
-           * la cotation du badge.
-           */
           if (
             entry.result !==
               "reussi" ||
@@ -352,10 +469,6 @@ function hasExactRouteSuccess(
             return false;
           }
 
-          /*
-           * Une réussite en tête valide aussi
-           * le niveau moulinette.
-           */
           if (
             targetMode ===
             "moulinette"
@@ -423,13 +536,6 @@ function getPrimaryPerformance(
   key: string;
   value: number;
 } | null {
-  /*
-   * Une seule métrique principale par exercice.
-   *
-   * On privilégie les métriques de force,
-   * puis durée, répétitions et progression.
-   */
-
   if (
     typeof log.weight ===
       "number"
@@ -449,7 +555,10 @@ function getPrimaryPerformance(
   ) {
     return {
       key:
-        "duration",
+        typeof log.gripSizeMm ===
+          "number"
+          ? `duration:${log.gripSizeMm}mm`
+          : "duration",
 
       value:
         log.duration,
@@ -549,13 +658,6 @@ function countPersonalRecords(
       second.timestamp,
   );
 
-  /*
-   * Clé :
-   * exercice + type de mesure.
-   *
-   * Cela évite par exemple qu'un changement
-   * de suivi durée → charge crée un faux record.
-   */
   const bestByMetric =
     new Map<
       string,
@@ -589,11 +691,6 @@ function countPersonalRecords(
           key,
         );
 
-      /*
-       * La toute première performance établit
-       * le record de référence mais ne compte
-       * pas comme "record battu".
-       */
       if (
         previousBest ===
         undefined
@@ -799,8 +896,6 @@ export function computeBest(
   badge: BadgeDefinition,
   logs: SessionLog[],
 ): number {
-  // Ancienne compatibilité.
-
   if (
     badge.metric ===
     "first"
@@ -810,8 +905,6 @@ export function computeBest(
       ? 1
       : -Infinity;
   }
-
-  // Couleur de bloc.
 
   if (
     badge.metric ===
@@ -824,8 +917,6 @@ export function computeBest(
       ? 1
       : -Infinity;
   }
-
-  // Kilter V précis.
 
   if (
     badge.metric ===
@@ -850,8 +941,6 @@ export function computeBest(
       : -Infinity;
   }
 
-  // Kilter inclinaison.
-
   if (
     badge.metric ===
     "kilter-angle"
@@ -872,8 +961,6 @@ export function computeBest(
       logs,
     );
   }
-
-  // Voies.
 
   if (
     badge.metric ===
@@ -909,8 +996,6 @@ export function computeBest(
       : -Infinity;
   }
 
-  // Records personnels.
-
   if (
     badge.metric ===
     "records"
@@ -930,6 +1015,11 @@ export function computeBest(
     getRelevantExerciseLogs(
       badge,
       logs,
+    ).filter((exerciseLog) =>
+      badge.levels.some((level) =>
+        matchesRequiredAssistance(exerciseLog, level) &&
+        matchesMinimumSets(exerciseLog, level),
+      ),
     );
 
   if (
@@ -1049,7 +1139,7 @@ export function computeBest(
 
       if (
         badge.metric ===
-        "assistance" &&
+          "assistance" &&
         typeof exerciseLog.reps ===
           "number"
       ) {
@@ -1062,7 +1152,7 @@ export function computeBest(
 
       if (
         badge.metric ===
-        "dips-reps" &&
+          "dips-reps" &&
         exerciseLog.sets >=
           3 &&
         typeof exerciseLog.reps ===
@@ -1102,8 +1192,6 @@ function isLevelUnlocked(
     return false;
   }
 
-  // ── Couleur de bloc ──────────────────────────────────────────────────────
-
   if (
     badge.metric ===
     "climbing-color"
@@ -1113,8 +1201,6 @@ function isLevelUnlocked(
       logs,
     );
   }
-
-  // ── Voies ────────────────────────────────────────────────────────────────
 
   if (
     badge.metric ===
@@ -1126,8 +1212,6 @@ function isLevelUnlocked(
       logs,
     );
   }
-
-  // ── Kilter V ─────────────────────────────────────────────────────────────
 
   if (
     badge.metric ===
@@ -1145,8 +1229,6 @@ function isLevelUnlocked(
       )
     );
   }
-
-  // ── Kilter V + angle exact ───────────────────────────────────────────────
 
   if (
     badge.metric ===
@@ -1173,8 +1255,6 @@ function isLevelUnlocked(
     );
   }
 
-  // ── Ancienne progression exacte ─────────────────────────────────────────
-
   if (
     badge.metric ===
       "progression" &&
@@ -1188,8 +1268,6 @@ function isLevelUnlocked(
     );
   }
 
-  // ── Compteur de records ─────────────────────────────────────────────────
-
   if (
     badge.metric ===
     "records"
@@ -1201,8 +1279,6 @@ function isLevelUnlocked(
       levelDefinition.threshold
     );
   }
-
-  // ── Exercices standards ─────────────────────────────────────────────────
 
   return hasStandardLevelPerformance(
     badge,
@@ -1370,13 +1446,6 @@ export function findNewlyUnlocked(
           second.level,
         );
 
-      /*
-       * Un vieux niveau Platine n'existe plus
-       * dans BADGE_LEVEL_ORDER.
-       *
-       * Le placer simplement après les niveaux actuels
-       * s'il apparaît dans une ancienne sauvegarde.
-       */
       const safeFirstIndex =
         firstLevelIndex ===
         -1
@@ -1411,12 +1480,6 @@ export function applyNewUnlocks(
   const result:
     EarnedBadges = {};
 
-  /*
-   * Copier absolument toutes les anciennes données.
-   *
-   * Ainsi, même un ancien niveau Platine ou
-   * un badge retiré reste conservé dans la sauvegarde.
-   */
   Object.entries(
     earnedBadges,
   ).forEach(

@@ -1414,11 +1414,36 @@ export function calculateMuscleRecovery(
               first.painLevel,
           )[0];
 
-      const injuryPenalty =
-        activeInjury
-          ? activeInjury.painLevel *
-            5
-          : 0;
+      const injuryPenalty = activeInjury
+        ? (() => {
+            const pain = activeInjury.painLevel;
+
+            const cautionDays =
+              pain >= 7 ? 42 :
+              pain >= 4 ? 21 : 7;
+
+            const start = new Date(
+              activeInjury.startDate + 'T12:00:00'
+            ).getTime();
+
+            const days = Number.isFinite(start)
+              ? Math.max(
+                  0,
+                  (now.getTime() - start) / 86400000
+                )
+              : 0;
+
+            const factor =
+              activeInjury.status === 'active'
+                ? 1
+                : Math.max(
+                    0,
+                    1 - days / cautionDays
+                  );
+
+            return pain * 5 * factor;
+          })()
+        : 0;
 
       const recoveryPercent =
         Math.max(

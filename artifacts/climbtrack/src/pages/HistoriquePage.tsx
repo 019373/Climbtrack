@@ -253,6 +253,17 @@ function getExerciseSummary(
   }
 
   if (
+    typeof log.gripSizeMm ===
+      "number"
+  ) {
+    values.push(
+      `${formatNumber(
+        log.gripSizeMm,
+      )} mm`,
+    );
+  }
+
+  if (
     typeof log.reps ===
     "number"
   ) {
@@ -286,6 +297,7 @@ function getExerciseSummary(
     "number"
   ) {
     if (
+      log.exerciseId !== 'lourd-leger' &&
       typeof log.secondaryWeight ===
       "number"
     ) {

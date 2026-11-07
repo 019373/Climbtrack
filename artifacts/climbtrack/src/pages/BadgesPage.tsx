@@ -37,6 +37,8 @@ import {
   cn,
 } from "@/lib/utils";
 
+import { isBadgeAvailable } from "@/utils/badgeVisibility";
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Niveaux affichés
 // ─────────────────────────────────────────────────────────────────────────────
@@ -106,12 +108,13 @@ function isRegularityCategory(
   );
 }
 
-function getVisibleBadges(): BadgeDefinition[] {
+function getVisibleBadges(
+  data: ReturnType<typeof useClimbTrack>["data"],
+): BadgeDefinition[] {
   return BADGES.filter(
     (badge) =>
-      !isRegularityCategory(
-        badge.category,
-      ),
+      !isRegularityCategory(badge.category) &&
+      isBadgeAvailable(badge, data),
   );
 }
 
@@ -645,8 +648,12 @@ export function BadgesPage() {
   const visibleBadges =
     useMemo(
       () =>
-        getVisibleBadges(),
-      [],
+        getVisibleBadges(data),
+      [
+        data.customExercises,
+        data.exerciseOverrides,
+        data.deletedExerciseIds,
+      ],
     );
 
   const visibleCategories =
@@ -828,7 +835,8 @@ export function BadgesPage() {
         )}
       </main>
 
-      {selectedBadge && (
+      {selectedBadge &&
+        visibleBadges.some((badge) => badge.id === selectedBadge.id) && (
         <BadgeDetailsModal
           badge={
             selectedBadge

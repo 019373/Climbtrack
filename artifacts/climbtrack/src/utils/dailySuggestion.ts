@@ -89,7 +89,11 @@ type GenerateSuggestionOptions = {
   availableMinutes:
     | number
     | null;
-
+  warmupMinutes:
+    | 0
+    | 5
+    | 10
+    | 15;
   preference: DailyPreference;
 
   climbingPreference?: ClimbingPreference;
@@ -474,13 +478,25 @@ function getSessionName(
 
 function getSessionDuration(
   sessionId: string,
+  customSessionExercises?: Record<
+    string,
+    SuggestionExerciseReference[]
+  >,
 ): number {
-  return (
-    SESSION_DURATION[
-      sessionId
-    ] ??
-    30
-  );
+  const baseDuration = SESSION_DURATION[sessionId] ?? 30;
+  const session = getSession(sessionId);
+  const current = customSessionExercises?.[sessionId];
+
+  if (!session || !current) return baseDuration;
+
+  const originalIds = new Set(session.exercises.map(ex => ex.id));
+  const currentIds = new Set(current.map(ex => ex.id));
+  const added = [...currentIds].filter(id => !originalIds.has(id)).length;
+  const removed = [...originalIds].filter(id => !currentIds.has(id)).length;
+
+  // Durée indicative : +/- 5 min par exercice. L'échauffement reste
+  // comptabilisé séparément par le générateur existant.
+  return Math.max(5, baseDuration + (added - removed) * 5);
 }
 
 function getSessionExerciseReferences(
@@ -490,56 +506,18 @@ function getSessionExerciseReferences(
     SuggestionExerciseReference[]
   >,
 ): SuggestionExerciseReference[] {
-  const session =
-    getSession(
-      sessionId,
-    );
+  const current = customSessionExercises?.[sessionId];
+  const definitions = current ?? getSession(sessionId)?.exercises.map(ex => ({
+    id: ex.id,
+    name: ex.name,
+  })) ?? [];
 
-  const builtIn =
-    session?.exercises.map(
-      (
-        exercise,
-      ) => ({
-        id:
-          exercise.id,
-
-        name:
-          exercise.name,
-      }),
-    ) ??
-    [];
-
-  const custom =
-    customSessionExercises?.[
-      sessionId
-    ] ??
-    [];
-
-  const seen =
-    new Set<string>();
-
-  return [
-    ...builtIn,
-    ...custom,
-  ].filter(
-    (
-      exercise,
-    ) => {
-      if (
-        seen.has(
-          exercise.id,
-        )
-      ) {
-        return false;
-      }
-
-      seen.add(
-        exercise.id,
-      );
-
-      return true;
-    },
-  );
+  const seen = new Set<string>();
+  return definitions.filter(ex => {
+    if (seen.has(ex.id)) return false;
+    seen.add(ex.id);
+    return true;
+  });
 }
 
 function getExerciseName(
@@ -934,29 +912,10 @@ function findPartialSession(
             ),
         );
 
-    const remainingExerciseIds =
-      log.exerciseLogs
-        .filter(
-          (
-            exercise,
-          ) =>
-            exercise.completed ===
-            false,
-        )
-        .map(
-          (
-            exercise,
-          ) =>
-            exercise.exerciseId,
-        )
-        .filter(
-          (
-            exerciseId,
-          ) =>
-            currentExerciseIds.has(
-              exerciseId,
-            ),
-        );
+    const completedIds = new Set(completedExerciseIds);
+    const remainingExerciseIds = [...currentExerciseIds].filter(
+      exerciseId => !completedIds.has(exerciseId),
+    );
 
     if (
       completedExerciseIds.length ===
@@ -1383,14 +1342,16 @@ function automaticSessionsAreCompatible(
   return true;
 }
 
-function chooseAutomaticSessionsForBudget(
-  logs: SessionLog[],
-  injuries: Injury[],
-  date: string,
-  seed: number,
-  budget: number,
-  recoveryExerciseData?: RecoveryExerciseData,
-): string[] {
+  function chooseAutomaticSessionsForBudget(
+    logs: SessionLog[],
+    injuries: Injury[],
+    date: string,
+    seed: number,
+    budget: number,
+    warmupMinutes: 0 | 5 | 10 | 15,
+    recoveryExerciseData?: RecoveryExerciseData,
+    customSessionExercises?: Record<string, SuggestionExerciseReference[]>,
+  ): string[] {
   const ranked =
     rankAutomaticMainSessions(
       logs,
@@ -1442,6 +1403,7 @@ function chooseAutomaticSessionsForBudget(
     const duration =
       getSessionDuration(
         candidate.sessionId,
+        customSessionExercises,
       );
 
     /*
@@ -1468,7 +1430,7 @@ function chooseAutomaticSessionsForBudget(
     const additionalWarmup =
       requiresWarmup &&
       !alreadyNeedsWarmup
-        ? 15
+        ? warmupMinutes
         : 0;
 
     if (
@@ -1517,6 +1479,7 @@ function chooseAutomaticSessionsForBudget(
       const duration =
         getSessionDuration(
           candidate.sessionId,
+          customSessionExercises,
         );
 
       const warmup =
@@ -1524,7 +1487,7 @@ function chooseAutomaticSessionsForBudget(
           "s1-force-doigts" ||
         candidate.sessionId ===
           "s2-resistance"
-          ? 10
+          ? warmupMinutes
           : 0;
 
       if (
@@ -2269,8 +2232,7 @@ function getBoulderGuidance(
 // ─────────────────────────────────────────────────────────────────────────────
 
 function getWarmupStep(
-  durationMinutes =
-    15,
+  durationMinutes: number,
 ): SuggestedStep {
   return {
     id:
@@ -2408,6 +2370,7 @@ function getFinisher(
 
 function buildSessionStep(
   sessionId: string,
+  customSessionExercises?: Record<string, SuggestionExerciseReference[]>,
 ): SuggestedStep | null {
   const session =
     getSession(
@@ -2436,6 +2399,7 @@ function buildSessionStep(
     durationMinutes:
       getSessionDuration(
         sessionId,
+        customSessionExercises,
       ),
 
     sessionId,
@@ -2465,6 +2429,7 @@ function buildPartialSessionStep(
       Math.round(
         getSessionDuration(
           partial.sessionId,
+          customSessionExercises,
         ) *
           (
             1 -
@@ -2786,10 +2751,11 @@ function buildSuggestion(
     logs,
     date,
     availableMinutes,
+    warmupMinutes,
     preference,
     variation,
-  } =
-    options;
+    recoveryExerciseData,
+  } = options;
 
   const injuries =
     options.injuries ??
@@ -3036,6 +3002,7 @@ function buildSuggestion(
     budget <
       getSessionDuration(
         partial.sessionId,
+        options.customSessionExercises,
       )
   ) {
     const partialStep =
@@ -3057,25 +3024,33 @@ function buildSuggestion(
           "s2-resistance";
 
       if (
-        needsWarmup
+        needsWarmup &&
+        warmupMinutes > 0
       ) {
-        const maximumWarmup =
-          budget -
-          Math.min(
-            partialStep.durationMinutes,
-            budget,
-          );
+        // Reserver au moins 5 min pour les exercices,
+        // si le temps disponible le permet.
+        const minimumExerciseMinutes = Math.min(
+          5,
+          partialStep.durationMinutes,
+          budget,
+        );
+
+        const maximumWarmup = Math.max(
+          0,
+          budget - minimumExerciseMinutes,
+        );
+
+        const actualWarmup =
+          Math.floor(
+            Math.min(warmupMinutes, maximumWarmup) / 5,
+          ) * 5;
 
         if (
-          maximumWarmup >=
-          8
+          actualWarmup > 0
         ) {
           const warmup =
             getWarmupStep(
-              Math.min(
-                15,
-                maximumWarmup,
-              ),
+              actualWarmup,
             );
 
           if (
@@ -3201,18 +3176,20 @@ function buildSuggestion(
     !wantsClimbing &&
     !wantsKilter
   ) {
-    const automaticSessions =
+    const selectedAutomaticSessionIds =
       chooseAutomaticSessionsForBudget(
         logs,
         injuries,
         date,
         seed,
         budget,
-        options.recoveryExerciseData,
+        warmupMinutes,
+        recoveryExerciseData,
+        options.customSessionExercises,
       );
 
     selectedSessionIds.push(
-      ...automaticSessions,
+      ...selectedAutomaticSessionIds,
     );
   }
 
@@ -3249,12 +3226,13 @@ function buildSuggestion(
           total +
           getSessionDuration(
             sessionId,
+            options.customSessionExercises,
           ),
         0,
       );
 
-    let warmupDuration =
-      15;
+    let warmupDuration: number =
+      warmupMinutes;
 
     /*
      * Lorsque les séances demandées remplissent presque
@@ -3267,14 +3245,15 @@ function buildSuggestion(
       budget
     ) {
       warmupDuration =
-        Math.max(
-          8,
-          Math.min(
-            10,
-            budget -
-              totalSelectedSessionMinutes,
-          ),
-        );
+        Math.floor(
+          Math.max(
+            0,
+            Math.min(
+              warmupDuration,
+              budget - totalSelectedSessionMinutes,
+            ),
+          ) / 5,
+        ) * 5;
     }
 
     if (
@@ -3315,6 +3294,7 @@ function buildSuggestion(
         steps,
         buildSessionStep(
           sessionId,
+          options.customSessionExercises,
         ),
         budget,
       );
@@ -3444,8 +3424,9 @@ function buildSuggestion(
 
     const requestedStep =
       buildSessionStep(
-        firstRequested,
-      );
+          firstRequested,
+          options.customSessionExercises,
+        );
 
     if (
       requestedStep &&
@@ -3520,8 +3501,9 @@ function buildSuggestion(
   ) {
     const pushups =
       buildSessionStep(
-        "s8-pompes-activation",
-      );
+          "s8-pompes-activation",
+          options.customSessionExercises,
+        );
 
     if (
       pushups
@@ -3558,8 +3540,9 @@ function buildSuggestion(
   ) {
     const prevention =
       buildSessionStep(
-        "s7-prevention",
-      );
+          "s7-prevention",
+          options.customSessionExercises,
+        );
 
     if (
       prevention
@@ -3713,6 +3696,7 @@ function buildSuggestion(
       const step =
         buildSessionStep(
           candidate.sessionId,
+          options.customSessionExercises,
         );
 
       if (

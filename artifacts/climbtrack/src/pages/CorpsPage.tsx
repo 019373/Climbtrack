@@ -7,6 +7,9 @@ import {
   useClimbTrack,
 } from "@/context/ClimbTrackContext";
 
+import type { SessionLog } from "@/context/ClimbTrackContext";
+import { getExerciseById } from "@/utils/exercises";
+
 import {
   cn,
 } from "@/lib/utils";
@@ -19,12 +22,16 @@ import {
   MUSCLE_GROUPS,
   calculateAccumulatedScores,
   calculateRecoveryScores,
+  getSessionMuscleLoad,
 } from "@/utils/muscleRecovery";
+
+import type { RecoveryExerciseData } from "@/utils/muscleRecovery";
 
 type TimeFilter =
   | "recovery"
   | "7"
   | "30"
+  | "365"
   | "all";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -42,6 +49,199 @@ function getMuscleName(
     )?.name ??
     muscleId
   );
+}
+
+
+// Conseils adaptés aux besoins de l'escalade.
+function getClimbingRecommendations(
+  logs: SessionLog[],
+  days: 30 | 365,
+  exerciseData: RecoveryExerciseData,
+  injuries: { area: string; status: string }[],
+): string[] {
+  const now = Date.now();
+  const durationMs = days * 24 * 60 * 60 * 1000;
+
+  const sessions = logs.flatMap((log) => {
+    const timestamp = log.completedAt
+      ? Date.parse(log.completedAt)
+      : Date.parse(`${log.date}T12:00:00`);
+
+    if (
+      !Number.isFinite(timestamp) ||
+      timestamp > now ||
+      now - timestamp > durationMs ||
+      log.isRestDay
+    ) {
+      return [];
+    }
+
+    const done = (log.exerciseLogs ?? []).filter(
+      ex => ex.completed !== false
+    );
+
+    const hasClimb =
+      (log.climbingDurationMinutes ?? 0) > 0 ||
+      (log.kilterEntries?.length ?? 0) > 0 ||
+      (log.routeClimbingEntries?.length ?? 0) > 0 ||
+      (log.routeClimbingDurationMinutes ?? 0) > 0;
+
+    if (
+      done.length === 0 &&
+      !hasClimb &&
+      log.finisherType !== "flexibility"
+    ) {
+      return [];
+    }
+
+    // La souplesse ne se mesure pas par la fatigue musculaire.
+    // On détecte les séances et exercices réellement pratiqués.
+    const isMobility =
+      log.finisherType === "flexibility" ||
+      (log.sessionId === "s5-souplesse" && done.length > 0) ||
+      done.some(ex => {
+        const definition = getExerciseById(
+          ex.exerciseId,
+          exerciseData
+        );
+        const category =
+          exerciseData.exerciseOverrides[ex.exerciseId]?.category
+          ?? definition?.category
+          ?? "";
+
+        return /souplesse|mobilit|etirement|étirement|stretch/i.test(
+          category
+        );
+      });
+
+    const preventionIds = new Set([
+      "rot-ext-epaule",
+      "scapular-pullups",
+      "ext-doigts",
+      "flex-poignet",
+      "ext-poignet",
+      "pronation-supination",
+      "facepull",
+      "equilibre-jambe",
+    ]);
+
+    const isPrevention =
+      (log.sessionId === "s7-prevention" && done.length > 0) ||
+      done.some(ex => preventionIds.has(ex.exerciseId));
+
+    return [{
+      load: getSessionMuscleLoad(log, exerciseData),
+      isMobility,
+      isPrevention,
+    }];
+  });
+
+  // Pas de recommandation à partir de trop peu de séances.
+  if (sessions.length < (days === 30 ? 6 : 24)) {
+    return [];
+  }
+
+  const domains = [
+    {
+      label: "mobilité et souplesse des hanches, chevilles et épaules",
+      target: 0.2,
+      weight: 1.45,
+      special: "mobility",
+    },
+    {
+      label: "prévention et stabilité des épaules",
+      target: 0.17,
+      weight: 1.3,
+      special: "prevention",
+    },
+    {
+      label: "gainage et tension corporelle",
+      groups: ["abdominaux", "obliques", "lombaires"],
+      target: 0.35,
+      weight: 1.15,
+    },
+    {
+      label: "poussée et muscles antagonistes",
+      groups: ["pectoraux", "triceps"],
+      target: 0.25,
+      weight: 1.1,
+    },
+    {
+      label: "appuis de pieds et force des jambes",
+      groups: ["quadriceps", "fessiers", "hanches", "adducteurs"],
+      target: 0.3,
+      weight: 1.05,
+    },
+    {
+      label: "tirage et verrouillages",
+      groups: ["dorsaux", "biceps"],
+      target: 0.4,
+      weight: 0.95,
+    },
+    {
+      label: "force des doigts et des avant-bras",
+      groups: ["doigts", "avant-bras"],
+      target: 0.45,
+      weight: 0.8,
+    },
+  ];
+
+  // Ne pas encourager un travail supplémentaire des doigts
+  // lorsqu'une blessure active concerne la main ou l'avant-bras.
+  const fingerInjury = injuries.some(injury =>
+    injury.status !== "guerie" &&
+    /doigt|main|poignet|avant.bras|coude/i.test(injury.area)
+  );
+
+  return domains.flatMap(domain => {
+    if (
+      fingerInjury &&
+      domain.label.includes("force des doigts")
+    ) {
+      return [];
+    }
+
+    const worked = sessions.filter(session => {
+      if (domain.special === "mobility") {
+        return session.isMobility;
+      }
+
+      if (domain.special === "prevention") {
+        return session.isPrevention;
+      }
+
+      const loads = Object.values(session.load).filter(
+        Number.isFinite
+      );
+
+      const maxLoad = Math.max(0, ...loads);
+      const local = Math.max(
+        0,
+        ...(domain.groups ?? []).map(
+          id => session.load[id] ?? 0
+        )
+      );
+
+      return (
+        maxLoad > 0 &&
+        local >= Math.max(3, maxLoad * 0.6)
+      );
+    }).length;
+
+    const wanted = Math.ceil(sessions.length * domain.target);
+
+    if (worked >= wanted) {
+      return [];
+    }
+
+    return [{
+      label: domain.label,
+      gap: ((wanted - worked) / wanted) * domain.weight,
+    }];
+  })
+  .sort((a, b) => b.gap - a.gap)
+  .slice(0, 3)
+  .map(item => item.label);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -110,7 +310,9 @@ export function CorpsPage() {
             : timeFilter ===
                 "30"
               ? 30
-              : null,
+              : timeFilter === "365"
+                ? 365
+                : null,
 
           new Date(),
 
@@ -133,43 +335,15 @@ export function CorpsPage() {
       ),
     );
 
-  const leastWorked =
-    Object.entries(
-      muscleAccumulation,
-    )
-      .sort(
-        (
-          first,
-          second,
-        ) =>
-          first[1] -
-          second[1],
-      )
-      .filter(
-        (
-          [
-            ,
-            score,
-          ],
-        ) =>
-          score <
-          maxScore *
-            0.3,
-      )
-      .slice(
-        0,
-        3,
-      )
-      .map(
-        (
-          [
-            muscleId,
-          ],
-        ) =>
-          getMuscleName(
-            muscleId,
-          ),
-      );
+  const recommendations =
+    timeFilter === "30" || timeFilter === "365"
+      ? getClimbingRecommendations(
+          data.sessionLogs,
+          timeFilter === "30" ? 30 : 365,
+          recoveryExerciseData,
+          data.injuries,
+        )
+      : [];
 
   const filters: {
     id: TimeFilter;
@@ -191,6 +365,11 @@ export function CorpsPage() {
       id: "30",
       label:
         "30 derniers jours",
+    },
+
+    {
+      id: "365",
+      label: "365 derniers jours",
     },
 
     {
@@ -267,20 +446,17 @@ export function CorpsPage() {
 
         {timeFilter !==
           "recovery" &&
-          leastWorked.length >
-            0 &&
-          maxScore >
-            5 && (
+          recommendations.length > 0 && (
             <div className="rounded-xl border border-border bg-[#151515] p-4">
               <h3 className="mb-2 text-sm font-bold text-white">
                 Recommandation
               </h3>
 
               <p className="text-sm text-muted-foreground">
-                Pour mieux équilibrer cette période, tu pourrais privilégier :{" "}
+                Pour compléter ton entraînement d’escalade sur cette période, tu pourrais privilégier :{" "}
                 <strong className="text-white">
                   {
-                    leastWorked.join(
+                    recommendations.join(
                       ", ",
                     )
                   }

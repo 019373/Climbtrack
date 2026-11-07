@@ -81,10 +81,38 @@ type ManualType =
   | "climbing"
   | "kilter"
   | "route";
-
+type WarmupMinutes =
+  | 0
+  | 5
+  | 10
+  | 15;
 type ManualLogSheetProps = {
   initialType?: ManualType;
   onClose: () => void;
+};
+
+type DailySuggestionStoredState = {
+  date: string;
+
+  expanded: boolean;
+
+  climbingPreference:
+    ClimbingPreference;
+
+  requestedSessionIds:
+    string[];
+
+  availableHoursText:
+    string;
+
+  availableMinutesText:
+    string;
+
+  warmupMinutes:
+    WarmupMinutes;
+
+  variation:
+    number;
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -93,6 +121,12 @@ type ManualLogSheetProps = {
 
 const DEFAULT_TOTAL_TIME_MINUTES =
   90;
+
+const DAILY_SUGGESTION_STORAGE_KEY =
+  "climbtrack_daily_suggestion_v1";
+
+const WEEKLY_SUGGESTION_CACHE_KEY =
+  'climbtrack_weekly_suggestion_v1';
 
 const CLIMBING_COLORS: {
   id: ClimbingColor;
@@ -368,6 +402,241 @@ function createDefaultKilterEntry(
     attempts:
       1,
   };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Daily suggestion persistence
+// ─────────────────────────────────────────────────────────────────────────────
+
+function getWeekStartLocalDate(): string {
+  const d = new Date(
+    getTodayLocalDate() + 'T12:00:00'
+  );
+
+  d.setDate(
+    d.getDate() - (d.getDay() + 6) % 7
+  );
+
+  return [
+    d.getFullYear(),
+    String(d.getMonth() + 1).padStart(2, '0'),
+    String(d.getDate()).padStart(2, '0'),
+  ].join('-');
+}
+
+function createDefaultDailySuggestionState():
+  DailySuggestionStoredState {
+  return {
+    date:
+      getWeekStartLocalDate(),
+
+    expanded:
+      false,
+
+    climbingPreference:
+      "none",
+
+    requestedSessionIds:
+      [],
+
+    availableHoursText:
+      "",
+
+    availableMinutesText:
+      "",
+    warmupMinutes:
+    15,
+
+    variation:
+      0,
+  };
+}
+
+function isValidClimbingPreference(
+  value: unknown,
+): value is ClimbingPreference {
+  return (
+    value ===
+      "none" ||
+    value ===
+      "climbing" ||
+    value ===
+      "kilter" ||
+    value ===
+      "climbing+kilter"
+  );
+}
+
+function loadDailySuggestionState():
+  DailySuggestionStoredState {
+  const fallback =
+    createDefaultDailySuggestionState();
+
+  if (
+    typeof window ===
+    "undefined"
+  ) {
+    return fallback;
+  }
+
+  try {
+    const raw =
+      window.localStorage.getItem(
+        DAILY_SUGGESTION_STORAGE_KEY,
+      );
+
+    if (
+      !raw
+    ) {
+      return fallback;
+    }
+
+    const parsed =
+      JSON.parse(
+        raw,
+      ) as Partial<DailySuggestionStoredState>;
+
+    /*
+     * Une suggestion appartient uniquement
+     * à la journée pendant laquelle elle a
+     * été créée.
+     *
+     * Au changement de jour, on repart
+     * volontairement de zéro.
+     */
+    if (
+      parsed.date !==
+      getWeekStartLocalDate()
+    ) {
+      return fallback;
+    }
+
+    const allowedSessionIds =
+      new Set<string>(
+        REQUESTABLE_SESSION_IDS,
+      );
+
+    const requestedSessionIds =
+      Array.isArray(
+        parsed.requestedSessionIds,
+      )
+        ? parsed.requestedSessionIds.filter(
+            (
+              sessionId,
+            ): sessionId is string =>
+              typeof sessionId ===
+                "string" &&
+              allowedSessionIds.has(
+                sessionId,
+              ),
+          )
+        : [];
+
+    const uniqueRequestedSessionIds =
+      Array.from(
+        new Set(
+          requestedSessionIds,
+        ),
+      );
+
+    const availableHoursText =
+      typeof parsed.availableHoursText ===
+        "string"
+        ? parsed.availableHoursText
+        : "";
+
+    const availableMinutesText =
+      typeof parsed.availableMinutesText ===
+        "string"
+        ? parsed.availableMinutesText
+        : "";
+
+    const variation =
+      typeof parsed.variation ===
+        "number" &&
+      Number.isFinite(
+        parsed.variation,
+      )
+        ? Math.max(
+            0,
+            Math.floor(
+              parsed.variation,
+            ),
+          )
+        : 0;
+    const warmupMinutes =
+      parsed.warmupMinutes === 0 ||
+      parsed.warmupMinutes === 5 ||
+      parsed.warmupMinutes === 10 ||
+      parsed.warmupMinutes === 15
+        ? parsed.warmupMinutes
+        : 15;
+
+    return {
+      date:
+        getWeekStartLocalDate(),
+
+      expanded:
+        typeof parsed.expanded ===
+        "boolean"
+          ? parsed.expanded
+          : false,
+
+      climbingPreference:
+        isValidClimbingPreference(
+          parsed.climbingPreference,
+        )
+          ? parsed.climbingPreference
+          : "none",
+
+      requestedSessionIds:
+        uniqueRequestedSessionIds,
+
+       availableHoursText,
+
+      availableMinutesText,
+
+      warmupMinutes,
+
+      variation,
+    };
+  } catch (
+    error
+  ) {
+    console.error(
+      "Failed to load daily suggestion",
+      error,
+    );
+
+    return fallback;
+  }
+}
+
+function saveDailySuggestionState(
+  state: DailySuggestionStoredState,
+): void {
+  if (
+    typeof window ===
+    "undefined"
+  ) {
+    return;
+  }
+
+  try {
+    window.localStorage.setItem(
+      DAILY_SUGGESTION_STORAGE_KEY,
+      JSON.stringify(
+        state,
+      ),
+    );
+  } catch (
+    error
+  ) {
+    console.error(
+      "Failed to save daily suggestion",
+      error,
+    );
+  }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1532,7 +1801,7 @@ function ManualLogSheet({
                             <NumberInput
                               value={
                                 entry.attempts ??
-                                1
+                                ""
                               }
                               min={1}
                               onChange={(
@@ -1542,12 +1811,15 @@ function ManualLogSheet({
                                   entry.id,
                                   {
                                     attempts:
-                                      Math.max(
-                                        1,
-                                        parsePositiveInteger(
-                                          value,
-                                        ),
-                                      ),
+                                      value.trim() ===
+                                      ""
+                                        ? undefined
+                                        : Math.max(
+                                            1,
+                                            parsePositiveInteger(
+                                              value,
+                                            ),
+                                          ),
                                   },
                                 )
                               }
@@ -1758,7 +2030,7 @@ function ManualLogSheet({
                           <NumberInput
                             value={
                               entry.attempts ??
-                              1
+                              ""
                             }
                             min={1}
                             onChange={(
@@ -1768,12 +2040,15 @@ function ManualLogSheet({
                                 entry.id,
                                 {
                                   attempts:
-                                    Math.max(
-                                      1,
-                                      parsePositiveInteger(
-                                        value,
-                                      ),
-                                    ),
+                                    value.trim() ===
+                                    ""
+                                      ? undefined
+                                      : Math.max(
+                                          1,
+                                          parsePositiveInteger(
+                                            value,
+                                          ),
+                                        ),
                                 },
                               )
                             }
@@ -1851,49 +2126,117 @@ function DailySuggestionCard({
   const navigate =
     useNavigate();
 
+  /*
+   * On charge UNE seule fois l'état sauvegardé
+   * pour la journée en cours.
+   */
+  const initialDailyState =
+    useMemo(
+      () =>
+        loadDailySuggestionState(),
+      [],
+    );
+
   const [
     expanded,
     setExpanded,
   ] =
-    useState(false);
+    useState(
+      initialDailyState.expanded,
+    );
 
   const [
     climbingPreference,
     setClimbingPreference,
   ] =
     useState<ClimbingPreference>(
-      "none",
+      initialDailyState.climbingPreference,
     );
 
   const [
     requestedSessionIds,
     setRequestedSessionIds,
   ] =
-    useState<string[]>([]);
+    useState<string[]>(
+      initialDailyState.requestedSessionIds,
+    );
 
   const [
     availableHoursText,
     setAvailableHoursText,
   ] =
-    useState("");
+    useState(
+      initialDailyState.availableHoursText,
+    );
 
   const [
     availableMinutesText,
     setAvailableMinutesText,
   ] =
-    useState("");
+    useState(
+      initialDailyState.availableMinutesText,
+    );
+  
+  const [
+    warmupMinutes,
+    setWarmupMinutes,
+  ] = useState<WarmupMinutes>(
+    initialDailyState.warmupMinutes,
+  );
 
   const [
     variation,
     setVariation,
   ] =
-    useState(0);
+    useState(
+      initialDailyState.variation,
+    );
 
   const [
     rotating,
     setRotating,
   ] =
     useState(false);
+
+  /*
+   * Toute modification de l'entraînement du jour
+   * est sauvegardée immédiatement.
+   *
+   * Ainsi, changer d'onglet, revenir sur Séances
+   * ou fermer/réouvrir la PWA ne réinitialise plus
+   * la proposition.
+   */
+  useEffect(
+    () => {
+      saveDailySuggestionState({
+        date:
+          getWeekStartLocalDate(),
+
+        expanded,
+
+        climbingPreference,
+
+        requestedSessionIds,
+
+        availableHoursText,
+
+        availableMinutesText,
+
+        warmupMinutes,
+
+        variation,
+      });
+    },
+    [
+      expanded,
+      climbingPreference,
+      requestedSessionIds,
+      availableHoursText,
+      availableMinutesText,
+      warmupMinutes,
+      variation,
+    ]
+  );
 
   const requestableSessions =
     useMemo(
@@ -1973,8 +2316,40 @@ function DailySuggestionCard({
 
   const suggestion =
     useMemo(
-      () =>
-        generateDailySuggestion({
+      (): ReturnType<typeof generateDailySuggestion> => {
+        const signature = JSON.stringify({
+          week: getWeekStartLocalDate(),
+          availableMinutes,
+          warmupMinutes,
+          climbingPreference,
+          requestedSessionIds,
+          customSessionExercises,
+          injuries: data.injuries,
+          exerciseOverrides: data.exerciseOverrides,
+          variation,
+        });
+
+        try {
+          const raw = window.localStorage.getItem(
+            WEEKLY_SUGGESTION_CACHE_KEY
+          );
+
+          if (raw) {
+            const saved = JSON.parse(raw);
+
+            if (
+              saved.signature === signature &&
+              saved.suggestion &&
+              Array.isArray(saved.suggestion.steps)
+            ) {
+              return saved.suggestion;
+            }
+          }
+        } catch (_) {
+          // Cache facultatif.
+        }
+
+        const generated = generateDailySuggestion({
           logs:
             data.sessionLogs,
 
@@ -1985,6 +2360,8 @@ function DailySuggestionCard({
             getTodayLocalDate(),
 
           availableMinutes,
+
+          warmupMinutes,
 
           preference:
             "unknown",
@@ -2004,13 +2381,29 @@ function DailySuggestionCard({
           },
 
           variation,
-        }),
+        });
+
+        try {
+          window.localStorage.setItem(
+            WEEKLY_SUGGESTION_CACHE_KEY,
+            JSON.stringify({
+              signature,
+              suggestion: generated,
+            })
+          );
+        } catch (_) {
+          // Stockage indisponible.
+        }
+
+        return generated;
+      },
       [
         data.sessionLogs,
         data.injuries,
         data.customExercises,
         data.exerciseOverrides,
         availableMinutes,
+        warmupMinutes,
         climbingPreference,
         requestedSessionIds,
         customSessionExercises,
@@ -2371,6 +2764,45 @@ function DailySuggestionCard({
             <p className="text-[11px] leading-relaxed text-muted-foreground/70">
               10 min sont automatiquement gardées pour la transition après l’entraînement.
             </p>
+          </Field>
+
+          <Field label="Échauffement">
+          <div className="grid grid-cols-4 gap-2">
+            {[
+              {
+                value: 0 as const,
+                label: "Aucun",
+              },
+              {
+                value: 5 as const,
+                label: "5 min",
+              },
+              {
+                value: 10 as const,
+                label: "10 min",
+              },
+              {
+                value: 15 as const,
+                label: "15 min",
+              },
+            ].map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                onClick={() =>
+                  setWarmupMinutes(option.value)
+                }
+                className={cn(
+                  "rounded-xl border px-2 py-3 text-sm font-semibold transition-colors",
+                  warmupMinutes === option.value
+                    ? "border-white bg-white text-black"
+                    : "border-border bg-background text-muted-foreground",
+                )}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
           </Field>
 
           <Field label="Envie de grimper">
@@ -2737,29 +3169,43 @@ export function SeancesPage() {
             Séances
           </h1>
 
-          <button
-            type="button"
-            onClick={
-              toggleAddSheet
-            }
-            className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full bg-white text-black shadow-lg active:scale-90"
-            aria-label={
-              manualSheetType
-                ? "Fermer"
-                : "Ajouter une séance"
-            }
-          >
-            <Plus
-              size={22}
-              strokeWidth={3}
-              className={cn(
-                "transition-transform duration-200 ease-out",
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() =>
+                navigate("/kilter")
+              }
+              className="flex h-11 items-center gap-2 rounded-full border border-border bg-card px-4 text-xs font-bold text-white active:scale-95"
+            >
+              <Sparkles
+                size={16}
+              />
+              Idées Kilter
+            </button>
 
-                manualSheetType &&
-                  "rotate-45",
-              )}
-            />
-          </button>
+            <button
+              type="button"
+              onClick={
+                toggleAddSheet
+              }
+              className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full bg-white text-black shadow-lg active:scale-90"
+              aria-label={
+                manualSheetType
+                  ? "Fermer"
+                  : "Ajouter une séance"
+              }
+            >
+              <Plus
+                size={22}
+                strokeWidth={3}
+                className={cn(
+                  "transition-transform duration-200 ease-out",
+                  manualSheetType &&
+                    "rotate-45",
+                )}
+              />
+            </button>
+          </div>
         </div>
       </header>
 

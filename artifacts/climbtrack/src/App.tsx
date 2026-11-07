@@ -50,6 +50,10 @@ import {
   SessionDetailPage,
 } from "@/pages/SessionDetailPage";
 
+import {
+  KilterIdeasPage,
+} from "@/pages/KilterIdeasPage";
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Router
 // ─────────────────────────────────────────────────────────────────────────────
@@ -150,6 +154,13 @@ function AppLayout() {
           path="/blessures"
           element={
             <BlessuresPage />
+          }
+        />
+
+        <Route
+          path="/kilter"
+          element={
+            <KilterIdeasPage />
           }
         />
 

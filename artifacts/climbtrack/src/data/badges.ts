@@ -1,4 +1,5 @@
 import type {
+  HangboardGripSizeMm,
   RouteGrade,
 } from "@/context/ClimbTrackContext";
 
@@ -62,40 +63,18 @@ export type BadgeLevelDefinition = {
 
   description: string;
 
-  /**
-   * Cotation Kilter précise.
-   */
   grade?: number;
 
-  /**
-   * Angle précis.
-   */
   angle?: number;
 
-  /**
-   * Cotation précise de voie.
-   */
   routeGrade?: RouteGrade;
 
-  /**
-   * Mode nécessaire pour le badge de voie.
-   */
   routeMode?:
     | "moulinette"
     | "tete";
 
-  /**
-   * Assistance éventuellement exigée.
-   *
-   * Exemple :
-   * les badges 20 mm doivent être réalisés
-   * sans assistance.
-   */
   requiredAssistance?: string;
 
-  /**
-   * Nombre minimum de séries nécessaire.
-   */
   minimumSets?: number;
 };
 
@@ -122,31 +101,42 @@ export type BadgeDefinition = {
 
   visualColor?: string;
 
-  /**
-   * Angle spécifique à tout le badge.
-   *
-   * Utile pour les trois badges 35 / 38 / 43°.
+  /*
+   * Angle spécifique à un badge de sloper.
    */
   targetAngle?: number;
 
+  /*
+   * Taille exacte de prise nécessaire.
+   *
+   * Exemple :
+   * un badge 8 mm ne peut être évalué
+   * qu'à partir d'un log enregistré sur 8 mm.
+   */
+  targetGripSizeMm?: HangboardGripSizeMm;
+
   levels: BadgeLevelDefinition[];
 
-  /**
-   * Ne pas afficher Bronze / Argent / Or / Diamant
-   * sous les badges à objectif unique.
-   */
   hideLevelLabel?: boolean;
 };
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Badges retirés
+// ─────────────────────────────────────────────────────────────────────────────
+
+/*
+ * Cette liste servira à la migration des anciennes
+ * sauvegardes afin que ces badges ne soient pas
+ * conservés éternellement dans earnedBadges.
+ */
+export const RETIRED_BADGE_IDS = [
+  "developpe-militaire",
+] as const;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Niveaux
 // ─────────────────────────────────────────────────────────────────────────────
 
-/*
- * Ordre ACTUEL.
- *
- * Platine n'en fait plus partie.
- */
 export const BADGE_LEVEL_ORDER: BadgeLevel[] = [
   "bronze",
   "silver",
@@ -195,12 +185,6 @@ export const BADGE_LEVEL_META: Record<
       "#FFD700",
   },
 
-  /*
-   * Compatibilité uniquement.
-   *
-   * Ne fait plus partie de BADGE_LEVEL_ORDER
-   * et n'est utilisé par aucun badge actuel.
-   */
   platinum: {
     label:
       "Platine",
@@ -225,7 +209,7 @@ export const BADGE_LEVEL_META: Record<
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Helper quatre niveaux
+// Helpers
 // ─────────────────────────────────────────────────────────────────────────────
 
 const STANDARD_LEVELS = (
@@ -287,6 +271,96 @@ const STANDARD_LEVELS = (
       descriptions[3],
   },
 ];
+
+function createGripBadge({
+  id,
+  size,
+  thresholds,
+  icon = "fingerboard-20",
+  requiredAssistance,
+}: {
+  id: string;
+
+  size: HangboardGripSizeMm;
+
+  thresholds: [
+    number,
+    number,
+    number,
+    number,
+  ];
+
+  icon?: string;
+
+  requiredAssistance?: string;
+}): BadgeDefinition {
+  const levelNames: BadgeLevel[] = [
+    "bronze",
+    "silver",
+    "gold",
+    "diamond",
+  ];
+
+  return {
+    id,
+
+    name:
+      `Suspension ${size} mm`,
+
+    subtitle:
+      requiredAssistance
+        ? `Suspension ${size} mm sans assistance`
+        : `Suspension sur une prise de ${size} mm`,
+
+    category:
+      "Force doigts",
+
+    icon,
+
+    kind:
+      "standard",
+
+    metric:
+      "duration",
+
+    /*
+     * Tous les nouveaux badges de réglette utilisent
+     * l'exercice de suspension comme mouvement de base.
+     *
+     * Le moteur vérifiera aussi targetGripSizeMm.
+     */
+    exerciseId:
+      "suspension-20mm",
+
+    targetGripSizeMm:
+      size,
+
+    unit:
+      "s",
+
+    levels:
+      thresholds.map(
+        (
+          threshold,
+          index,
+        ) => ({
+          level:
+            levelNames[
+              index
+            ],
+
+          threshold,
+
+          requiredAssistance,
+
+          description:
+            requiredAssistance
+              ? `Tenir ${threshold} secondes sur ${size} mm sans assistance.`
+              : `Tenir ${threshold} secondes sur ${size} mm.`,
+        }),
+      ),
+  };
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Couleurs de blocs
@@ -437,16 +511,6 @@ const CLIMBING_COLOR_BADGES: BadgeDefinition[] =
 // Kilterboard
 // ─────────────────────────────────────────────────────────────────────────────
 
-/*
- * Même fonctionnement que dans la version de base :
- *
- * chaque cotation V0 → V17 possède son propre badge.
- *
- * Bronze  : 30°
- * Argent  : 35°
- * Or      : 40°
- * Diamant : 45°
- */
 const KILTER_BADGES: BadgeDefinition[] =
   Array.from(
     {
@@ -674,151 +738,137 @@ const ROUTE_BADGES: BadgeDefinition[] =
 
 export const BADGES: BadgeDefinition[] = [
   // ═══════════════════════════════════════════════════════════════════════════
-  // FORCE DOIGTS
+  // FORCE DOIGTS — PRISES
   // ═══════════════════════════════════════════════════════════════════════════
 
-  {
+  createGripBadge({
+    id:
+      "suspension-45mm",
+
+    size:
+      45,
+
+    thresholds: [
+      25,
+      35,
+      50,
+      75,
+    ],
+  }),
+
+  /*
+   * ID historique conservé.
+   *
+   * Seuils identiques à l'ancien badge 25 mm.
+   */
+  createGripBadge({
+    id:
+      "suspension-25mm",
+
+    size:
+      25,
+
+    thresholds: [
+      30,
+      45,
+      60,
+      90,
+    ],
+
+    icon:
+      "fingerboard-25",
+  }),
+
+  /*
+   * ID historique conservé.
+   *
+   * Comme avant, le 20 mm exige
+   * explicitement "Sans assistance".
+   */
+  createGripBadge({
     id:
       "suspension-20mm",
 
-    name:
-      "Suspension 20 mm",
+    size:
+      20,
 
-    subtitle:
-      "Suspension sans assistance",
-
-    category:
-      "Force doigts",
+    thresholds: [
+      15,
+      25,
+      35,
+      50,
+    ],
 
     icon:
       "fingerboard-20",
 
-    kind:
-      "standard",
+    requiredAssistance:
+      "Sans assistance",
+  }),
 
-    metric:
-      "duration",
-
-    exerciseId:
-      "suspension-20mm",
-
-    unit:
-      "s",
-
-    levels: [
-      {
-        level:
-          "bronze",
-
-        threshold:
-          15,
-
-        requiredAssistance:
-          "Sans assistance",
-
-        description:
-          "Tenir 15 secondes sans assistance.",
-      },
-
-      {
-        level:
-          "silver",
-
-        threshold:
-          25,
-
-        requiredAssistance:
-          "Sans assistance",
-
-        description:
-          "Tenir 25 secondes sans assistance.",
-      },
-
-      {
-        level:
-          "gold",
-
-        threshold:
-          35,
-
-        requiredAssistance:
-          "Sans assistance",
-
-        description:
-          "Tenir 35 secondes sans assistance.",
-      },
-
-      {
-        level:
-          "diamond",
-
-        threshold:
-          50,
-
-        requiredAssistance:
-          "Sans assistance",
-
-        description:
-          "Tenir 50 secondes sans assistance.",
-      },
-    ],
-  },
-
-  {
+  createGripBadge({
     id:
-      "suspension-25mm",
+      "suspension-18mm",
 
-    name:
-      "Suspension 25 mm",
+    size:
+      18,
 
-    subtitle:
-      "Suspension bras tendus sur une prise de 25 mm",
+    thresholds: [
+      15,
+      25,
+      40,
+      50,
+    ],
+  }),
 
-    category:
-      "Force doigts",
+  createGripBadge({
+    id:
+      "suspension-10mm",
 
-    icon:
-      "fingerboard-25",
+    size:
+      10,
 
-    kind:
-      "standard",
+    thresholds: [
+      10,
+      15,
+      20,
+      25,
+    ],
+  }),
 
-    metric:
-      "duration",
+  createGripBadge({
+    id:
+      "suspension-8mm",
 
-    exerciseId:
-      "dead-hang",
+    size:
+      8,
 
-    unit:
-      "s",
+    thresholds: [
+      5,
+      10,
+      15,
+      20,
+    ],
+  }),
 
-    levels:
-      STANDARD_LEVELS(
-        [
-          30,
-          45,
-          60,
-          90,
-        ],
+  createGripBadge({
+    id:
+      "suspension-6mm",
 
-        [
-          "Tenir 30 secondes.",
-          "Tenir 45 secondes.",
-          "Tenir 60 secondes.",
-          "Tenir 90 secondes.",
-        ],
-      ),
-  },
+    size:
+      6,
 
-  /*
-   * Le nouvel exercice utilise 35 / 38 / 43°.
-   *
-   * On sépare les trois angles pour ne jamais
-   * comparer une durée facile à une durée plus difficile.
-   *
-   * Les seuils sont volontairement plus exigeants
-   * que les premières valeurs utilisées précédemment.
-   */
+    thresholds: [
+      3,
+      8,
+      15,
+      20,
+    ],
+  }),
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // FORCE DOIGTS — SLOPERS
+  // ═══════════════════════════════════════════════════════════════════════════
 
   {
     id:
@@ -966,6 +1016,10 @@ export const BADGES: BadgeDefinition[] = [
         ],
       ),
   },
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // FORCE DOIGTS — AUTRES
+  // ═══════════════════════════════════════════════════════════════════════════
 
   {
     id:
@@ -1205,51 +1259,9 @@ export const BADGES: BadgeDefinition[] = [
   // MUSCULATION
   // ═══════════════════════════════════════════════════════════════════════════
 
-  {
-    id:
-      "developpe-militaire",
-
-    name:
-      "Développé militaire",
-
-    subtitle:
-      "Augmenter la charge",
-
-    category:
-      "Musculation",
-
-    icon:
-      "barbell",
-
-    kind:
-      "standard",
-
-    metric:
-      "weight",
-
-    exerciseId:
-      "developpe-militaire",
-
-    unit:
-      "kg",
-
-    levels:
-      STANDARD_LEVELS(
-        [
-          30,
-          40,
-          50,
-          60,
-        ],
-
-        [
-          "Réaliser les séries à 30 kg.",
-          "Réaliser les séries à 40 kg.",
-          "Réaliser les séries à 50 kg.",
-          "Réaliser les séries à 60 kg.",
-        ],
-      ),
-  },
+  /*
+   * Développé militaire retiré volontairement.
+   */
 
   {
     id:
@@ -1343,12 +1355,6 @@ export const BADGES: BadgeDefinition[] = [
       ),
   },
 
-  /*
-   * Nouvel objectif conservé pour le développé couché.
-   *
-   * Le réglage de base étant déjà 30 kg,
-   * le premier badge ne se débloque pas automatiquement.
-   */
   {
     id:
       "developpe-couche",

@@ -576,6 +576,7 @@ export interface ExerciseDef {
 
   assistanceOptions?: string[];
   isHangboard?: boolean;
+  gripSizeSelectable?: boolean;
   variantOptions?: string[];
   bandOptions?: ResistanceBandColor[];
   totalWeight?: boolean;
@@ -664,7 +665,7 @@ export const SLOPER_ANGLES = [
 // Séances
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const SESSIONS: SessionDef[] = [
+const SESSION_DEFINITIONS: SessionDef[] = [
   // ── Force doigts ────────────────────────────────────────────────────────────
 
   {
@@ -680,6 +681,23 @@ export const SESSIONS: SessionDef[] = [
         category: "Doigts",
         tracking: "duration+assistance",
         isHangboard: true,
+        gripSizeSelectable: true,
+
+        muscleLoads: [
+          {
+            muscleId: "flechisseurs-doigts",
+            intensity: "high",
+          },
+          {
+            muscleId: "flechisseurs-poignet",
+            intensity: "medium",
+          },
+          {
+            muscleId: "extenseurs-poignet",
+            intensity: "low",
+          },
+        ],
+
         defaultValues: {
           sets: 6,
           duration: 10,
@@ -739,17 +757,15 @@ export const SESSIONS: SessionDef[] = [
         description:
           "Alterner une série lourde et une série plus légère en conservant une exécution explosive.",
         category: "Dos",
-        tracking: "dual-reps+dual-weight",
+        tracking: "dual-reps+weight",
         primaryRepsLabel: "Répétitions lourdes",
         secondaryRepsLabel: "Répétitions légères",
-        primaryWeightLabel: "Charge lourde (kg)",
-        secondaryWeightLabel: "Charge légère (kg)",
+        primaryWeightLabel: "Charge ajoutée (kg)",
         defaultValues: {
           sets: 4,
           reps: 3,
           secondaryReps: 5,
           weight: 20,
-          secondaryWeight: 10,
           restSeconds: 180,
         },
       },
@@ -803,6 +819,7 @@ export const SESSIONS: SessionDef[] = [
         category: "Résistance",
         tracking: "reps+duration",
         isHangboard: true,
+        gripSizeSelectable: true,
         primaryRepsLabel: "Répétitions par série",
         defaultValues: {
           sets: 5,
@@ -862,6 +879,7 @@ export const SESSIONS: SessionDef[] = [
         category: "Résistance",
         tracking: "duration",
         isHangboard: true,
+        gripSizeSelectable: true,
         defaultValues: {
           sets: 4,
           duration: 30,
@@ -982,22 +1000,6 @@ export const SESSIONS: SessionDef[] = [
           bandColor: "jaune",
           bandStretch: 1,
           restSeconds: 60,
-        },
-      },
-
-      {
-        id: "developpe-militaire",
-        name: "Développé militaire",
-        description:
-          "Poussée verticale avec gainage du tronc.",
-        category: "Épaules",
-        tracking: "weight+reps",
-        totalWeight: true,
-        defaultValues: {
-          sets: 4,
-          reps: 6,
-          weight: 30,
-          restSeconds: 150,
         },
       },
 
@@ -1808,12 +1810,1811 @@ export const SESSIONS: SessionDef[] = [
     ],
   },
 
-  // ── Grimpe libre ────────────────────────────────────────────────────────────
 
-  {
-    id: "grimpe-libre",
-    name: "Grimpe libre",
-    moment: "Bloc libre",
-    exercises: [],
-  },
-];
+// ── Dos / épaules ───────────────────────────────────────────────────────────
+
+{
+  id: "s3-dos-epaules",
+  name: "Dos / épaules",
+  moment: "Tirage · stabilité · prévention",
+  exercises: [
+    {
+      id: "tractions-lestees",
+      name: "Tractions lestées",
+      description:
+        "Tractions strictes avec charge additionnelle. Éviter l’échec sur les premières séries.",
+      category: "Dos",
+      tracking: "weight+reps",
+      muscleLoads: [
+        {
+          muscleId: "grand-dorsal",
+          intensity: "high",
+        },
+        {
+          muscleId: "biceps-brachial",
+          intensity: "high",
+        },
+        {
+          muscleId: "brachial",
+          intensity: "medium",
+        },
+        {
+          muscleId: "trapeze-inferieur",
+          intensity: "medium",
+        },
+      ],
+      defaultValues: {
+        sets: 5,
+        reps: 5,
+        weight: 10,
+        restSeconds: 180,
+      },
+    },
+
+    {
+      id: "blocages",
+      name: "Blocages",
+      description:
+        "Maintien isométrique en haut de traction à différents angles.",
+      category: "Dos",
+      tracking: "duration",
+      muscleLoads: [
+        {
+          muscleId: "grand-dorsal",
+          intensity: "high",
+        },
+        {
+          muscleId: "biceps-brachial",
+          intensity: "high",
+        },
+        {
+          muscleId: "trapeze-inferieur",
+          intensity: "medium",
+        },
+      ],
+      defaultValues: {
+        sets: 3,
+        duration: 10,
+        restSeconds: 120,
+      },
+    },
+
+    {
+      id: "rowing-haltere",
+      name: "Rowing haltère",
+      description:
+        "Tirage unilatéral contrôlé en gardant le dos stable.",
+      category: "Dos",
+      tracking: "weight+reps",
+      muscleLoads: [
+        {
+          muscleId: "grand-dorsal",
+          intensity: "high",
+        },
+        {
+          muscleId: "rhomboide-majeur",
+          intensity: "high",
+        },
+        {
+          muscleId: "trapeze-moyen",
+          intensity: "medium",
+        },
+        {
+          muscleId: "biceps-brachial",
+          intensity: "medium",
+        },
+      ],
+      defaultValues: {
+        sets: 3,
+        reps: 10,
+        weight: 20,
+        restSeconds: 90,
+      },
+    },
+
+    {
+      id: "lat-pulldown",
+      name: "Lat Pulldown",
+      description:
+        "Tirage vertical contrôlé en amenant les coudes vers les hanches.",
+      category: "Dos",
+      tracking: "weight+reps",
+      muscleLoads: [
+        {
+          muscleId: "grand-dorsal",
+          intensity: "high",
+        },
+        {
+          muscleId: "biceps-brachial",
+          intensity: "medium",
+        },
+        {
+          muscleId: "grand-rond",
+          intensity: "medium",
+        },
+        {
+          muscleId: "trapeze-inferieur",
+          intensity: "medium",
+        },
+      ],
+      defaultValues: {
+        sets: 3,
+        reps: 10,
+        weight: 45,
+        restSeconds: 90,
+      },
+    },
+
+    {
+      id: "facepull",
+      name: "Face Pull",
+      description:
+        "Tirage vers le visage avec rotation externe contrôlée.",
+      category: "Épaules",
+      tracking: "weight+reps",
+      muscleLoads: [
+        {
+          muscleId: "deltoide-posterieur",
+          intensity: "high",
+        },
+        {
+          muscleId: "infra-epineux",
+          intensity: "high",
+        },
+        {
+          muscleId: "trapeze-moyen",
+          intensity: "medium",
+        },
+        {
+          muscleId: "rhomboide-majeur",
+          intensity: "medium",
+        },
+      ],
+      defaultValues: {
+        sets: 3,
+        reps: 15,
+        weight: 12.5,
+        restSeconds: 60,
+      },
+    },
+
+    {
+      id: "triceps-elastique",
+      name: "Triceps élastique",
+      description:
+        "Extension des coudes avec élastique.",
+      category: "Bras",
+      tracking: "reps",
+      muscleLoads: [
+        {
+          muscleId: "triceps-brachial",
+          intensity: "high",
+        },
+      ],
+      defaultValues: {
+        sets: 3,
+        reps: 15,
+        restSeconds: 60,
+      },
+    },
+
+    {
+      id: "developpe-couche",
+      name: "Développé couché",
+      description:
+        "Développé couché contrôlé, trajectoire stable.",
+      category: "Pectoraux",
+      tracking: "weight+reps",
+      muscleLoads: [
+        {
+          muscleId: "grand-pectoral-sternal",
+          intensity: "high",
+        },
+        {
+          muscleId: "grand-pectoral-claviculaire",
+          intensity: "medium",
+        },
+        {
+          muscleId: "triceps-brachial",
+          intensity: "high",
+        },
+        {
+          muscleId: "deltoide-anterieur",
+          intensity: "medium",
+        },
+      ],
+      defaultValues: {
+        sets: 3,
+        reps: 8,
+        weight: 60,
+        restSeconds: 120,
+      },
+    },
+
+    {
+      id: "dips",
+      name: "Dips",
+      description:
+        "Dips contrôlés avec amplitude adaptée.",
+      category: "Bras",
+      tracking: "weight+reps",
+      muscleLoads: [
+        {
+          muscleId: "triceps-brachial",
+          intensity: "high",
+        },
+        {
+          muscleId: "grand-pectoral-sternal",
+          intensity: "high",
+        },
+        {
+          muscleId: "deltoide-anterieur",
+          intensity: "medium",
+        },
+      ],
+      defaultValues: {
+        sets: 3,
+        reps: 8,
+        weight: 0,
+        restSeconds: 120,
+      },
+    },
+  ],
+},
+
+// ── Gainage ─────────────────────────────────────────────────────────────────
+
+{
+  id: "s4-gainage",
+  name: "Gainage",
+  moment: "Core · contrôle · transfert de force",
+  exercises: [
+    {
+      id: "dead-bug",
+      name: "Dead Bug",
+      description:
+        "Extension alternée bras/jambe en maintenant le bas du dos stable.",
+      category: "Abdos",
+      tracking: "reps",
+      muscleLoads: [
+        {
+          muscleId: "transverse-abdomen",
+          intensity: "high",
+        },
+        {
+          muscleId: "droit-abdomen",
+          intensity: "medium",
+        },
+        {
+          muscleId: "oblique-interne",
+          intensity: "medium",
+        },
+      ],
+      defaultValues: {
+        sets: 3,
+        reps: 10,
+        restSeconds: 45,
+      },
+    },
+
+    {
+      id: "planche",
+      name: "Planche",
+      description:
+        "Gainage frontal en gardant une ligne corporelle stable.",
+      category: "Abdos",
+      tracking: "duration",
+      muscleLoads: [
+        {
+          muscleId: "transverse-abdomen",
+          intensity: "high",
+        },
+        {
+          muscleId: "droit-abdomen",
+          intensity: "high",
+        },
+        {
+          muscleId: "grand-fessier",
+          intensity: "medium",
+        },
+      ],
+      defaultValues: {
+        sets: 3,
+        duration: 45,
+        restSeconds: 45,
+      },
+    },
+
+    {
+      id: "planche-laterale",
+      name: "Planche latérale",
+      description:
+        "Gainage latéral avec maintien du bassin aligné.",
+      category: "Abdos",
+      tracking: "duration",
+      muscleLoads: [
+        {
+          muscleId: "oblique-externe",
+          intensity: "high",
+        },
+        {
+          muscleId: "oblique-interne",
+          intensity: "high",
+        },
+        {
+          muscleId: "carre-lombes",
+          intensity: "medium",
+        },
+        {
+          muscleId: "moyen-fessier",
+          intensity: "medium",
+        },
+      ],
+      defaultValues: {
+        sets: 3,
+        duration: 30,
+        restSeconds: 45,
+      },
+    },
+
+    {
+      id: "pallof-press",
+      name: "Pallof Press",
+      description:
+        "Résister à la rotation avec un élastique ou une poulie.",
+      category: "Abdos",
+      tracking: "reps",
+      muscleLoads: [
+        {
+          muscleId: "transverse-abdomen",
+          intensity: "high",
+        },
+        {
+          muscleId: "oblique-externe",
+          intensity: "high",
+        },
+        {
+          muscleId: "oblique-interne",
+          intensity: "high",
+        },
+      ],
+      defaultValues: {
+        sets: 3,
+        reps: 10,
+        restSeconds: 45,
+      },
+    },
+
+    {
+      id: "releves-jambes",
+      name: "Relevés de jambes",
+      description:
+        "Relevés de jambes contrôlés sans balancement.",
+      category: "Abdos",
+      tracking: "reps",
+      muscleLoads: [
+        {
+          muscleId: "droit-abdomen",
+          intensity: "high",
+        },
+        {
+          muscleId: "ilio-psoas",
+          intensity: "high",
+        },
+        {
+          muscleId: "transverse-abdomen",
+          intensity: "medium",
+        },
+      ],
+      defaultValues: {
+        sets: 3,
+        reps: 10,
+        restSeconds: 60,
+      },
+    },
+
+    {
+      id: "genoux-suspendus-twist",
+      name: "Genoux suspendus avec twist",
+      description:
+        "Montée des genoux suspendu avec rotation contrôlée du bassin.",
+      category: "Abdos",
+      tracking: "reps",
+      muscleLoads: [
+        {
+          muscleId: "droit-abdomen",
+          intensity: "high",
+        },
+        {
+          muscleId: "oblique-externe",
+          intensity: "high",
+        },
+        {
+          muscleId: "oblique-interne",
+          intensity: "high",
+        },
+        {
+          muscleId: "ilio-psoas",
+          intensity: "medium",
+        },
+      ],
+      defaultValues: {
+        sets: 3,
+        reps: 10,
+        restSeconds: 60,
+      },
+    },
+
+    {
+      id: "rotations-russes",
+      name: "Rotations russes",
+      description:
+        "Rotation du tronc avec contrôle du bassin.",
+      category: "Abdos",
+      tracking: "reps",
+      muscleLoads: [
+        {
+          muscleId: "oblique-externe",
+          intensity: "high",
+        },
+        {
+          muscleId: "oblique-interne",
+          intensity: "high",
+        },
+        {
+          muscleId: "droit-abdomen",
+          intensity: "medium",
+        },
+      ],
+      defaultValues: {
+        sets: 3,
+        reps: 16,
+        restSeconds: 45,
+      },
+    },
+
+    {
+      id: "superman-hold",
+      name: "Superman Hold",
+      description:
+        "Extension isométrique du dos et des hanches.",
+      category: "Dos",
+      tracking: "duration",
+      muscleLoads: [
+        {
+          muscleId: "erecteurs-rachis",
+          intensity: "high",
+        },
+        {
+          muscleId: "grand-fessier",
+          intensity: "medium",
+        },
+        {
+          muscleId: "multifides",
+          intensity: "medium",
+        },
+      ],
+      defaultValues: {
+        sets: 3,
+        duration: 30,
+        restSeconds: 45,
+      },
+    },
+
+    {
+      id: "copenhagen-plank",
+      name: "Copenhagen Plank",
+      description:
+        "Gainage latéral avec appui de la jambe supérieure.",
+      category: "Abdos",
+      tracking: "duration",
+      muscleLoads: [
+        {
+          muscleId: "long-adducteur",
+          intensity: "high",
+        },
+        {
+          muscleId: "grand-adducteur",
+          intensity: "high",
+        },
+        {
+          muscleId: "gracile",
+          intensity: "medium",
+        },
+        {
+          muscleId: "oblique-interne",
+          intensity: "medium",
+        },
+      ],
+      defaultValues: {
+        sets: 3,
+        duration: 20,
+        restSeconds: 45,
+      },
+    },
+  ],
+},
+      // ── Souplesse ────────────────────────────────────────────────────────────────
+
+      {
+        id: "s5-souplesse",
+        name: "Souplesse / mobilité",
+        moment: "Mobilité · amplitude · récupération",
+        exercises: [
+          {
+            id: "etirement-poignet-paume",
+            name: "Étirement poignet — paume vers l’avant",
+            description:
+              "Étirement doux des fléchisseurs du poignet.",
+            category: "Souplesse / mobilité",
+            tracking: "duration",
+            perSide: true,
+            muscleLoads: [
+              {
+                muscleId: "flechisseurs-poignet",
+                intensity: "low",
+              },
+              {
+                muscleId: "flechisseurs-doigts",
+                intensity: "low",
+              },
+            ],
+
+            defaultValues: {
+              sets: 2,
+              duration: 30,
+              restSeconds: 10,
+            },
+          },
+
+          {
+            id: "etirement-poignet-dos-main",
+            name: "Étirement poignet — dos de la main",
+            description:
+              "Étirement doux des extenseurs du poignet.",
+            category: "Souplesse / mobilité",
+            tracking: "duration",
+            perSide: true,
+            muscleLoads: [
+              {
+                muscleId: "extenseurs-poignet",
+                intensity: "low",
+              },
+              {
+                muscleId: "extenseurs-doigts",
+                intensity: "low",
+              },
+            ],
+
+            defaultValues: {
+              sets: 2,
+              duration: 30,
+              restSeconds: 10,
+            },
+          },
+
+          {
+            id: "epaules-chaise",
+            name: "Épaules sur chaise ou banc",
+            description:
+              "Ouvrir progressivement les épaules sans forcer les lombaires.",
+            category: "Souplesse / mobilité",
+            tracking: "duration",
+            muscleLoads: [
+              {
+                muscleId: "grand-dorsal",
+                intensity: "low",
+              },
+              {
+                muscleId: "deltoide-anterieur",
+                intensity: "low",
+              },
+              {
+                muscleId: "grand-pectoral-claviculaire",
+                intensity: "low",
+              },
+            ],
+
+            defaultValues: {
+              sets: 2,
+              duration: 40,
+              restSeconds: 10,
+            },
+          },
+
+          {
+            id: "rotation-thoracique",
+            name: "Rotation thoracique",
+            description:
+              "Rotation contrôlée du haut du dos.",
+            category: "Souplesse / mobilité",
+            tracking: "reps",
+            perSide: true,
+            muscleLoads: [
+              {
+                muscleId: "oblique-externe",
+                intensity: "low",
+              },
+              {
+                muscleId: "oblique-interne",
+                intensity: "low",
+              },
+              {
+                muscleId: "multifides",
+                intensity: "low",
+              },
+              {
+                muscleId: "erecteurs-rachis",
+                intensity: "low",
+              },
+            ],
+
+            defaultValues: {
+              sets: 2,
+              reps: 8,
+              restSeconds: 10,
+            },
+          },
+
+          {
+            id: "dos-rond-dos-creux",
+            name: "Dos rond / dos creux",
+            description:
+              "Mobiliser doucement la colonne vertébrale.",
+            category: "Souplesse / mobilité",
+            tracking: "reps",
+            muscleLoads: [
+              {
+                muscleId: "erecteurs-rachis",
+                intensity: "low",
+              },
+              {
+                muscleId: "multifides",
+                intensity: "low",
+              },
+              {
+                muscleId: "transverse-abdomen",
+                intensity: "low",
+              },
+            ],
+
+            defaultValues: {
+              sets: 2,
+              reps: 10,
+              restSeconds: 10,
+            },
+          },
+
+          {
+            id: "child-pose",
+            name: "Position de l’enfant",
+            description:
+              "Relâcher le dos et les épaules.",
+            category: "Souplesse / mobilité",
+            tracking: "duration",
+            muscleLoads: [
+              {
+                muscleId: "grand-dorsal",
+                intensity: "low",
+              },
+              {
+                muscleId: "erecteurs-rachis",
+                intensity: "low",
+              },
+              {
+                muscleId: "deltoide-anterieur",
+                intensity: "low",
+              },
+            ],
+
+            defaultValues: {
+              sets: 2,
+              duration: 45,
+              restSeconds: 10,
+            },
+          },
+
+          {
+            id: "papillon",
+            name: "Papillon",
+            description:
+              "Mobilité douce des adducteurs et des hanches.",
+            category: "Souplesse / mobilité",
+            tracking: "duration",
+            muscleLoads: [
+              {
+                muscleId: "long-adducteur",
+                intensity: "low",
+              },
+              {
+                muscleId: "grand-adducteur",
+                intensity: "low",
+              },
+              {
+                muscleId: "gracile",
+                intensity: "low",
+              },
+            ],
+
+            defaultValues: {
+              sets: 2,
+              duration: 45,
+              restSeconds: 10,
+            },
+          },
+
+          {
+            id: "grenouille",
+            name: "Grenouille",
+            description:
+              "Ouverture progressive des hanches et des adducteurs.",
+            category: "Souplesse / mobilité",
+            tracking: "duration",
+            muscleLoads: [
+              {
+                muscleId: "grand-adducteur",
+                intensity: "low",
+              },
+              {
+                muscleId: "long-adducteur",
+                intensity: "low",
+              },
+              {
+                muscleId: "court-adducteur",
+                intensity: "low",
+              },
+              {
+                muscleId: "gracile",
+                intensity: "low",
+              },
+            ],
+
+            defaultValues: {
+              sets: 2,
+              duration: 40,
+              restSeconds: 10,
+            },
+          },
+
+          {
+            id: "fente-hanche",
+            name: "Fente — ouverture de hanche",
+            description:
+              "Mobiliser les fléchisseurs de hanche.",
+            category: "Souplesse / mobilité",
+            tracking: "duration",
+            perSide: true,
+            muscleLoads: [
+              {
+                muscleId: "ilio-psoas",
+                intensity: "low",
+              },
+              {
+                muscleId: "droit-femoral",
+                intensity: "low",
+              },
+              {
+                muscleId: "sartorius",
+                intensity: "low",
+              },
+            ],
+
+            defaultValues: {
+              sets: 2,
+              duration: 30,
+              restSeconds: 10,
+            },
+          },
+
+          {
+            id: "pigeon",
+            name: "Pigeon",
+            description:
+              "Mobilité de hanche et des fessiers.",
+            category: "Souplesse / mobilité",
+            tracking: "duration",
+            perSide: true,
+            muscleLoads: [
+              {
+                muscleId: "grand-fessier",
+                intensity: "low",
+              },
+              {
+                muscleId: "moyen-fessier",
+                intensity: "low",
+              },
+              {
+                muscleId: "petit-fessier",
+                intensity: "low",
+              },
+            ],
+
+            defaultValues: {
+              sets: 2,
+              duration: 35,
+              restSeconds: 10,
+            },
+          },
+
+          {
+            id: "ischios-jambe-tendue",
+            name: "Ischio-jambiers — jambe tendue",
+            description:
+              "Étirement contrôlé de l’arrière de la cuisse.",
+            category: "Souplesse / mobilité",
+            tracking: "duration",
+            perSide: true,
+            muscleLoads: [
+              {
+                muscleId: "biceps-femoral",
+                intensity: "low",
+              },
+              {
+                muscleId: "semi-tendineux",
+                intensity: "low",
+              },
+              {
+                muscleId: "semi-membraneux",
+                intensity: "low",
+              },
+            ],
+
+            defaultValues: {
+              sets: 2,
+              duration: 30,
+              restSeconds: 10,
+            },
+          },
+
+          {
+            id: "quadriceps-debout",
+            name: "Quadriceps debout",
+            description:
+              "Étirement doux du quadriceps.",
+            category: "Souplesse / mobilité",
+            tracking: "duration",
+            perSide: true,
+            muscleLoads: [
+              {
+                muscleId: "droit-femoral",
+                intensity: "low",
+              },
+              {
+                muscleId: "vaste-lateral",
+                intensity: "low",
+              },
+              {
+                muscleId: "vaste-medial",
+                intensity: "low",
+              },
+            ],
+
+            defaultValues: {
+              sets: 2,
+              duration: 30,
+              restSeconds: 10,
+            },
+          },
+
+          {
+            id: "mollet-mur",
+            name: "Étirement mollet contre un mur",
+            description:
+              "Étirement du mollet avec talon au sol.",
+            category: "Souplesse / mobilité",
+            tracking: "duration",
+            perSide: true,
+            muscleLoads: [
+              {
+                muscleId: "gastrocnemien",
+                intensity: "low",
+              },
+              {
+                muscleId: "soleaire",
+                intensity: "low",
+              },
+            ],
+
+            defaultValues: {
+              sets: 2,
+              duration: 30,
+              restSeconds: 10,
+            },
+          },
+
+          {
+            id: "mobilite-genou-mur",
+            name: "Montée de genou active contre le mur",
+            description:
+              "Mobilité active de hanche et contrôle du genou.",
+            category: "Souplesse / mobilité",
+            tracking: "reps",
+            perSide: true,
+            muscleLoads: [
+              {
+                muscleId: "ilio-psoas",
+                intensity: "medium",
+              },
+              {
+                muscleId: "droit-femoral",
+                intensity: "low",
+              },
+              {
+                muscleId: "sartorius",
+                intensity: "low",
+              },
+            ],
+
+            defaultValues: {
+              sets: 2,
+              reps: 10,
+              restSeconds: 10,
+            },
+          },
+
+          {
+            id: "mobilite-cheville",
+            name: "Mobilité cheville",
+            description:
+              "Avancer le genou sans décoller le talon.",
+            category: "Souplesse / mobilité",
+            tracking: "reps",
+            perSide: true,
+            muscleLoads: [
+              {
+                muscleId: "soleaire",
+                intensity: "low",
+              },
+              {
+                muscleId: "gastrocnemien",
+                intensity: "low",
+              },
+              {
+                muscleId: "tibial-anterieur",
+                intensity: "low",
+              },
+            ],
+
+            defaultValues: {
+              sets: 2,
+              reps: 12,
+              restSeconds: 10,
+            },
+          },
+
+          {
+            id: "rotation-cheville",
+            name: "Rotations de cheville",
+            description:
+              "Mobiliser doucement la cheville dans toutes les directions.",
+            category: "Souplesse / mobilité",
+            tracking: "reps",
+            perSide: true,
+            muscleLoads: [
+              {
+                muscleId: "tibial-anterieur",
+                intensity: "low",
+              },
+              {
+                muscleId: "tibial-posterieur",
+                intensity: "low",
+              },
+              {
+                muscleId: "fibulaires",
+                intensity: "low",
+              },
+              {
+                muscleId: "intrinseques-pied",
+                intensity: "low",
+              },
+            ],
+
+            defaultValues: {
+              sets: 2,
+              reps: 10,
+              restSeconds: 10,
+            },
+          },
+
+          {
+            id: "pont-talon-sureleve",
+            name: "Pont une jambe — talon surélevé",
+            description:
+              "Activation douce des ischio-jambiers et des fessiers.",
+            category: "Souplesse / mobilité",
+            tracking: "reps",
+            perSide: true,
+            muscleLoads: [
+              {
+                muscleId: "biceps-femoral",
+                intensity: "medium",
+              },
+              {
+                muscleId: "semi-tendineux",
+                intensity: "medium",
+              },
+              {
+                muscleId: "semi-membraneux",
+                intensity: "medium",
+              },
+              {
+                muscleId: "grand-fessier",
+                intensity: "medium",
+              },
+            ],
+
+            defaultValues: {
+              sets: 2,
+              reps: 10,
+              restSeconds: 30,
+            },
+          },
+
+          {
+            id: "rotation-cervicale",
+            name: "Rotation cervicale douce",
+            description:
+              "Mobiliser le cou sans aller dans la douleur.",
+            category: "Souplesse / mobilité",
+            tracking: "reps",
+            perSide: true,
+            muscleLoads: [
+              {
+                muscleId: "trapeze-superieur",
+                intensity: "low",
+              },
+            ],
+
+            defaultValues: {
+              sets: 1,
+              reps: 6,
+              restSeconds: 10,
+            },
+          },
+
+          {
+            id: "ouverture-pectoraux",
+            name: "Ouverture des pectoraux",
+            description:
+              "Étirement doux de la poitrine et de l’avant des épaules.",
+            category: "Souplesse / mobilité",
+            tracking: "duration",
+            perSide: true,
+            muscleLoads: [
+              {
+                muscleId: "grand-pectoral-claviculaire",
+                intensity: "low",
+              },
+              {
+                muscleId: "grand-pectoral-sternal",
+                intensity: "low",
+              },
+              {
+                muscleId: "deltoide-anterieur",
+                intensity: "low",
+              },
+            ],
+
+            defaultValues: {
+              sets: 2,
+              duration: 30,
+              restSeconds: 10,
+            },
+          },
+
+          {
+            id: "squat-profond-mobilite",
+            name: "Squat profond — mobilité",
+            description:
+              "Maintenir un squat profond confortable pour mobiliser chevilles, genoux et hanches.",
+            category: "Souplesse / mobilité",
+            tracking: "duration",
+            muscleLoads: [
+              {
+                muscleId: "grand-adducteur",
+                intensity: "low",
+              },
+              {
+                muscleId: "ilio-psoas",
+                intensity: "low",
+              },
+              {
+                muscleId: "soleaire",
+                intensity: "low",
+              },
+              {
+                muscleId: "grand-fessier",
+                intensity: "low",
+              },
+            ],
+
+            defaultValues: {
+              sets: 2,
+              duration: 30,
+              restSeconds: 10,
+            },
+          },
+        ],
+      },
+
+      // ── Jambes ──────────────────────────────────────────────────────────────────
+
+      {
+        id: "s6-jambes",
+        name: "Jambes",
+        moment: "Force · stabilité · chaîne postérieure",
+        exercises: [
+          {
+            id: "squat",
+            name: "Squat",
+            description:
+              "Squat contrôlé en gardant le tronc stable et les genoux dans l’axe.",
+            category: "Jambes",
+            tracking: "weight+reps",
+            totalWeight: true,
+            muscleLoads: [
+              {
+                muscleId: "droit-femoral",
+                intensity: "high",
+              },
+              {
+                muscleId: "vaste-lateral",
+                intensity: "high",
+              },
+              {
+                muscleId: "vaste-medial",
+                intensity: "high",
+              },
+              {
+                muscleId: "grand-fessier",
+                intensity: "high",
+              },
+              {
+                muscleId: "grand-adducteur",
+                intensity: "medium",
+              },
+              {
+                muscleId: "erecteurs-rachis",
+                intensity: "medium",
+              },
+            ],
+
+            defaultValues: {
+              sets: 4,
+              reps: 8,
+              weight: 40,
+              restSeconds: 150,
+            },
+          },
+
+          {
+            id: "fentes-bulgares",
+            name: "Fentes bulgares",
+            description:
+              "Fente unilatérale avec pied arrière surélevé.",
+            category: "Jambes",
+            tracking: "weight+reps",
+            perSide: true,
+            muscleLoads: [
+              {
+                muscleId: "droit-femoral",
+                intensity: "high",
+              },
+              {
+                muscleId: "vaste-lateral",
+                intensity: "high",
+              },
+              {
+                muscleId: "grand-fessier",
+                intensity: "high",
+              },
+              {
+                muscleId: "moyen-fessier",
+                intensity: "medium",
+              },
+              {
+                muscleId: "biceps-femoral",
+                intensity: "medium",
+              },
+            ],
+
+            defaultValues: {
+              sets: 3,
+              reps: 8,
+              weight: 10,
+              restSeconds: 120,
+            },
+          },
+
+          {
+            id: "sdle-roumain",
+            name: "Soulevé de terre roumain",
+            description:
+              "Charnière de hanche avec tension contrôlée des ischio-jambiers.",
+            category: "Jambes",
+            tracking: "weight+reps",
+            totalWeight: true,
+            muscleLoads: [
+              {
+                muscleId: "biceps-femoral",
+                intensity: "high",
+              },
+              {
+                muscleId: "semi-tendineux",
+                intensity: "high",
+              },
+              {
+                muscleId: "semi-membraneux",
+                intensity: "high",
+              },
+              {
+                muscleId: "grand-fessier",
+                intensity: "high",
+              },
+              {
+                muscleId: "erecteurs-rachis",
+                intensity: "medium",
+              },
+            ],
+
+            defaultValues: {
+              sets: 4,
+              reps: 8,
+              weight: 40,
+              restSeconds: 150,
+            },
+          },
+
+          {
+            id: "step-up",
+            name: "Step-up",
+            description:
+              "Monter sur un banc ou une box en contrôlant la poussée de la jambe de travail.",
+            category: "Jambes",
+            tracking: "weight+reps",
+            perSide: true,
+            muscleLoads: [
+              {
+                muscleId: "droit-femoral",
+                intensity: "high",
+              },
+              {
+                muscleId: "vaste-lateral",
+                intensity: "high",
+              },
+              {
+                muscleId: "grand-fessier",
+                intensity: "high",
+              },
+              {
+                muscleId: "moyen-fessier",
+                intensity: "medium",
+              },
+            ],
+
+            defaultValues: {
+              sets: 3,
+              reps: 10,
+              weight: 10,
+              restSeconds: 90,
+            },
+          },
+
+          {
+            id: "mollets-debout",
+            name: "Mollets debout",
+            description:
+              "Montée complète sur la pointe des pieds puis descente contrôlée.",
+            category: "Jambes",
+            tracking: "weight+reps",
+            totalWeight: true,
+            muscleLoads: [
+              {
+                muscleId: "gastrocnemien",
+                intensity: "high",
+              },
+              {
+                muscleId: "soleaire",
+                intensity: "high",
+              },
+              {
+                muscleId: "tibial-posterieur",
+                intensity: "medium",
+              },
+              {
+                muscleId: "intrinseques-pied",
+                intensity: "low",
+              },
+            ],
+
+            defaultValues: {
+              sets: 4,
+              reps: 15,
+              weight: 20,
+              restSeconds: 75,
+            },
+          },
+
+          {
+            id: "tibialis-raise",
+            name: "Tibialis raise",
+            description:
+              "Relever l’avant du pied en gardant les talons au sol.",
+            category: "Jambes",
+            tracking: "reps",
+            muscleLoads: [
+              {
+                muscleId: "tibial-anterieur",
+                intensity: "high",
+              },
+            ],
+
+            defaultValues: {
+              sets: 3,
+              reps: 20,
+              restSeconds: 60,
+            },
+          },
+
+          {
+            id: "tibialis-charge",
+            name: "Tibialis chargé",
+            description:
+              "Travail du tibial antérieur avec résistance supplémentaire.",
+            category: "Jambes",
+            tracking: "weight+reps",
+            muscleLoads: [
+              {
+                muscleId: "tibial-anterieur",
+                intensity: "high",
+              },
+            ],
+
+            defaultValues: {
+              sets: 3,
+              reps: 15,
+              weight: 5,
+              restSeconds: 60,
+            },
+          },
+        ],
+      },
+
+      // ── Prévention ──────────────────────────────────────────────────────────────
+
+      {
+        id: "s7-prevention",
+        name: "Prévention blessures",
+        moment: "Épaules · poignets · doigts · stabilité",
+        exercises: [
+          {
+            id: "rot-ext-epaule",
+            name: "Rotation externe épaule",
+            description:
+              "Rotation externe légère et contrôlée, coude proche du corps.",
+            category: "Prévention",
+            tracking: "duration+band",
+            perSide: true,
+            muscleLoads: [
+              {
+                muscleId: "infra-epineux",
+                intensity: "high",
+              },
+              {
+                muscleId: "petit-rond",
+                intensity: "high",
+              },
+              {
+                muscleId: "deltoide-posterieur",
+                intensity: "low",
+              },
+            ],
+
+            defaultValues: {
+              sets: 3,
+              duration: 25,
+              bandColor: "jaune",
+              bandStretch: 1,
+              restSeconds: 45,
+            },
+          },
+
+          {
+            id: "scapular-pullups",
+            name: "Scapular pull-ups",
+            description:
+              "Dépression et élévation contrôlée des omoplates sans plier les coudes.",
+            category: "Prévention",
+            tracking: "reps",
+            muscleLoads: [
+              {
+                muscleId: "trapeze-inferieur",
+                intensity: "high",
+              },
+              {
+                muscleId: "dentelé-anterieur",
+                intensity: "medium",
+              },
+              {
+                muscleId: "grand-dorsal",
+                intensity: "medium",
+              },
+              {
+                muscleId: "rhomboide-majeur",
+                intensity: "low",
+              },
+            ],
+
+            defaultValues: {
+              sets: 3,
+              reps: 10,
+              restSeconds: 60,
+            },
+          },
+
+          {
+            id: "ext-doigts",
+            name: "Extension des doigts",
+            description:
+              "Ouvrir les doigts contre un petit élastique pour travailler les extenseurs.",
+            category: "Prévention",
+            tracking: "reps",
+            muscleLoads: [
+              {
+                muscleId: "extenseurs-doigts",
+                intensity: "high",
+              },
+              {
+                muscleId: "interosseux-main",
+                intensity: "low",
+              },
+            ],
+
+            defaultValues: {
+              sets: 3,
+              reps: 20,
+              restSeconds: 45,
+            },
+          },
+
+          {
+            id: "flex-poignet",
+            name: "Flexion du poignet",
+            description:
+              "Flexion contrôlée du poignet avec charge légère.",
+            category: "Prévention",
+            tracking: "weight+reps",
+            perSide: true,
+            muscleLoads: [
+              {
+                muscleId: "flechisseurs-poignet",
+                intensity: "high",
+              },
+              {
+                muscleId: "flechisseurs-doigts",
+                intensity: "medium",
+              },
+            ],
+
+            defaultValues: {
+              sets: 3,
+              reps: 15,
+              weight: 3,
+              restSeconds: 45,
+            },
+          },
+
+          {
+            id: "ext-poignet",
+            name: "Extension du poignet",
+            description:
+              "Extension contrôlée du poignet avec charge légère.",
+            category: "Prévention",
+            tracking: "weight+reps",
+            perSide: true,
+            muscleLoads: [
+              {
+                muscleId: "extenseurs-poignet",
+                intensity: "high",
+              },
+              {
+                muscleId: "extenseurs-doigts",
+                intensity: "medium",
+              },
+            ],
+
+            defaultValues: {
+              sets: 3,
+              reps: 15,
+              weight: 3,
+              restSeconds: 45,
+            },
+          },
+
+          {
+            id: "pronation-supination",
+            name: "Pronation / supination",
+            description:
+              "Rotation lente de l’avant-bras avec charge légère.",
+            category: "Prévention",
+            tracking: "weight+reps",
+            perSide: true,
+            muscleLoads: [
+              {
+                muscleId: "pronateur-rond",
+                intensity: "high",
+              },
+              {
+                muscleId: "pronateur-carre",
+                intensity: "medium",
+              },
+              {
+                muscleId: "supinateur",
+                intensity: "high",
+              },
+              {
+                muscleId: "brachioradial",
+                intensity: "medium",
+              },
+            ],
+
+            defaultValues: {
+              sets: 3,
+              reps: 12,
+              weight: 2,
+              restSeconds: 45,
+            },
+          },
+
+          {
+            id: "equilibre-jambe",
+            name: "Équilibre une jambe",
+            description:
+              "Maintien stable sur une jambe avec pied actif.",
+            category: "Prévention",
+            tracking: "duration",
+            perSide: true,
+            muscleLoads: [
+              {
+                muscleId: "intrinseques-pied",
+                intensity: "high",
+              },
+              {
+                muscleId: "moyen-fessier",
+                intensity: "medium",
+              },
+              {
+                muscleId: "tibial-anterieur",
+                intensity: "medium",
+              },
+              {
+                muscleId: "tibial-posterieur",
+                intensity: "medium",
+              },
+              {
+                muscleId: "fibulaires",
+                intensity: "medium",
+              },
+            ],
+
+            defaultValues: {
+              sets: 3,
+              duration: 30,
+              restSeconds: 30,
+            },
+          },
+        ],
+      },
+
+      // ── Pompes / activation ─────────────────────────────────────────────────────
+
+      {
+        id: "s8-pompes-activation",
+        name: "Pompes / activation",
+        moment: "Activation courte · poussée · épaules",
+        exercises: [
+          {
+            id: "pompes-normales",
+            name: "Pompes normales",
+            description:
+              "Pompes classiques avec tronc gainé.",
+            category: "Pectoraux",
+            tracking: "reps",
+            muscleLoads: [
+              {
+                muscleId: "grand-pectoral-sternal",
+                intensity: "high",
+              },
+              {
+                muscleId: "triceps-brachial",
+                intensity: "medium",
+              },
+              {
+                muscleId: "deltoide-anterieur",
+                intensity: "medium",
+              },
+              {
+                muscleId: "dentelé-anterieur",
+                intensity: "medium",
+              },
+            ],
+
+            defaultValues: {
+              sets: 2,
+              reps: 12,
+              restSeconds: 45,
+            },
+          },
+
+          {
+            id: "pompes-pieds-sureleves",
+            name: "Pompes pieds surélevés",
+            description:
+              "Pompes avec pieds surélevés pour augmenter le travail du haut du corps.",
+            category: "Pectoraux",
+            tracking: "reps",
+            muscleLoads: [
+              {
+                muscleId: "grand-pectoral-claviculaire",
+                intensity: "high",
+              },
+              {
+                muscleId: "deltoide-anterieur",
+                intensity: "high",
+              },
+              {
+                muscleId: "triceps-brachial",
+                intensity: "medium",
+              },
+              {
+                muscleId: "dentelé-anterieur",
+                intensity: "medium",
+              },
+            ],
+
+            defaultValues: {
+              sets: 2,
+              reps: 10,
+              restSeconds: 45,
+            },
+          },
+
+          {
+            id: "pompes-diamant",
+            name: "Pompes diamant",
+            description:
+              "Pompes mains rapprochées avec accent sur les triceps.",
+            category: "Bras",
+            tracking: "reps",
+            muscleLoads: [
+              {
+                muscleId: "triceps-brachial",
+                intensity: "high",
+              },
+              {
+                muscleId: "grand-pectoral-sternal",
+                intensity: "medium",
+              },
+              {
+                muscleId: "deltoide-anterieur",
+                intensity: "medium",
+              },
+            ],
+
+            defaultValues: {
+              sets: 2,
+              reps: 10,
+              restSeconds: 45,
+            },
+          },
+
+          {
+            id: "pompes-larges",
+            name: "Pompes larges",
+            description:
+              "Pompes avec prise légèrement plus large.",
+            category: "Pectoraux",
+            tracking: "reps",
+            muscleLoads: [
+              {
+                muscleId: "grand-pectoral-sternal",
+                intensity: "high",
+              },
+              {
+                muscleId: "grand-pectoral-claviculaire",
+                intensity: "medium",
+              },
+              {
+                muscleId: "deltoide-anterieur",
+                intensity: "low",
+              },
+            ],
+
+            defaultValues: {
+              sets: 2,
+              reps: 12,
+              restSeconds: 45,
+            },
+          },
+
+          {
+            id: "pompes-pike",
+            name: "Pompes Pike",
+            description:
+              "Pompes en position pike avec accent sur les épaules.",
+            category: "Épaules",
+            tracking: "reps",
+            muscleLoads: [
+              {
+                muscleId: "deltoide-anterieur",
+                intensity: "high",
+              },
+              {
+                muscleId: "deltoide-lateral",
+                intensity: "medium",
+              },
+              {
+                muscleId: "triceps-brachial",
+                intensity: "high",
+              },
+              {
+                muscleId: "dentelé-anterieur",
+                intensity: "medium",
+              },
+            ],
+
+            defaultValues: {
+              sets: 2,
+              reps: 8,
+              restSeconds: 45,
+            },
+          },
+
+          {
+            id: "pompes-coudes-serres",
+            name: "Pompes coudes serrés",
+            description:
+              "Pompes en gardant les coudes proches du corps.",
+            category: "Bras",
+            tracking: "reps",
+            muscleLoads: [
+              {
+                muscleId: "triceps-brachial",
+                intensity: "high",
+              },
+              {
+                muscleId: "grand-pectoral-sternal",
+                intensity: "medium",
+              },
+              {
+                muscleId: "deltoide-anterieur",
+                intensity: "medium",
+              },
+            ],
+
+            defaultValues: {
+              sets: 2,
+              reps: 10,
+              restSeconds: 45,
+            },
+          },
+        ],
+      },
+
+      // ── Grimpe libre ────────────────────────────────────────────────────────────
+
+      {
+        id: "grimpe-libre",
+        name: "Grimpe libre",
+        moment: "Bloc libre",
+        exercises: [],
+      },
+    ];
+
+// Une seule definition par seance, derniere version prioritaire.
+// Identifiants et historiques conserves.
+export const SESSIONS: SessionDef[] = Array.from(
+  new Map<string, SessionDef>(
+    SESSION_DEFINITIONS.map(session => [session.id, session]),
+  ).values(),
+);

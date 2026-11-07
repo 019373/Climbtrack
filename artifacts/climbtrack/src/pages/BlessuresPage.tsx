@@ -292,18 +292,18 @@ function InjuryFormSheet({
 }) {
   return (
     <div
-      className="fixed inset-0 z-[100000] bg-black/80 backdrop-blur-sm"
+      className="fixed inset-0 z-[100000] overflow-x-hidden bg-black/80 backdrop-blur-sm"
       onClick={onClose}
     >
       <div
-        className="absolute inset-x-0 bottom-0 max-h-[94dvh] overflow-y-auto rounded-t-3xl border border-border bg-background pb-[calc(env(safe-area-inset-bottom)+24px)]"
+        className="absolute inset-x-0 bottom-0 w-full max-w-full max-h-[94dvh] overflow-x-hidden overflow-y-auto overscroll-contain rounded-t-3xl border border-border bg-background pb-[calc(env(safe-area-inset-bottom)+24px)]"
         onClick={(
           event,
         ) =>
           event.stopPropagation()
         }
       >
-        <header className="sticky top-0 z-10 flex items-start justify-between gap-4 border-b border-border bg-background/95 px-5 py-4 backdrop-blur-md">
+        <header className="sticky top-0 z-10 flex min-w-0 items-start justify-between gap-4 border-b border-border bg-background/95 px-5 py-4 backdrop-blur-md">
           <div>
             <h2 className="text-xl font-black text-white">
               {form.id

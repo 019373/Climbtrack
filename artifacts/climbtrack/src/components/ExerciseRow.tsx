@@ -25,9 +25,14 @@ import type {
   ExerciseDef,
 } from "@/data/sessions";
 
+import {
+  HANGBOARD_GRIP_SIZES,
+} from "@/context/ClimbTrackContext";
+
 import type {
   ExerciseDefaults,
   ExerciseLog,
+  HangboardGripSizeMm,
   ResistanceBandColor,
 } from "@/context/ClimbTrackContext";
 
@@ -345,7 +350,7 @@ function DecimalInput({
     ) {
       if (
         typeof value ===
-        "number"
+          "number"
       ) {
         setText(
           formatNumber(
@@ -424,27 +429,41 @@ export function ExerciseRow({
   onUpdateDefault: _onUpdateDefault,
   isPainful,
   showProgressionIncrease = false,
-}: ExerciseRowProps) {
-  const [
-    isExpanded,
-    setIsExpanded,
-  ] =
-    useState(false);
+  }: ExerciseRowProps) {
+    const [
+      isExpanded,
+      setIsExpanded,
+    ] = useState(false);
 
-  const updateLog = <
-    K extends keyof ExerciseLog,
-  >(
-    field: K,
-    value: ExerciseLog[K],
-  ) => {
-    onChange({
-      ...log,
+    const displayedWeight =
+      log.weight ??
+      defaults.weight;
 
-      [field]:
-        value,
-    });
-  };
+    const displayedReps =
+      log.reps ??
+      defaults.reps;
 
+    const displayedDuration =
+      log.duration ??
+      defaults.duration;
+
+    const displayedSets =
+      log.sets ??
+      defaults.sets;
+
+    const updateLog = <
+      K extends keyof ExerciseLog,
+    >(
+      field: K,
+      value: ExerciseLog[K],
+    ) => {
+      onChange({
+        ...log,
+
+        [field]:
+          value,
+      });
+    };
   function toggleCheck(
     event: React.MouseEvent,
   ) {
@@ -540,6 +559,21 @@ export function ExerciseRow({
     exercise.tracking ===
       "variant+reps";
 
+  /*
+   * IMPORTANT :
+   *
+   * Tous les exercices hangboard ne doivent
+   * pas afficher une taille de réglette.
+   *
+   * Exemple :
+   * Suspension sur plats reste un exercice
+   * hangboard, mais utilise 35 / 38 / 43°
+   * et non une taille en millimètres.
+   */
+  const hasGripSizeSelector =
+    exercise.gripSizeSelectable ===
+    true;
+
   const isDynamicJump =
     exercise.id ===
       "sauts-prise" ||
@@ -607,6 +641,16 @@ export function ExerciseRow({
             ? "s"
             : ""
         }`,
+      );
+    }
+
+    if (
+      hasGripSizeSelector &&
+      typeof log.gripSizeMm ===
+        "number"
+    ) {
+      parts.push(
+        `${log.gripSizeMm} mm`,
       );
     }
 
@@ -945,6 +989,63 @@ export function ExerciseRow({
               />
             </div>
 
+            {hasGripSizeSelector && (
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  Prise utilisée
+                </label>
+
+                <select
+                  value={
+                    log.gripSizeMm ??
+                    ""
+                  }
+                  onChange={(
+                    event,
+                  ) => {
+                    const value =
+                      event.target
+                        .value;
+
+                    updateLog(
+                      "gripSizeMm",
+                      value ===
+                        ""
+                        ? undefined
+                        : Number(
+                            value,
+                          ) as HangboardGripSizeMm,
+                    );
+                  }}
+                  className="w-full rounded border border-border bg-background p-2 font-mono text-white"
+                >
+                  <option value="">
+                    Choisir
+                  </option>
+
+                  {HANGBOARD_GRIP_SIZES.map(
+                    (
+                      size,
+                    ) => (
+                      <option
+                        key={
+                          size
+                        }
+                        value={
+                          size
+                        }
+                      >
+                        {
+                          size
+                        }{" "}
+                        mm
+                      </option>
+                    ),
+                  )}
+                </select>
+              </div>
+            )}
+
             {hasReps && (
               <div className="space-y-1.5">
                 <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
@@ -959,8 +1060,7 @@ export function ExerciseRow({
                   step="1"
                   inputMode="numeric"
                   value={
-                    log.reps ??
-                    ""
+                    displayedReps ?? ""
                   }
                   onChange={(
                     event,
@@ -1025,7 +1125,7 @@ export function ExerciseRow({
 
                 <DecimalInput
                   value={
-                    log.duration
+                    displayedDuration
                   }
                   fallbackValue={
                     defaults.duration
@@ -1052,7 +1152,7 @@ export function ExerciseRow({
 
                 <DecimalInput
                   value={
-                    log.weight
+                    displayedWeight
                   }
                   fallbackValue={
                     defaults.weight
@@ -1096,6 +1196,12 @@ export function ExerciseRow({
               </div>
             )}
           </div>
+
+          {hasGripSizeSelector && (
+            <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
+              Indiquer la taille de la prise réellement utilisée pendant cette séance.
+            </p>
+          )}
 
           {exercise.totalWeight &&
             hasWeight && (

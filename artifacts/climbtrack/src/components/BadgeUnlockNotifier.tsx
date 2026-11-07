@@ -21,6 +21,8 @@ import {
   BadgeHex,
 } from "@/components/BadgeHex";
 
+import { isBadgeAvailable } from "@/utils/badgeVisibility";
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Types locaux
 // ─────────────────────────────────────────────────────────────────────────────
@@ -86,12 +88,29 @@ export function BadgeUnlockNotifier() {
         ]
       : undefined;
 
+  const badgeUnavailable = Boolean(
+    notification && !isBadgeAvailable(badge, data),
+  );
+
+  // Un badge masque ne doit pas bloquer les notifications.
+  useEffect(() => {
+    if (notification && badgeUnavailable) {
+      clearBadgeNotification(notification.badgeId, notification.level);
+    }
+  }, [
+    notification?.badgeId,
+    notification?.level,
+    badgeUnavailable,
+    clearBadgeNotification,
+  ]);
+
   useEffect(
     () => {
       if (
         notification &&
         badge &&
-        levelMeta
+        levelMeta &&
+        !badgeUnavailable
       ) {
         const timer =
           window.setTimeout(
@@ -121,13 +140,15 @@ export function BadgeUnlockNotifier() {
       notification?.level,
       badge,
       levelMeta,
+      badgeUnavailable,
     ],
   );
 
   if (
     !notification ||
     !badge ||
-    !levelMeta
+    !levelMeta ||
+    badgeUnavailable
   ) {
     return null;
   }

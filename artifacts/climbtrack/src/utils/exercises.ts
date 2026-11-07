@@ -369,6 +369,14 @@ function applyOverride(
 // Exercices intégrés
 // ─────────────────────────────────────────────────────────────────────────────
 
+const REMOVED_EXERCISE_IDS = new Set([
+  'sdle-roumain',
+  'rotation-cervicale',
+  'ouverture-pectoraux',
+  'squat-profond-mobilite',
+  'developpe-militaire',
+]);
+
 export function getBuiltinExercises(): ExerciseDef[] {
   return uniqueById(
     SESSIONS.flatMap(
@@ -377,7 +385,7 @@ export function getBuiltinExercises(): ExerciseDef[] {
       ) =>
         session.exercises,
     ),
-  );
+  ).filter(e => !REMOVED_EXERCISE_IDS.has(e.id));
 }
 
 /*
@@ -407,12 +415,21 @@ export function getAllManagedExercises(
       (
         exercise,
       ) =>
-        applyOverride(
-          exercise,
-          overrides[
-            exercise.id
-          ],
-        ),
+        (() => {
+          const adapted = applyOverride(
+            exercise,
+            overrides[exercise.id]
+          );
+
+          return adapted.id === 'lourd-leger'
+            ? {
+                ...adapted,
+                tracking: 'dual-reps+weight' as const,
+                primaryWeightLabel: 'Charge ajoutée (kg)',
+                secondaryWeightLabel: undefined
+              }
+            : adapted;
+        })(),
     );
 
   const customExercises =
@@ -434,7 +451,7 @@ export function getAllManagedExercises(
   return uniqueById([
     ...builtinExercises,
     ...customExercises,
-  ]);
+  ]).filter(e => !REMOVED_EXERCISE_IDS.has(e.id));
 }
 
 export function getAllExercises(

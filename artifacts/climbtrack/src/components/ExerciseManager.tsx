@@ -768,6 +768,7 @@ function getDefaultsSummary(
     "number"
   ) {
     if (
+      exercise.tracking === "dual-reps+dual-weight" &&
       typeof defaults.secondaryWeight ===
       "number"
     ) {
