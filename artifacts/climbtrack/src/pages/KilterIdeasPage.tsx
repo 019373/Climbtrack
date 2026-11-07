@@ -1,4 +1,5 @@
 import {
+  useEffect,
   useState,
 } from "react";
 
@@ -74,6 +75,10 @@ function getGradeLabel(
 
 export function KilterIdeasPage() {
   const navigate = useNavigate();
+
+  useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+  }, []);
 
   const {
     data,
@@ -182,10 +187,10 @@ export function KilterIdeasPage() {
   };
 
   return (
-    <div className="min-h-screen pb-20">
+    <div className="min-h-screen pb-20 pt-safe">
       {/* Header */}
 
-      <header className="sticky top-0 z-40 border-b border-border bg-background/95 backdrop-blur-md">
+      <header className="sticky top-[env(safe-area-inset-top)] z-40 border-b border-border bg-background/95 backdrop-blur-md">
         <div className="flex h-14 items-center gap-3 px-4">
           <button
             type="button"

@@ -1,6 +1,7 @@
 import {
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 
@@ -141,6 +142,84 @@ function createInitialExerciseLog(
         ? source.reps
         : undefined,
   };
+}
+
+// Brouillons locaux, valables uniquement pendant la journée.
+const SESSION_DRAFT_PREFIX = "climbtrack_session_draft_v1_";
+
+type DailySessionDraft = {
+  date: string;
+  exerciseLogs: ExerciseLog[];
+  note: string;
+  pain: Record<string, number>;
+  showPainSection: boolean;
+};
+
+function dailyDraftKey(id: string): string {
+  return SESSION_DRAFT_PREFIX + id;
+}
+
+function readDailyDraft(id: string | undefined): DailySessionDraft | null {
+  if (!id) return null;
+
+  try {
+    const raw = window.localStorage.getItem(dailyDraftKey(id));
+    if (!raw) return null;
+
+    const saved: unknown = JSON.parse(raw);
+    if (!saved || typeof saved !== "object") return null;
+
+    const value = saved as Partial<DailySessionDraft>;
+
+    if (
+      value.date !== getLocalDateString() ||
+      !Array.isArray(value.exerciseLogs)
+    ) {
+      window.localStorage.removeItem(dailyDraftKey(id));
+      return null;
+    }
+
+    return {
+      date: value.date,
+      exerciseLogs: value.exerciseLogs,
+      note: typeof value.note === "string" ? value.note : "",
+      pain: value.pain && typeof value.pain === "object"
+        ? value.pain
+        : {},
+      showPainSection: value.showPainSection === true,
+    };
+  } catch {
+    return null;
+  }
+}
+
+function clearExpiredDailyDrafts(): void {
+  try {
+    for (
+      let index = window.localStorage.length - 1;
+      index >= 0;
+      index--
+    ) {
+      const key = window.localStorage.key(index);
+
+      if (!key?.startsWith(SESSION_DRAFT_PREFIX)) continue;
+
+      const raw = window.localStorage.getItem(key);
+
+      try {
+        if (
+          !raw ||
+          JSON.parse(raw).date !== getLocalDateString()
+        ) {
+          window.localStorage.removeItem(key);
+        }
+      } catch {
+        window.localStorage.removeItem(key);
+      }
+    }
+  } catch {
+    // L'application reste utilisable sans stockage.
+  }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -482,16 +561,16 @@ export function SessionDetailPage() {
         return [];
       }
 
-      return getExercisesForSession(
-        sessionId,
-        data,
-      ).map(
+      const saved = readDailyDraft(sessionId);
+
+      return getExercisesForSession(sessionId, data).map(
         (exercise) =>
+          saved?.exerciseLogs.find(
+            (log) => log.exerciseId === exercise.id
+          ) ??
           createInitialExerciseLog(
             exercise,
-            data.exerciseDefaults[
-              exercise.id
-            ],
+            data.exerciseDefaults[exercise.id]
           ),
       );
     });
@@ -536,7 +615,7 @@ export function SessionDetailPage() {
     note,
     setNote,
   ] =
-    useState("");
+    useState(() => readDailyDraft(sessionId)?.note ?? "");
 
   const [
     pain,
@@ -544,13 +623,120 @@ export function SessionDetailPage() {
   ] =
     useState<
       Record<string, number>
-    >({});
+    >(() => readDailyDraft(sessionId)?.pain ?? {});
 
   const [
     showPainSection,
     setShowPainSection,
   ] =
-    useState(false);
+    useState(() => readDailyDraft(sessionId)?.showPainSection ?? false);
+
+  const [draftSessionId, setDraftSessionId] = useState(sessionId);
+  const [draftDate, setDraftDate] = useState(getLocalDateString);
+  const savedSessionRef = useRef(false);
+
+  useEffect(() => {
+    clearExpiredDailyDrafts();
+  }, []);
+
+  // Ne jamais mélanger les brouillons de deux séances.
+  useEffect(() => {
+    if (sessionId === draftSessionId) return;
+
+    const saved = readDailyDraft(sessionId);
+
+    setExerciseLogs(
+      visibleExercises.map((exercise) =>
+        saved?.exerciseLogs.find(
+          (log) => log.exerciseId === exercise.id
+        ) ??
+        createInitialExerciseLog(
+          exercise,
+          data.exerciseDefaults[exercise.id]
+        )
+      )
+    );
+
+    setNote(saved?.note ?? "");
+    setPain(saved?.pain ?? {});
+    setShowPainSection(saved?.showPainSection ?? false);
+    setDraftDate(getLocalDateString());
+    setDraftSessionId(sessionId);
+  }, [
+    sessionId,
+    draftSessionId,
+    visibleExercises,
+    data.exerciseDefaults
+  ]);
+
+  // Le lendemain, repartir avec les exercices non cochés.
+  useEffect(() => {
+    const checkDate = () => {
+      const today = getLocalDateString();
+      if (today === draftDate) return;
+
+      clearExpiredDailyDrafts();
+
+      setExerciseLogs(
+        visibleExercises.map((exercise) =>
+          createInitialExerciseLog(
+            exercise,
+            data.exerciseDefaults[exercise.id]
+          )
+        )
+      );
+
+      setNote("");
+      setPain({});
+      setShowPainSection(false);
+      setDraftDate(today);
+    };
+
+    const timer = window.setInterval(checkDate, 60000);
+
+    window.addEventListener("focus", checkDate);
+    document.addEventListener("visibilitychange", checkDate);
+
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener("focus", checkDate);
+      document.removeEventListener("visibilitychange", checkDate);
+    };
+  }, [draftDate, visibleExercises, data.exerciseDefaults]);
+
+  // Sauvegarder uniquement le brouillon temporaire.
+  useEffect(() => {
+    if (
+      !sessionId ||
+      sessionId !== draftSessionId ||
+      savedSessionRef.current
+    ) return;
+
+    if (draftDate !== getLocalDateString()) return;
+
+    try {
+      window.localStorage.setItem(
+        dailyDraftKey(sessionId),
+        JSON.stringify({
+          date: draftDate,
+          exerciseLogs,
+          note,
+          pain,
+          showPainSection,
+        } satisfies DailySessionDraft)
+      );
+    } catch {
+      // Une erreur de stockage ne bloque pas la séance.
+    }
+  }, [
+    sessionId,
+    draftSessionId,
+    draftDate,
+    exerciseLogs,
+    note,
+    pain,
+    showPainSection
+  ]);
 
   const activeInjuries =
     useMemo(
@@ -746,9 +932,16 @@ export function SessionDetailPage() {
      * La page n'a donc plus à modifier elle-même
      * les valeurs par défaut.
      */
-    addSessionLog(
-      sessionLog,
-    );
+    savedSessionRef.current = true;
+    addSessionLog(sessionLog);
+
+    try {
+      window.localStorage.removeItem(
+        dailyDraftKey(currentSession.id)
+      );
+    } catch {
+      // La séance est déjà enregistrée dans l'historique.
+    }
 
     navigate(
       "/historique",
